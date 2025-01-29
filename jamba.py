@@ -1,34 +1,42 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
-import os
 
+# AI21 API Key
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
 
+# Mock Inventory Data
 INVENTORY = {
     "iPhone 15": 5,
     "MacBook Pro": 2,
     "iPad Air": 10
 }
 
+# Example Email
 email_text = 'Dear seller, I would like to order three iPhone 15s and two MacBook Pros. Thank you!'
 
+
 def extract_order_details(email_text):
+    """
+    Extracts structured order details from an email.
+    Returns a list of products and quantities.
+    """
     messages = [
         UserMessage(
             content=f"""
-    You are an AI assistant extracting order details from emails.
-    Extract and format in JSON:
-    
-    Email: "{email_text}"
-    
-    **JSON Output Format:**
-    {{
-        "orders": [
-            {{"product": "Product Name", "quantity": Number}}
-        ],
-    }}
-    """
+            You are an AI assistant extracting order details from an email.
+            Extract and return only in JSON format:
+
+            **Email:**
+            "{email_text}"
+
+            **Expected JSON Output:**
+            {{
+                "orders": [
+                    {{"product": "Product Name", "quantity": Number}}
+                ]
+            }}
+            """
         )
     ]
 
@@ -36,13 +44,13 @@ def extract_order_details(email_text):
         response = client.chat.completions.create(
             model="jamba-1.5-large",
             messages=messages,
-            top_p=1.0  # Keep it at 1 for more deterministic responses.
+            top_p=1.0  # Keep at 1 for a deterministic response
         )
 
         # Convert response to JSON
         result = response.model_dump()
 
-        # Extract JSON content safely
+        # Extract JSON content
         if "choices" in result and result["choices"]:
             content_str = result["choices"][0]["message"]["content"]
             extracted_orders = json.loads(content_str)  # Convert string to dictionary
@@ -58,9 +66,35 @@ def extract_order_details(email_text):
             return []
 
     except Exception as e:
-        print(f"Error in extracting order details: {e}")
+        print(f"Error extracting order details: {e}")
         return []
 
-data = extract_order_details(email_text)
 
-print(type(data))
+def check_availability(orders):
+    """
+    Checks whether the requested products are available in inventory.
+    Returns structured availability info.
+    """
+    availability = []
+
+    for order in orders:
+        product = order["product"]
+        requested_quantity = order["quantity"]
+        available_quantity = INVENTORY.get(product, 0)
+
+        availability.append({
+            "product": product,
+            "requested": requested_quantity,
+            "available": available_quantity
+        })
+
+    return {"availability": availability}
+
+
+# Run the functions
+order_details = extract_order_details(email_text)
+availability_info = check_availability(order_details)
+
+# Output results
+print("Extracted Order Details:", order_details)
+print("Availability Check:", availability_info)
