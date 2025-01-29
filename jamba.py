@@ -1,5 +1,7 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
+import json
+import os
 
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
 
@@ -30,11 +32,35 @@ def extract_order_details(email_text):
         )
     ]
 
-    response = client.chat.completions.create(
-        model="jamba-1.5-large",
-        messages=messages,
-        top_p=1.0 # Setting to 1 encourages different responses each call.
-    )
-    print(response.to_json())
+    try:
+        response = client.chat.completions.create(
+            model="jamba-1.5-large",
+            messages=messages,
+            top_p=1.0  # Keep it at 1 for more deterministic responses.
+        )
 
-extract_order_details(email_text)
+        # Convert response to JSON
+        result = response.model_dump()
+
+        # Extract JSON content safely
+        if "choices" in result and result["choices"]:
+            content_str = result["choices"][0]["message"]["content"]
+            extracted_orders = json.loads(content_str)  # Convert string to dictionary
+
+            # Validate extracted orders
+            if "orders" in extracted_orders:
+                return extracted_orders["orders"]
+            else:
+                print("Error: Unexpected response format.")
+                return []
+        else:
+            print("Error: No choices found in API response.")
+            return []
+
+    except Exception as e:
+        print(f"Error in extracting order details: {e}")
+        return []
+
+data = extract_order_details(email_text)
+
+print(type(data))
