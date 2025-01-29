@@ -1,0 +1,42 @@
+{
+  "Workflows": [
+    {
+      "Path": null,
+      "SortBy": 0,
+      "VariablesSectionElementsOrder": [],
+      "ArgumentsSectionElementsOrder": null,
+      "ConstantsSectionElementsOrder": [],
+      "AddedNamespaces": null
+    },
+    {
+      "Path": "Recieve Emails.xaml",
+      "SortBy": 0,
+      "VariablesSectionElementsOrder": [
+        "MailDate&Sequence_2",
+        "DT1&Sequence_2",
+        "From&Sequence_3",
+        "Subject&Sequence_3",
+        "Body&Sequence_3",
+        "eMails&Sequence_2"
+      ],
+      "ArgumentsSectionElementsOrder": [],
+      "ConstantsSectionElementsOrder": [],
+      "AddedNamespaces": null
+    },
+    {
+      "Path": "Extract Emails To Excel.xaml",
+      "SortBy": 0,
+      "VariablesSectionElementsOrder": [
+        "eMails&Sequence_2",
+        "MailDate&Sequence_2",
+        "DT1&Sequence_2",
+        "From&Sequence_3",
+        "Subject&Sequence_3",
+        "Body&Sequence_3"
+      ],
+      "ArgumentsSectionElementsOrder": [],
+      "ConstantsSectionElementsOrder": [],
+      "AddedNamespaces": null
+    }
+  ]
+}
