@@ -1,6 +1,7 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
+from configdb import inventory_collection
 
 # AI21 API Key
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
