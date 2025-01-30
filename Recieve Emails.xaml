@@ -148,7 +148,7 @@
                 <x:Boolean x:Key="IsExpanded">True</x:Boolean>
               </scg:Dictionary>
             </sap:WorkflowViewStateService.ViewState>
-            <uga:GetMailMessages ContinueOnError="{x:Null}" EmailId="{x:Null}" SearchExpression="{x:Null}" AuthScopesInvalid="False" DisplayName="Get Mail Messages" sap:VirtualizedContainerService.HintSize="484.8,138.4" sap2010:WorkflowViewState.IdRef="GetMailMessages_1" MarkAsRead="False" MaxResults="3" Result="[eMails]">
+            <uga:GetMailMessages ContinueOnError="{x:Null}" EmailId="{x:Null}" SearchExpression="{x:Null}" AuthScopesInvalid="False" DisplayName="Get Mail Messages" sap:VirtualizedContainerService.HintSize="484.8,138.4" sap2010:WorkflowViewState.IdRef="GetMailMessages_1" MarkAsRead="False" MaxResults="1" Result="[eMails]">
               <uga:GetMailMessages.Labels>
                 <scg:List x:TypeArguments="InArgument(x:String)" Capacity="0" />
               </uga:GetMailMessages.Labels>
