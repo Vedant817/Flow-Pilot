@@ -6,8 +6,8 @@ import subprocess
 import json
 
 # Define the file path and the directory to watch
-excel_file_path = r'D:\Deloitte\Prototype\Sample.xlsx'  # Replace with your file path
-directory_to_watch = r'D:\Deloitte\Prototype'  # Replace with the directory of the file
+excel_file_path = r'D:\Deloitte\Prototype\python\Sample.xlsx'  # Replace with your file path
+directory_to_watch = r'D:\Deloitte\Prototype\python'  # Replace with the directory of the file
 
 # Store previous content for comparison
 previous_content = {}
@@ -56,7 +56,7 @@ def handle_modified_file():
             json.dump(changes, f)
         
         # Call the second Python script using subprocess
-        subprocess.run([r'D:\Deloitte\Prototype\venv\Scripts\python.exe', 'jamba.py'])
+        subprocess.run([r'D:\Deloitte\Prototype\python\venv\Scripts\python.exe', 'jamba.py'])
 
     else:
         print("No changes detected.")
