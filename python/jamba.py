@@ -2,6 +2,15 @@ from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
 from configdb import inventory_collection, order_collection
+from smtp import send_email
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+
+sender_email = os.getenv("SENDER_EMAIL")
+sender_password = os.getenv("EMAIL_PASSWORD")
+recipient_email = os.getenv("RECEIVER_EMAIL")
 
 # AI21 API Key
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
@@ -98,6 +107,8 @@ fulfilled_orders, unavailable_items = check_availability(order_details)
 if fulfilled_orders:
     order_collection.insert_many(fulfilled_orders)
     print("Order placed successfully! Acknowledgment sent.")
+    send_email("Order Acknowledgment", "Your order has been placed successfully!", sender_email, sender_password, recipient_email)
 
 if unavailable_items:
     print("Missing inventory for the following items:", unavailable_items)
+    send_email("Order Error", f"Error processing order: {unavailable_items}", sender_email, sender_password, recipient_email)

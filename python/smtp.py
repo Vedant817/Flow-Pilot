@@ -30,4 +30,4 @@ recipient_email = os.getenv("RECEIVER_EMAIL")
 subject = "Test Email from Python"
 body = "This is a test email sent using Python and Gmail SMTP."
 
-send_email(subject, body, sender_email, sender_password, recipient_email)
+# send_email(subject, body, sender_email, sender_password, recipient_email)
