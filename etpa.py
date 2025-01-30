@@ -2,6 +2,8 @@ import time
 import openpyxl
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import subprocess
+import json
 
 # Define the file path and the directory to watch
 excel_file_path = r'D:\Deloitte\Prototype\Sample.xlsx'  # Replace with your file path
@@ -39,7 +41,7 @@ def compare_changes(new_content):
     
     return changes
 
-# Function to handle modified part of the file
+# Function to handle modified part of the file and trigger the second script
 def handle_modified_file():
     new_content = read_excel_file()
     changes = compare_changes(new_content)
@@ -48,6 +50,14 @@ def handle_modified_file():
         print(f"Detected changes in the file:")
         for cell, new_value in changes.items():
             print(f"Cell {cell} changed to {new_value}")
+        
+        # Save the changes as JSON to pass to the second script
+        with open('changes.json', 'w') as f:
+            json.dump(changes, f)
+        
+        # Call the second Python script using subprocess
+        subprocess.run([r'D:\Deloitte\Prototype\venv\Scripts\python.exe', 'jamba.py'])
+
     else:
         print("No changes detected.")
 

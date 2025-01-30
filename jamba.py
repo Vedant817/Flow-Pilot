@@ -12,8 +12,15 @@ INVENTORY = {
     "iPad Air": 10
 }
 
+with open('changes.json', 'r') as f:
+    changes = json.load(f)
+
+email_text = ''
+for new_value in changes.values():
+    email_text = new_value
+
 # Example Email
-email_text = 'Dear seller, I would like to order three iPhone 15s and two MacBook Pros. Thank you!'
+# email_text = 'Dear seller, I would like to order three iPhone 15s and two MacBook Pros. Thank you!'
 
 
 def extract_order_details(email_text):
@@ -96,5 +103,6 @@ order_details = extract_order_details(email_text)
 availability_info = check_availability(order_details)
 
 # Output results
-print("Extracted Order Details:", order_details)
+# print(email_text)
+# print("Extracted Order Details:", order_details)
 print("Availability Check:", availability_info)
