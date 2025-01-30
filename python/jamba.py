@@ -6,6 +6,7 @@ from smtp import send_email
 import os
 from dotenv import load_dotenv
 load_dotenv()
+from inv import generate_invoice
 
 
 sender_email = os.getenv("SENDER_EMAIL")
@@ -107,7 +108,8 @@ fulfilled_orders, unavailable_items = check_availability(order_details)
 if fulfilled_orders:
     order_collection.insert_many(fulfilled_orders)
     print("Order placed successfully! Acknowledgment sent.")
-    send_email("Order Acknowledgment", "Your order has been placed successfully!", sender_email, sender_password, recipient_email)
+    invoice_path = generate_invoice(fulfilled_orders, recipient_email)
+    send_email("Order Acknowledgment","Your order has been placed successfully! Please find your invoice attached.", sender_email, sender_password, recipient_email,attachment_path=invoice_path)
 
 if unavailable_items:
     print("Missing inventory for the following items:", unavailable_items)
