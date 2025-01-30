@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useMemo } from "react"
 import { LayoutGrid, Share2, Settings } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -53,7 +52,6 @@ export function DataTable() {
     direction: SortDirection
   }>({ field: "name", direction: "asc" })
 
-  // Filter and sort contacts
   const filteredAndSortedContacts = useMemo(() => {
     return contacts
       .filter((contact) => {
@@ -84,7 +82,7 @@ export function DataTable() {
   }
 
   return (
-    <div className="space-y-4 w-full">
+    <div className="space-y-4 w-full px-4 py-2">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Business angels list</h1>
         <div className="flex items-center gap-2">
