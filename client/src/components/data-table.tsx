@@ -5,61 +5,91 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { NewContactDialog } from "./new-contact-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-type Status = "To contact" | "To followup" | "Negotiation" | "Complete"
 type View = "Table view" | "Board view"
-type SortField = "name" | "email" | "company" | "jobTitle" | "status"
+type SortField = "name" | "email" | "nameOfOrg" | "orderNo" | "orderName"
 type SortDirection = "asc" | "desc"
 
-interface Contact {
+interface Person {
+  id: string
   name: string
   email: string
-  company: string
-  companyLogo: string
-  jobTitle: string
-  status: Status
+  nameOfOrg: string
+  avatar: string
 }
 
-const initialContacts: Contact[] = [
+interface Order {
+  serialNo: number
+  orderNo: string
+  orderId: string
+  orderName: string
+  email: string
+  nameOfOrg: string
+  itemList: { itemId: string; quantity: number }[]
+}
+
+const initialPersons: Person[] = [
   {
-    name: "Jerome Bell",
-    email: "jerome.bell@loom.com",
-    company: "Loom",
-    companyLogo: "/placeholder.svg?height=32&width=32",
-    jobTitle: "Founder",
-    status: "To contact",
+    id: "1",
+    name: "John Doe",
+    email: "john@example.com",
+    nameOfOrg: "Org A",
+    avatar: "/placeholder-user.jpg",
   },
   {
-    name: "Albert Flores",
-    email: "albert.flores@notion.com",
-    company: "Notion",
-    companyLogo: "/placeholder.svg?height=32&width=32",
-    jobTitle: "President of Sales",
-    status: "To followup",
+    id: "2",
+    name: "Jane Smith",
+    email: "jane@example.com",
+    nameOfOrg: "Org B",
+    avatar: "/placeholder-user.jpg",
   },
-  // Add more contacts as needed
+  // Add more persons as needed
+]
+
+const initialOrders: Order[] = [
+  {
+    serialNo: 1,
+    orderNo: "ORD001",
+    orderId: "ID001",
+    orderName: "First Order",
+    email: "john@example.com",
+    nameOfOrg: "Org A",
+    itemList: [
+      { itemId: "ITEM1", quantity: 2 },
+      { itemId: "ITEM2", quantity: 1 },
+    ],
+  },
+  {
+    serialNo: 2,
+    orderNo: "ORD002",
+    orderId: "ID002",
+    orderName: "Second Order",
+    email: "jane@example.com",
+    nameOfOrg: "Org B",
+    itemList: [{ itemId: "ITEM3", quantity: 3 }],
+  },
 ]
 
 export function DataTable() {
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts)
+  const [persons, setPersons] = useState<Person[]>(initialPersons)
+  const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [selectedView, setSelectedView] = useState<View>("Table view")
   const [filterText, setFilterText] = useState("")
-  const [filterStatus, setFilterStatus] = useState<Status | "All">("All")
   const [sortConfig, setSortConfig] = useState<{
     field: SortField
     direction: SortDirection
   }>({ field: "name", direction: "asc" })
+  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
-  const filteredAndSortedContacts = useMemo(() => {
-    return contacts
-      .filter((contact) => {
-        const matchesText =
+  const filteredAndSortedPersons = useMemo(() => {
+    return persons
+      .filter((person) => {
+        return (
           filterText === "" ||
-          Object.values(contact).some((value) => value.toString().toLowerCase().includes(filterText.toLowerCase()))
-        const matchesStatus = filterStatus === "All" || contact.status === filterStatus
-        return matchesText && matchesStatus
+          Object.values(person).some((value) => value.toString().toLowerCase().includes(filterText.toLowerCase()))
+        )
       })
       .sort((a, b) => {
         const aValue = a[sortConfig.field]
@@ -68,7 +98,7 @@ export function DataTable() {
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1
         return 0
       })
-  }, [contacts, filterText, filterStatus, sortConfig])
+  }, [persons, filterText, sortConfig])
 
   const handleSort = (field: SortField) => {
     setSortConfig({
@@ -77,21 +107,25 @@ export function DataTable() {
     })
   }
 
-  const handleNewContact = (data: Contact) => {
-    setContacts([...contacts, { ...data, companyLogo: "/placeholder.svg?height=32&width=32" }])
+  const handlePersonClick = (person: Person) => {
+    setSelectedPerson(person)
+  }
+
+  const handleOrderClick = (order: Order) => {
+    setSelectedOrder(order)
   }
 
   return (
     <div className="space-y-4 w-full px-4 py-2">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Business angels list</h1>
+        <h1 className="text-xl font-semibold">Person List</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Share2 className="mr-2 h-4 w-4" />
             Share
           </Button>
           <Button variant="outline" size="sm">
-            Invite members
+            Export Data
           </Button>
         </div>
       </div>
@@ -109,36 +143,18 @@ export function DataTable() {
               <DropdownMenuItem onClick={() => setSelectedView("Board view")}>Board view</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Filter contacts..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              className="h-9 w-[200px]"
-            />
-            <Select value={filterStatus} onValueChange={(value: Status | "All") => setFilterStatus(value)}>
-              <SelectTrigger className="h-9 w-[150px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Status</SelectItem>
-                <SelectItem value="To contact">To contact</SelectItem>
-                <SelectItem value="To followup">To followup</SelectItem>
-                <SelectItem value="Negotiation">Negotiation</SelectItem>
-                <SelectItem value="Complete">Complete</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Input
+            placeholder="Filter persons..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="h-9 w-[200px]"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </Button>
-          <Button variant="outline" size="sm">
-            Import/Export
-          </Button>
-          <NewContactDialog onSave={handleNewContact} />
         </div>
       </div>
       {selectedView === "Table view" ? (
@@ -150,57 +166,40 @@ export function DataTable() {
                   className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
                   onClick={() => handleSort("name")}
                 >
-                  Person name {sortConfig.field === "name" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  Name {sortConfig.field === "name" && (sortConfig.direction === "asc" ? "↑" : "↓")}
                 </th>
                 <th
                   className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
                   onClick={() => handleSort("email")}
                 >
-                  Emails {sortConfig.field === "email" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  Email {sortConfig.field === "email" && (sortConfig.direction === "asc" ? "↑" : "↓")}
                 </th>
                 <th
                   className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("company")}
+                  onClick={() => handleSort("nameOfOrg")}
                 >
-                  Companies {sortConfig.field === "company" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("jobTitle")}
-                >
-                  Job title {sortConfig.field === "jobTitle" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("status")}
-                >
-                  Status {sortConfig.field === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  Organization {sortConfig.field === "nameOfOrg" && (sortConfig.direction === "asc" ? "↑" : "↓")}
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filteredAndSortedContacts.map((contact) => (
-                <tr key={contact.email} className="border-b">
+              {filteredAndSortedPersons.map((person) => (
+                <tr
+                  key={person.id}
+                  className="border-b hover:bg-muted/50 cursor-pointer"
+                  onClick={() => handlePersonClick(person)}
+                >
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src="/placeholder-user.jpg" />
-                        <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={person.avatar} />
+                        <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      {contact.name}
+                      {person.name}
                     </div>
                   </td>
-                  <td className="p-4 text-muted-foreground">{contact.email}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <img src={contact.companyLogo || "/placeholder.svg"} alt={contact.company} className="h-5 w-5" />
-                      {contact.company}
-                    </div>
-                  </td>
-                  <td className="p-4">{contact.jobTitle}</td>
-                  <td className="p-4">
-                    <StatusBadge status={contact.status} />
-                  </td>
+                  <td className="p-4">{person.email}</td>
+                  <td className="p-4">{person.nameOfOrg}</td>
                 </tr>
               ))}
             </tbody>
@@ -208,42 +207,132 @@ export function DataTable() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedContacts.map((contact) => (
-            <div key={contact.email} className="rounded-lg border p-4">
-              <div className="flex items-center gap-3 mb-4">
+          {filteredAndSortedPersons.map((person) => (
+            <div
+              key={person.id}
+              className="rounded-lg border p-4 hover:bg-muted/50 cursor-pointer"
+              onClick={() => handlePersonClick(person)}
+            >
+              <div className="flex items-center gap-3 mb-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder-user.jpg" />
-                  <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={person.avatar} />
+                  <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="font-semibold">{contact.name}</h3>
-                  <p className="text-sm text-muted-foreground">{contact.email}</p>
-                </div>
+                <h3 className="font-semibold">{person.name}</h3>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <img src={contact.companyLogo || "/placeholder.svg"} alt={contact.company} className="h-5 w-5" />
-                  <span>{contact.company}</span>
-                </div>
-                <p>{contact.jobTitle}</p>
-                <StatusBadge status={contact.status} />
-              </div>
+              <p className="text-sm">{person.email}</p>
+              <p className="text-sm text-muted-foreground">{person.nameOfOrg}</p>
             </div>
           ))}
         </div>
       )}
+      <PersonOrdersDialog
+        person={selectedPerson}
+        orders={orders.filter((order) => order.email === selectedPerson?.email)}
+        onClose={() => setSelectedPerson(null)}
+        onOrderClick={handleOrderClick}
+      />
+      <OrderDetailsDialog order={selectedOrder} onClose={() => setSelectedOrder(null)} />
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  const colors = {
-    "To contact": "text-orange-600",
-    "To followup": "text-blue-600",
-    Negotiation: "text-pink-600",
-    Complete: "text-green-600",
-  }
-
-  return <span className={colors[status]}>{status}</span>
+interface PersonOrdersDialogProps {
+  person: Person | null
+  orders: Order[]
+  onClose: () => void
+  onOrderClick: (order: Order) => void
 }
 
+function PersonOrdersDialog({ person, orders, onClose, onOrderClick }: PersonOrdersDialogProps) {
+  if (!person) return null
+
+  return (
+    <Dialog open={!!person} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{person.name}'s Orders</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <p>
+            <strong>Email:</strong> {person.email}
+          </p>
+          <p>
+            <strong>Organization:</strong> {person.nameOfOrg}
+          </p>
+          <h4 className="font-semibold mt-4">Orders:</h4>
+          {orders.length > 0 ? (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">Order No</th>
+                  <th className="p-2 text-left">Order Name</th>
+                  <th className="p-2 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.orderId} className="border-b">
+                    <td className="p-2">{order.orderNo}</td>
+                    <td className="p-2">{order.orderName}</td>
+                    <td className="p-2">
+                      <Button variant="outline" size="sm" onClick={() => onOrderClick(order)}>
+                        View Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>No orders found for this person.</p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface OrderDetailsDialogProps {
+  order: Order | null
+  onClose: () => void
+}
+
+function OrderDetailsDialog({ order, onClose }: OrderDetailsDialogProps) {
+  if (!order) return null
+
+  return (
+    <Dialog open={!!order} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Order Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <p>
+            <strong>Order No:</strong> {order.orderNo}
+          </p>
+          <p>
+            <strong>Order ID:</strong> {order.orderId}
+          </p>
+          <p>
+            <strong>Order Name:</strong> {order.orderName}
+          </p>
+          <p>
+            <strong>Email:</strong> {order.email}
+          </p>
+          <p>
+            <strong>Organization:</strong> {order.nameOfOrg}
+          </p>
+          <h4 className="font-semibold mt-4">Items:</h4>
+          <ul>
+            {order.itemList.map((item, index) => (
+              <li key={index}>
+                Item ID: {item.itemId}, Quantity: {item.quantity}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
