@@ -1,20 +1,20 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
+from configdb import inventory_collection, order_collection
 
 # AI21 API Key
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
 
-# Mock Inventory Data
-INVENTORY = {
-    "iPhone 15": 5,
-    "MacBook Pro": 2,
-    "iPad Air": 10
-}
+with open('changes.json', 'r') as f:
+    changes = json.load(f)
+
+email_text = ''
+for new_value in changes.values():
+    email_text = new_value
 
 # Example Email
-email_text = 'Dear seller, I would like to order three iPhone 15s and two MacBook Pros. Thank you!'
-
+# email_text = 'Dear seller, I would like to order three iPhone 15s and two MacBook Pros. Thank you!'
 
 def extract_order_details(email_text):
     """
@@ -47,54 +47,57 @@ def extract_order_details(email_text):
             top_p=1.0  # Keep at 1 for a deterministic response
         )
 
-        # Convert response to JSON
         result = response.model_dump()
-
-        # Extract JSON content
+        
         if "choices" in result and result["choices"]:
             content_str = result["choices"][0]["message"]["content"]
             extracted_orders = json.loads(content_str)  # Convert string to dictionary
 
-            # Validate extracted orders
-            if "orders" in extracted_orders:
-                return extracted_orders["orders"]
-            else:
-                print("Error: Unexpected response format.")
-                return []
+            return extracted_orders.get("orders", [])
         else:
             print("Error: No choices found in API response.")
             return []
-
     except Exception as e:
         print(f"Error extracting order details: {e}")
         return []
-
 
 def check_availability(orders):
     """
     Checks whether the requested products are available in inventory.
     Returns structured availability info.
     """
-    availability = []
+    unavailable_items = []
+    fulfilled_orders = []
 
     for order in orders:
         product = order["product"]
         requested_quantity = order["quantity"]
-        available_quantity = INVENTORY.get(product, 0)
 
-        availability.append({
-            "product": product,
-            "requested": requested_quantity,
-            "available": available_quantity
-        })
+        product_data = inventory_collection.find_one({"product": product})
+        available_quantity = product_data["quantity"] if product_data else 0
 
-    return {"availability": availability}
-
+        if available_quantity >= requested_quantity:
+            fulfilled_orders.append(order)
+            inventory_collection.update_one(
+                {"product": product},
+                {"$inc": {"quantity": -requested_quantity}}
+            )
+        else:
+            unavailable_items.append({
+                "product": product,
+                "requested": requested_quantity,
+                "available": available_quantity
+            })
+    
+    return fulfilled_orders, unavailable_items
 
 # Run the functions
 order_details = extract_order_details(email_text)
-availability_info = check_availability(order_details)
+fulfilled_orders, unavailable_items = check_availability(order_details)
 
-# Output results
-print("Extracted Order Details:", order_details)
-print("Availability Check:", availability_info)
+if fulfilled_orders:
+    order_collection.insert_many(fulfilled_orders)
+    print("Order placed successfully! Acknowledgment sent.")
+
+if unavailable_items:
+    print("Missing inventory for the following items:", unavailable_items)

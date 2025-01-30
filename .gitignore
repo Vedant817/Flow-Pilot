@@ -1,3 +1,11 @@
 /venv
 /ram.py
 /.env
+/test.py
+/Process.txt
+/credentials.json
+/Sample.xlsx
+/changes.json
+/Order.xlsx
+/etp.py
+/dummyinv.py
