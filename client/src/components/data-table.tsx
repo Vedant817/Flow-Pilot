@@ -1,94 +1,76 @@
 "use client"
 import { useState, useMemo } from "react"
 import { LayoutGrid, Share2, Settings } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type View = "Table view" | "Board view"
-type SortField = "name" | "email" | "nameOfOrg" | "orderNo" | "orderName"
+type SortField = "orderId" | "customerName" | "status" | "orderDate" | "deadlineDate"
 type SortDirection = "asc" | "desc"
-
-interface Person {
-  id: string
-  name: string
-  email: string
-  nameOfOrg: string
-  avatar: string
-}
 
 interface Order {
   serialNo: number
-  orderNo: string
   orderId: string
-  orderName: string
+  customerName: string
+  status: "Pending" | "Processing" | "Shipped" | "Delivered" | "Cancelled"
+  orderDate: string
+  deadlineDate: string
   email: string
-  nameOfOrg: string
-  itemList: { itemId: string; quantity: number }[]
+  items: {
+    itemId: string
+    name: string
+    quantity: number
+    specification: string
+    status: "Filled" | "Cancelled" | "Pending"
+  }[]
 }
-
-const initialPersons: Person[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john@example.com",
-    nameOfOrg: "Org A",
-    avatar: "/placeholder-user.jpg",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    nameOfOrg: "Org B",
-    avatar: "/placeholder-user.jpg",
-  },
-  // Add more persons as needed
-]
 
 const initialOrders: Order[] = [
   {
     serialNo: 1,
-    orderNo: "ORD001",
-    orderId: "ID001",
-    orderName: "First Order",
+    orderId: "ORD001",
+    customerName: "John Doe",
+    status: "Processing",
+    orderDate: "2024-03-08",
+    deadlineDate: "2024-03-15",
     email: "john@example.com",
-    nameOfOrg: "Org A",
-    itemList: [
-      { itemId: "ITEM1", quantity: 2 },
-      { itemId: "ITEM2", quantity: 1 },
+    items: [
+      { itemId: "ITEM1", name: "Product A", quantity: 2, specification: "Model X", status: "Filled" },
+      { itemId: "ITEM2", name: "Product B", quantity: 1, specification: "Model Y", status: "Pending" },
     ],
   },
   {
     serialNo: 2,
-    orderNo: "ORD002",
-    orderId: "ID002",
-    orderName: "Second Order",
+    orderId: "ORD002",
+    customerName: "Jane Smith",
+    status: "Pending",
+    orderDate: "2024-03-10",
+    deadlineDate: "2024-03-20",
     email: "jane@example.com",
-    nameOfOrg: "Org B",
-    itemList: [{ itemId: "ITEM3", quantity: 3 }],
+    items: [{ itemId: "ITEM3", name: "Product C", quantity: 3, specification: "Model Z", status: "Filled" }],
   },
+  // Add more sample orders as needed
 ]
 
 export function DataTable() {
-  const [persons, setPersons] = useState<Person[]>(initialPersons)
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [selectedView, setSelectedView] = useState<View>("Table view")
   const [filterText, setFilterText] = useState("")
   const [sortConfig, setSortConfig] = useState<{
     field: SortField
     direction: SortDirection
-  }>({ field: "name", direction: "asc" })
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
+  }>({ field: "orderId", direction: "asc" })
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
-  const filteredAndSortedPersons = useMemo(() => {
-    return persons
-      .filter((person) => {
+  const filteredAndSortedOrders = useMemo(() => {
+    return orders
+      .filter((order) => {
         return (
           filterText === "" ||
-          Object.values(person).some((value) => value.toString().toLowerCase().includes(filterText.toLowerCase()))
+          Object.values(order).some((value) => value.toString().toLowerCase().includes(filterText.toLowerCase()))
         )
       })
       .sort((a, b) => {
@@ -98,7 +80,7 @@ export function DataTable() {
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1
         return 0
       })
-  }, [persons, filterText, sortConfig])
+  }, [orders, filterText, sortConfig])
 
   const handleSort = (field: SortField) => {
     setSortConfig({
@@ -107,18 +89,18 @@ export function DataTable() {
     })
   }
 
-  const handlePersonClick = (person: Person) => {
-    setSelectedPerson(person)
-  }
-
   const handleOrderClick = (order: Order) => {
     setSelectedOrder(order)
+  }
+
+  const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
+    setOrders(orders.map((order) => (order.orderId === orderId ? { ...order, status: newStatus } : order)))
   }
 
   return (
     <div className="space-y-4 w-full px-4 py-2">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Person List</h1>
+        <h1 className="text-xl font-semibold">Order List</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Share2 className="mr-2 h-4 w-4" />
@@ -144,7 +126,7 @@ export function DataTable() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Input
-            placeholder="Filter persons..."
+            placeholder="Filter orders..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="h-9 w-[200px]"
@@ -157,139 +139,79 @@ export function DataTable() {
           </Button>
         </div>
       </div>
-      {selectedView === "Table view" ? (
-        <div className="rounded-lg border">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("name")}
-                >
-                  Name {sortConfig.field === "name" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("email")}
-                >
-                  Email {sortConfig.field === "email" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("nameOfOrg")}
-                >
-                  Organization {sortConfig.field === "nameOfOrg" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
+      <div className="rounded-lg border overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-muted/50">
+              <th className="p-4 text-left font-medium">S.No.</th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("orderId")}
+              >
+                Order ID {sortConfig.field === "orderId" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("customerName")}
+              >
+                Customer Name {sortConfig.field === "customerName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("status")}
+              >
+                Status {sortConfig.field === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("orderDate")}
+              >
+                Order Date {sortConfig.field === "orderDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("deadlineDate")}
+              >
+                Deadline Date {sortConfig.field === "deadlineDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAndSortedOrders.map((order) => (
+              <tr
+                key={order.orderId}
+                className="border-b hover:bg-muted/50 cursor-pointer"
+                onClick={() => handleOrderClick(order)}
+              >
+                <td className="p-4">{order.serialNo}</td>
+                <td className="p-4">{order.orderId}</td>
+                <td className="p-4">{order.customerName}</td>
+                <td className="p-4">
+                  <Select
+                    value={order.status}
+                    onValueChange={(value) => handleStatusChange(order.orderId, value as Order["status"])}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Processing">Processing</SelectItem>
+                      <SelectItem value="Shipped">Shipped</SelectItem>
+                      <SelectItem value="Delivered">Delivered</SelectItem>
+                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="p-4">{order.orderDate}</td>
+                <td className="p-4">{order.deadlineDate}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedPersons.map((person) => (
-                <tr
-                  key={person.id}
-                  className="border-b hover:bg-muted/50 cursor-pointer"
-                  onClick={() => handlePersonClick(person)}
-                >
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={person.avatar} />
-                        <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      {person.name}
-                    </div>
-                  </td>
-                  <td className="p-4">{person.email}</td>
-                  <td className="p-4">{person.nameOfOrg}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedPersons.map((person) => (
-            <div
-              key={person.id}
-              className="rounded-lg border p-4 hover:bg-muted/50 cursor-pointer"
-              onClick={() => handlePersonClick(person)}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={person.avatar} />
-                  <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <h3 className="font-semibold">{person.name}</h3>
-              </div>
-              <p className="text-sm">{person.email}</p>
-              <p className="text-sm text-muted-foreground">{person.nameOfOrg}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      <PersonOrdersDialog
-        person={selectedPerson}
-        orders={orders.filter((order) => order.email === selectedPerson?.email)}
-        onClose={() => setSelectedPerson(null)}
-        onOrderClick={handleOrderClick}
-      />
+            ))}
+          </tbody>
+        </table>
+      </div>
       <OrderDetailsDialog order={selectedOrder} onClose={() => setSelectedOrder(null)} />
     </div>
-  )
-}
-
-interface PersonOrdersDialogProps {
-  person: Person | null
-  orders: Order[]
-  onClose: () => void
-  onOrderClick: (order: Order) => void
-}
-
-function PersonOrdersDialog({ person, orders, onClose, onOrderClick }: PersonOrdersDialogProps) {
-  if (!person) return null
-
-  return (
-    <Dialog open={!!person} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{person.name}'s Orders</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2">
-          <p>
-            <strong>Email:</strong> {person.email}
-          </p>
-          <p>
-            <strong>Organization:</strong> {person.nameOfOrg}
-          </p>
-          <h4 className="font-semibold mt-4">Orders:</h4>
-          {orders.length > 0 ? (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-2 text-left">Order No</th>
-                  <th className="p-2 text-left">Order Name</th>
-                  <th className="p-2 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.orderId} className="border-b">
-                    <td className="p-2">{order.orderNo}</td>
-                    <td className="p-2">{order.orderName}</td>
-                    <td className="p-2">
-                      <Button variant="outline" size="sm" onClick={() => onOrderClick(order)}>
-                        View Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p>No orders found for this person.</p>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -303,34 +225,56 @@ function OrderDetailsDialog({ order, onClose }: OrderDetailsDialogProps) {
 
   return (
     <Dialog open={!!order} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Order Details</DialogTitle>
         </DialogHeader>
-        <div className="space-y-2">
-          <p>
-            <strong>Order No:</strong> {order.orderNo}
-          </p>
-          <p>
-            <strong>Order ID:</strong> {order.orderId}
-          </p>
-          <p>
-            <strong>Order Name:</strong> {order.orderName}
-          </p>
-          <p>
-            <strong>Email:</strong> {order.email}
-          </p>
-          <p>
-            <strong>Organization:</strong> {order.nameOfOrg}
-          </p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <p>
+              <strong>Customer Name:</strong> {order.customerName}
+            </p>
+            <p>
+              <strong>Order ID:</strong> {order.orderId}
+            </p>
+            <p>
+              <strong>Email:</strong> {order.email}
+            </p>
+            <p>
+              <strong>Order Date:</strong> {order.orderDate}
+            </p>
+            <p>
+              <strong>Deadline Date:</strong> {order.deadlineDate}
+            </p>
+            <p>
+              <strong>Status:</strong> {order.status}
+            </p>
+          </div>
           <h4 className="font-semibold mt-4">Items:</h4>
-          <ul>
-            {order.itemList.map((item, index) => (
-              <li key={index}>
-                Item ID: {item.itemId}, Quantity: {item.quantity}
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-lg border overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="p-2 text-left">S.No.</th>
+                  <th className="p-2 text-left">Item Name</th>
+                  <th className="p-2 text-left">Quantity</th>
+                  <th className="p-2 text-left">Specification</th>
+                  <th className="p-2 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.items.map((item, index) => (
+                  <tr key={item.itemId} className="border-b">
+                    <td className="p-2">{index + 1}</td>
+                    <td className="p-2">{item.name}</td>
+                    <td className="p-2">{item.quantity}</td>
+                    <td className="p-2">{item.specification}</td>
+                    <td className="p-2">{item.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
