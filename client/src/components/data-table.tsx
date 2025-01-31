@@ -1,65 +1,77 @@
 "use client"
 import { useState, useMemo } from "react"
 import { LayoutGrid, Share2, Settings } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { NewContactDialog } from "./new-contact-dialog"
 
-type Status = "To contact" | "To followup" | "Negotiation" | "Complete"
 type View = "Table view" | "Board view"
-type SortField = "name" | "email" | "company" | "jobTitle" | "status"
+type SortField = "orderId" | "customerName" | "status" | "orderDate" | "deadlineDate"
 type SortDirection = "asc" | "desc"
 
-interface Contact {
-  name: string
+interface Order {
+  serialNo: number
+  orderId: string
+  customerName: string
+  status: "Pending" | "Processing" | "Shipped" | "Delivered" | "Cancelled"
+  orderDate: string
+  deadlineDate: string
   email: string
-  company: string
-  companyLogo: string
-  jobTitle: string
-  status: Status
+  items: {
+    itemId: string
+    name: string
+    quantity: number
+    specification: string
+    status: "Filled" | "Cancelled" | "Pending"
+  }[]
 }
 
-const initialContacts: Contact[] = [
+const initialOrders: Order[] = [
   {
-    name: "Jerome Bell",
-    email: "jerome.bell@loom.com",
-    company: "Loom",
-    companyLogo: "/placeholder.svg?height=32&width=32",
-    jobTitle: "Founder",
-    status: "To contact",
+    serialNo: 1,
+    orderId: "ORD001",
+    customerName: "John Doe",
+    status: "Processing",
+    orderDate: "2024-03-08",
+    deadlineDate: "2024-03-15",
+    email: "john@example.com",
+    items: [
+      { itemId: "ITEM1", name: "Product A", quantity: 2, specification: "Model X", status: "Filled" },
+      { itemId: "ITEM2", name: "Product B", quantity: 1, specification: "Model Y", status: "Pending" },
+    ],
   },
   {
-    name: "Albert Flores",
-    email: "albert.flores@notion.com",
-    company: "Notion",
-    companyLogo: "/placeholder.svg?height=32&width=32",
-    jobTitle: "President of Sales",
-    status: "To followup",
+    serialNo: 2,
+    orderId: "ORD002",
+    customerName: "Jane Smith",
+    status: "Pending",
+    orderDate: "2024-03-10",
+    deadlineDate: "2024-03-20",
+    email: "jane@example.com",
+    items: [{ itemId: "ITEM3", name: "Product C", quantity: 3, specification: "Model Z", status: "Filled" }],
   },
-  // Add more contacts as needed
+  // Add more sample orders as needed
 ]
 
 export function DataTable() {
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts)
+  const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [selectedView, setSelectedView] = useState<View>("Table view")
   const [filterText, setFilterText] = useState("")
-  const [filterStatus, setFilterStatus] = useState<Status | "All">("All")
   const [sortConfig, setSortConfig] = useState<{
     field: SortField
     direction: SortDirection
-  }>({ field: "name", direction: "asc" })
+  }>({ field: "orderId", direction: "asc" })
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
-  const filteredAndSortedContacts = useMemo(() => {
-    return contacts
-      .filter((contact) => {
-        const matchesText =
+  const filteredAndSortedOrders = useMemo(() => {
+    return orders
+      .filter((order) => {
+        return (
           filterText === "" ||
-          Object.values(contact).some((value) => value.toString().toLowerCase().includes(filterText.toLowerCase()))
-        const matchesStatus = filterStatus === "All" || contact.status === filterStatus
-        return matchesText && matchesStatus
+          Object.values(order).some((value) => value.toString().toLowerCase().includes(filterText.toLowerCase()))
+        )
       })
       .sort((a, b) => {
         const aValue = a[sortConfig.field]
@@ -68,7 +80,7 @@ export function DataTable() {
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1
         return 0
       })
-  }, [contacts, filterText, filterStatus, sortConfig])
+  }, [orders, filterText, sortConfig])
 
   const handleSort = (field: SortField) => {
     setSortConfig({
@@ -77,21 +89,25 @@ export function DataTable() {
     })
   }
 
-  const handleNewContact = (data: Contact) => {
-    setContacts([...contacts, { ...data, companyLogo: "/placeholder.svg?height=32&width=32" }])
+  const handleOrderClick = (order: Order) => {
+    setSelectedOrder(order)
+  }
+
+  const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
+    setOrders(orders.map((order) => (order.orderId === orderId ? { ...order, status: newStatus } : order)))
   }
 
   return (
     <div className="space-y-4 w-full px-4 py-2">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Business angels list</h1>
+        <h1 className="text-xl font-semibold">Order List</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Share2 className="mr-2 h-4 w-4" />
             Share
           </Button>
           <Button variant="outline" size="sm">
-            Invite members
+            Export Data
           </Button>
         </div>
       </div>
@@ -109,141 +125,158 @@ export function DataTable() {
               <DropdownMenuItem onClick={() => setSelectedView("Board view")}>Board view</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Filter contacts..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              className="h-9 w-[200px]"
-            />
-            <Select value={filterStatus} onValueChange={(value: Status | "All") => setFilterStatus(value)}>
-              <SelectTrigger className="h-9 w-[150px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Status</SelectItem>
-                <SelectItem value="To contact">To contact</SelectItem>
-                <SelectItem value="To followup">To followup</SelectItem>
-                <SelectItem value="Negotiation">Negotiation</SelectItem>
-                <SelectItem value="Complete">Complete</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Input
+            placeholder="Filter orders..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="h-9 w-[200px]"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </Button>
-          <Button variant="outline" size="sm">
-            Import/Export
-          </Button>
-          <NewContactDialog onSave={handleNewContact} />
         </div>
       </div>
-      {selectedView === "Table view" ? (
-        <div className="rounded-lg border">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("name")}
-                >
-                  Person name {sortConfig.field === "name" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("email")}
-                >
-                  Emails {sortConfig.field === "email" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("company")}
-                >
-                  Companies {sortConfig.field === "company" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("jobTitle")}
-                >
-                  Job title {sortConfig.field === "jobTitle" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                  onClick={() => handleSort("status")}
-                >
-                  Status {sortConfig.field === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-                </th>
+      <div className="rounded-lg border overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-muted/50">
+              <th className="p-4 text-left font-medium">S.No.</th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("orderId")}
+              >
+                Order ID {sortConfig.field === "orderId" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("customerName")}
+              >
+                Customer Name {sortConfig.field === "customerName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("status")}
+              >
+                Status {sortConfig.field === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("orderDate")}
+              >
+                Order Date {sortConfig.field === "orderDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+              <th
+                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                onClick={() => handleSort("deadlineDate")}
+              >
+                Deadline Date {sortConfig.field === "deadlineDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAndSortedOrders.map((order) => (
+              <tr
+                key={order.orderId}
+                className="border-b hover:bg-muted/50 cursor-pointer"
+                onClick={() => handleOrderClick(order)}
+              >
+                <td className="p-4">{order.serialNo}</td>
+                <td className="p-4">{order.orderId}</td>
+                <td className="p-4">{order.customerName}</td>
+                <td className="p-4">
+                  <Select
+                    value={order.status}
+                    onValueChange={(value) => handleStatusChange(order.orderId, value as Order["status"])}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Processing">Processing</SelectItem>
+                      <SelectItem value="Shipped">Shipped</SelectItem>
+                      <SelectItem value="Delivered">Delivered</SelectItem>
+                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="p-4">{order.orderDate}</td>
+                <td className="p-4">{order.deadlineDate}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedContacts.map((contact) => (
-                <tr key={contact.email} className="border-b">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src="/placeholder-user.jpg" />
-                        <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      {contact.name}
-                    </div>
-                  </td>
-                  <td className="p-4 text-muted-foreground">{contact.email}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <img src={contact.companyLogo || "/placeholder.svg"} alt={contact.company} className="h-5 w-5" />
-                      {contact.company}
-                    </div>
-                  </td>
-                  <td className="p-4">{contact.jobTitle}</td>
-                  <td className="p-4">
-                    <StatusBadge status={contact.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedContacts.map((contact) => (
-            <div key={contact.email} className="rounded-lg border p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder-user.jpg" />
-                  <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-semibold">{contact.name}</h3>
-                  <p className="text-sm text-muted-foreground">{contact.email}</p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <img src={contact.companyLogo || "/placeholder.svg"} alt={contact.company} className="h-5 w-5" />
-                  <span>{contact.company}</span>
-                </div>
-                <p>{contact.jobTitle}</p>
-                <StatusBadge status={contact.status} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <OrderDetailsDialog order={selectedOrder} onClose={() => setSelectedOrder(null)} />
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  const colors = {
-    "To contact": "text-orange-600",
-    "To followup": "text-blue-600",
-    Negotiation: "text-pink-600",
-    Complete: "text-green-600",
-  }
-
-  return <span className={colors[status]}>{status}</span>
+interface OrderDetailsDialogProps {
+  order: Order | null
+  onClose: () => void
 }
 
+function OrderDetailsDialog({ order, onClose }: OrderDetailsDialogProps) {
+  if (!order) return null
+
+  return (
+    <Dialog open={!!order} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Order Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <p>
+              <strong>Customer Name:</strong> {order.customerName}
+            </p>
+            <p>
+              <strong>Order ID:</strong> {order.orderId}
+            </p>
+            <p>
+              <strong>Email:</strong> {order.email}
+            </p>
+            <p>
+              <strong>Order Date:</strong> {order.orderDate}
+            </p>
+            <p>
+              <strong>Deadline Date:</strong> {order.deadlineDate}
+            </p>
+            <p>
+              <strong>Status:</strong> {order.status}
+            </p>
+          </div>
+          <h4 className="font-semibold mt-4">Items:</h4>
+          <div className="rounded-lg border overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="p-2 text-left">S.No.</th>
+                  <th className="p-2 text-left">Item Name</th>
+                  <th className="p-2 text-left">Quantity</th>
+                  <th className="p-2 text-left">Specification</th>
+                  <th className="p-2 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.items.map((item, index) => (
+                  <tr key={item.itemId} className="border-b">
+                    <td className="p-2">{index + 1}</td>
+                    <td className="p-2">{item.name}</td>
+                    <td className="p-2">{item.quantity}</td>
+                    <td className="p-2">{item.specification}</td>
+                    <td className="p-2">{item.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
