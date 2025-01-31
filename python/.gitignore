@@ -1,11 +1,9 @@
 /venv
-/ram.py
 /.env
-/test.py
-/Process.txt
-/credentials.json
+/test
 /Sample.xlsx
-/changes.json
-/Order.xlsx
-/etp.py
-/dummyinv.py
+/services/changes.json
+/db/dummyinv.py
+/db/__init__.py
+/db/__pycache__
+/services/__pycache__
