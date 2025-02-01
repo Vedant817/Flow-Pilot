@@ -6,14 +6,13 @@ import os
 import threading
 import json
 from datetime import datetime, timedelta
+from emailContentExtract import extract_order_details
 
-#? Define the file path and the directory to watch
 excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
 
 previous_content = []
 
-# Function to read the Excel file and return content as a list of dictionaries
 def read_excel_file():
     content = []
     try:
@@ -26,8 +25,7 @@ def read_excel_file():
             if isinstance(row, tuple):
                 email_data = dict(zip(headers, row)) 
                 content.append(email_data)
-
-        print("Read Excel Content:", content)
+        return content
 
     except Exception as e:
         print(f"Error reading the Excel file: {e}")
@@ -63,17 +61,26 @@ def handle_modified_file():
         
         with open('changes.json', 'w') as f:
             json.dump(changes, f, indent=4)
-    else:
-        print("No changes detected.")
+        
+        for change in changes:
+            email = change.get("Email")
+            subject = change.get("Subject")
+            body = change.get("Body")
+            print("Processing Email:", email)
+            print("Extracting from body:", body)
+            order_details = extract_order_details(body)
+            if order_details:
+                print(f"Extracted Order Details for {email}:", order_details)
+            else:
+                print("No order details extracted.")
 
-# Function to start monitoring
 def start_monitoring():
     class ExcelFileHandler(FileSystemEventHandler):
         def on_modified(self, event):
             if event.src_path == excel_file_path:
                 print(f"Detected update in file: {excel_file_path}")
                 read_excel_file()
-    
+                handle_modified_file()
     event_handler = ExcelFileHandler()
     observer = Observer()
     observer.schedule(event_handler, directory_to_watch, recursive=False)
