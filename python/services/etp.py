@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta
 
 # Define the file path and the directory to watch
-excel_file_path = os.path.abspath(r'D:\Deloitte\Prototype\python\Sample.xlsx')  # Replace with your file path
+excel_file_path = os.path.abspath(r'D:\Deloitte\Prototype\RPA\Order.xlsx')  # Replace with your file path
 directory_to_watch = os.path.dirname(excel_file_path)  # Get directory of file
 
 # Initialize previous content as a list of tuples
@@ -25,6 +25,9 @@ def read_excel_file():
         headers = [cell.value for cell in sheet[1]]  # Read column names
         
         for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip headers
+            if all(cell is None for cell in row):  # Skip empty rows
+                continue
+
             if isinstance(row, tuple):  # Ensure row is not a list
                 email_data = dict(zip(headers, row))  # Convert row to dictionary
                 content.append(email_data)
@@ -80,7 +83,7 @@ def handle_modified_file():
             json.dump(changes, f, indent=4)  # Pretty print JSON
         
         # Call the second Python script using subprocess
-        subprocess.run([r'D:\Deloitte\Prototype\python\venv\Scripts\python.exe', r'D:\Deloitte\Prototype\python\ai\jamba.py'])
+        # subprocess.run([r'D:\Deloitte\Prototype\python\venv\Scripts\python.exe', r'D:\Deloitte\Prototype\python\ai\jamba.py'])
 
     else:
         print("No changes detected.")
