@@ -1,1 +1,5 @@
 flask
+watchdog
+openpyxl
+ai21
+python-dotenv
