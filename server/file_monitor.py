@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_order_details
 
-excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
+excel_file_path = os.path.abspath(r'D:\Deloitte\Prototype\RPA\Order.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
 
 previous_content = []
@@ -23,12 +23,17 @@ def read_excel_file():
         
         for row in sheet.iter_rows(min_row=2, values_only=True):
             if isinstance(row, tuple):
+                # Skip empty rows (rows where all values are None or empty strings)
+                if all(cell is None or cell == '' for cell in row):
+                    continue
+                
                 email_data = dict(zip(headers, row)) 
                 content.append(email_data)
         return content
 
     except Exception as e:
         print(f"Error reading the Excel file: {e}")
+
 
 def compare_changes(new_content):
     global previous_content
@@ -52,6 +57,10 @@ def compare_changes(new_content):
 
 def handle_modified_file():
     new_content = read_excel_file()
+    
+    if not new_content:
+        return
+    
     changes = compare_changes(new_content)
     
     if changes:
