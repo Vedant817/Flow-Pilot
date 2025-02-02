@@ -1,11 +1,12 @@
 "use client"
 import { useState, useMemo } from "react"
-import { LayoutGrid, Share2, Settings } from "lucide-react"
+import { LayoutGrid, Share2, Settings, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent } from "@/components/ui/card"
 
 type View = "Table view" | "Board view"
 type SortField = "orderId" | "customerName" | "status" | "orderDate" | "deadlineDate"
@@ -64,6 +65,7 @@ export function DataTable() {
     direction: SortDirection
   }>({ field: "orderId", direction: "asc" })
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
 
   const filteredAndSortedOrders = useMemo(() => {
     return orders
@@ -90,7 +92,11 @@ export function DataTable() {
   }
 
   const handleOrderClick = (order: Order) => {
-    setSelectedOrder(order)
+    if (window.innerWidth <= 640) {
+      setExpandedOrderId(expandedOrderId === order.orderId ? null : order.orderId)
+    } else {
+      setSelectedOrder(order)
+    }
   }
 
   const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
@@ -99,7 +105,7 @@ export function DataTable() {
 
   return (
     <div className="space-y-4 w-full px-4 py-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Order List</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -111,8 +117,8 @@ export function DataTable() {
           </Button>
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -129,86 +135,138 @@ export function DataTable() {
             placeholder="Filter orders..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            className="h-9 w-[200px]"
+            className="h-9 w-full sm:w-[200px]"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Button>
-        </div>
+        <Button variant="outline" size="sm">
+          <Settings className="mr-2 h-4 w-4" />
+          Settings
+        </Button>
       </div>
-      <div className="rounded-lg border overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="p-4 text-left font-medium">S.No.</th>
-              <th
-                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                onClick={() => handleSort("orderId")}
-              >
-                Order ID {sortConfig.field === "orderId" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </th>
-              <th
-                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                onClick={() => handleSort("customerName")}
-              >
-                Customer Name {sortConfig.field === "customerName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </th>
-              <th
-                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                onClick={() => handleSort("status")}
-              >
-                Status {sortConfig.field === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </th>
-              <th
-                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                onClick={() => handleSort("orderDate")}
-              >
-                Order Date {sortConfig.field === "orderDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </th>
-              <th
-                className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
-                onClick={() => handleSort("deadlineDate")}
-              >
-                Deadline Date {sortConfig.field === "deadlineDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAndSortedOrders.map((order) => (
-              <tr
-                key={order.orderId}
-                className="border-b hover:bg-muted/50 cursor-pointer"
-                onClick={() => handleOrderClick(order)}
-              >
-                <td className="p-4">{order.serialNo}</td>
-                <td className="p-4">{order.orderId}</td>
-                <td className="p-4">{order.customerName}</td>
-                <td className="p-4">
-                  <Select
-                    value={order.status}
-                    onValueChange={(value) => handleStatusChange(order.orderId, value as Order["status"])}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Processing">Processing</SelectItem>
-                      <SelectItem value="Shipped">Shipped</SelectItem>
-                      <SelectItem value="Delivered">Delivered</SelectItem>
-                      <SelectItem value="Cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="p-4">{order.orderDate}</td>
-                <td className="p-4">{order.deadlineDate}</td>
+      <div className="rounded-lg border overflow-hidden">
+        <div className="overflow-x-auto">
+          {/* Desktop view */}
+          <table className="w-full hidden sm:table">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="p-4 text-left font-medium">S.No.</th>
+                <th
+                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                  onClick={() => handleSort("orderId")}
+                >
+                  Order ID {sortConfig.field === "orderId" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
+                <th
+                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                  onClick={() => handleSort("customerName")}
+                >
+                  Customer Name {sortConfig.field === "customerName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
+                <th
+                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                  onClick={() => handleSort("status")}
+                >
+                  Status {sortConfig.field === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
+                <th
+                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                  onClick={() => handleSort("orderDate")}
+                >
+                  Order Date {sortConfig.field === "orderDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
+                <th
+                  className="p-4 text-left font-medium cursor-pointer hover:bg-muted/70"
+                  onClick={() => handleSort("deadlineDate")}
+                >
+                  Deadline Date {sortConfig.field === "deadlineDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
               </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedOrders.map((order) => (
+                <tr
+                  key={order.orderId}
+                  className="border-b hover:bg-muted/50 cursor-pointer"
+                  onClick={() => handleOrderClick(order)}
+                >
+                  <td className="p-4">{order.serialNo}</td>
+                  <td className="p-4">{order.orderId}</td>
+                  <td className="p-4">{order.customerName}</td>
+                  <td className="p-4">
+                    <Select
+                      value={order.status}
+                      onValueChange={(value) => handleStatusChange(order.orderId, value as Order["status"])}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Pending">Pending</SelectItem>
+                        <SelectItem value="Processing">Processing</SelectItem>
+                        <SelectItem value="Shipped">Shipped</SelectItem>
+                        <SelectItem value="Delivered">Delivered</SelectItem>
+                        <SelectItem value="Cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="p-4">{order.orderDate}</td>
+                  <td className="p-4">{order.deadlineDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Mobile view */}
+          <div className="sm:hidden">
+            {filteredAndSortedOrders.map((order) => (
+              <Card key={order.orderId} className="mb-4">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center" onClick={() => handleOrderClick(order)}>
+                    <div>
+                      <p className="font-semibold">{order.orderId}</p>
+                      <p className="text-sm text-gray-600">{order.customerName}</p>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="mr-2">{order.status}</span>
+                      {expandedOrderId === order.orderId ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                  </div>
+                  {expandedOrderId === order.orderId && (
+                    <div className="mt-4 space-y-2">
+                      <p>
+                        <strong>Order Date:</strong> {order.orderDate}
+                      </p>
+                      <p>
+                        <strong>Deadline Date:</strong> {order.deadlineDate}
+                      </p>
+                      <p>
+                        <strong>Email:</strong> {order.email}
+                      </p>
+                      <div>
+                        <strong>Status:</strong>
+                        <Select
+                          value={order.status}
+                          onValueChange={(value) => handleStatusChange(order.orderId, value as Order["status"])}
+                        >
+                          <SelectTrigger className="w-full mt-1">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Processing">Processing</SelectItem>
+                            <SelectItem value="Shipped">Shipped</SelectItem>
+                            <SelectItem value="Delivered">Delivered</SelectItem>
+                            <SelectItem value="Cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
       <OrderDetailsDialog order={selectedOrder} onClose={() => setSelectedOrder(null)} />
     </div>
@@ -230,7 +288,7 @@ function OrderDetailsDialog({ order, onClose }: OrderDetailsDialogProps) {
           <DialogTitle>Order Details</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <p>
               <strong>Customer Name:</strong> {order.customerName}
             </p>

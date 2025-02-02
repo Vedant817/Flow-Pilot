@@ -87,7 +87,7 @@ export function Analytics() {
     return (
         <div className="p-6">
             <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                     <h1 className="text-2xl font-semibold">Analytics Dashboard</h1>
                     <TabsList>
                         <TabsTrigger value="customers">Customer Analysis</TabsTrigger>
@@ -96,13 +96,13 @@ export function Analytics() {
                 </div>
                 <div className="grid gap-6">
                     <TabsContent value="customers">
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Order Trend (Last 30 Days)</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={320}>
+                                    <ResponsiveContainer width="100%" height={320} minHeight={200}>
                                         <LineChart data={orderTrendData}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" />
@@ -119,7 +119,7 @@ export function Analytics() {
                                     <CardTitle>Order Status Distribution</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={320}>
+                                    <ResponsiveContainer width="100%" height={320} minHeight={200}>
                                         <PieChart>
                                             <Pie
                                                 data={orderStatusChart}
@@ -145,7 +145,7 @@ export function Analytics() {
                                     <CardTitle>Top 10 Customers by Spending</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={320}>
+                                    <ResponsiveContainer width="100%" height={320} minHeight={200}>
                                         <BarChart data={customerSpendingData}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="name" />
@@ -162,13 +162,13 @@ export function Analytics() {
                         </div>
                     </TabsContent>
                     <TabsContent value="products">
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Inventory by Category</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={320}>
+                                    <ResponsiveContainer width="100%" height={320} minHeight={200}>
                                         <PieChart>
                                             <Pie
                                                 data={inventoryByCategory}
@@ -194,7 +194,7 @@ export function Analytics() {
                                     <CardTitle>Stock Levels vs Reorder Points</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={320}>
+                                    <ResponsiveContainer width="100%" height={320} minHeight={200}>
                                         <BarChart data={productPerformance}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="name" />
@@ -214,4 +214,3 @@ export function Analytics() {
         </div>
     )
 }
-
