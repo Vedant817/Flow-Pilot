@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 from python.services.inv import generate_invoice
 
-
 sender_email = os.getenv("SENDER_EMAIL")
 sender_password = os.getenv("EMAIL_PASSWORD")
 recipient_email = os.getenv("RECEIVER_EMAIL")
@@ -72,7 +71,8 @@ for change in changes:
         except Exception as e:
             print(f"Error extracting order details: {e}")
             return []
-
+        
+        
     def check_availability(orders):
         """
         Checks whether the requested products are available in inventory.
