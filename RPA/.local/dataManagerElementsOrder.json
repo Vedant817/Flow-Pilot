@@ -12,12 +12,12 @@
       "Path": "Recieve Emails.xaml",
       "SortBy": 0,
       "VariablesSectionElementsOrder": [
+        "eMails&Sequence_2",
         "MailDate&Sequence_2",
         "DT1&Sequence_2",
         "From&Sequence_3",
         "Subject&Sequence_3",
-        "Body&Sequence_3",
-        "eMails&Sequence_2"
+        "Body&Sequence_3"
       ],
       "ArgumentsSectionElementsOrder": [],
       "ConstantsSectionElementsOrder": [],
@@ -33,6 +33,22 @@
         "From&Sequence_3",
         "Subject&Sequence_3",
         "Body&Sequence_3"
+      ],
+      "ArgumentsSectionElementsOrder": [],
+      "ConstantsSectionElementsOrder": [],
+      "AddedNamespaces": null
+    },
+    {
+      "Path": "Recieve Emails OneDrive.xaml",
+      "SortBy": 0,
+      "VariablesSectionElementsOrder": [
+        "eMails&Sequence_2",
+        "MailDate&Sequence_2",
+        "DT1&Sequence_2",
+        "From&Sequence_3",
+        "Subject&Sequence_3",
+        "Body&Sequence_3",
+        "driveItem&Sequence_5"
       ],
       "ArgumentsSectionElementsOrder": [],
       "ConstantsSectionElementsOrder": [],
