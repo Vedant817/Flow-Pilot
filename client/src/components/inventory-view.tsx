@@ -7,18 +7,18 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { products } from "@/lib/data"
 
-export function InventoryView() {
+export default function InventoryView() {
     const [search, setSearch] = useState("")
 
     const filteredProducts = products.filter((product) => product.name.toLowerCase().includes(search.toLowerCase()))
 
     return (
-        <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-semibold">Inventory Management</h1>
+        <div className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
+                <h1 className="text-xl md:text-2xl font-semibold">Inventory Management</h1>
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button>
+                        <Button className="w-full md:w-auto">
                             <Plus className="mr-2 h-4 w-4" />
                             Add Product
                         </Button>
@@ -31,17 +31,20 @@ export function InventoryView() {
                     </DialogContent>
                 </Dialog>
             </div>
+
             <div className="mb-4">
                 <Input
                     placeholder="Search products..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
             </div>
-            <div className="rounded-md border">
-                <Table>
-                    <TableHeader>
+
+            {/* Responsive Table Wrapper */}
+            <div className="overflow-x-auto rounded-md border">
+                <Table className="w-full min-w-max">
+                    <TableHeader className="hidden md:table-header-group">
                         <TableRow>
                             <TableHead>Product ID</TableHead>
                             <TableHead>Name</TableHead>
@@ -55,19 +58,41 @@ export function InventoryView() {
                     </TableHeader>
                     <TableBody>
                         {filteredProducts.map((product) => (
-                            <TableRow key={product.id}>
-                                <TableCell>{product.id}</TableCell>
-                                <TableCell className="font-medium">{product.name}</TableCell>
-                                <TableCell>{product.category}</TableCell>
-                                <TableCell>${product.price.toFixed(2)}</TableCell>
-                                <TableCell>
+                            <TableRow key={product.id} className="flex flex-col md:table-row border-b md:border-0 p-4 md:p-0">
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Product ID: </span>
+                                    {product.id}
+                                </TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Name: </span>
+                                    {product.name}
+                                </TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Category: </span>
+                                    {product.category}
+                                </TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Price: </span>
+                                    ${product.price.toFixed(2)}
+                                </TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Quantity: </span>
                                     <span className={product.quantity <= product.reorderPoint ? "text-red-500 font-medium" : ""}>
                                         {product.quantity}
                                     </span>
                                 </TableCell>
-                                <TableCell>{product.reorderPoint}</TableCell>
-                                <TableCell>{product.supplier}</TableCell>
-                                <TableCell>{product.lastRestocked}</TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Reorder Point: </span>
+                                    {product.reorderPoint}
+                                </TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Supplier: </span>
+                                    {product.supplier}
+                                </TableCell>
+                                <TableCell className="md:table-cell">
+                                    <span className="font-medium md:hidden">Last Restocked: </span>
+                                    {product.lastRestocked}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -76,4 +101,3 @@ export function InventoryView() {
         </div>
     )
 }
-

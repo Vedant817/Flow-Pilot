@@ -21,9 +21,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { DataTable } from "./data-table"
-import { InventoryView } from "./inventory-view"
+import InventoryView from "./inventory-view"
 import { Analytics } from "./analytics"
-import { ChatbotView } from "./chatbot-view"
+import ChatbotView from "./chatbot-view"
 
 type View = "orders" | "inventory" | "analytics" | "chatbot"
 
@@ -40,7 +40,7 @@ export function DashboardShell() {
 
   return (
     <SidebarProvider className="w-full">
-      <div className="flex min-h-screen flex-1">
+      <div className="flex min-h-screen md:flex-1 flex-col lg:flex-row">
         <Sidebar className="border-r">
           <SidebarHeader className="border-b p-4">
             <Link href="/" className="flex items-center gap-2 font-semibold">
@@ -82,8 +82,8 @@ export function DashboardShell() {
             </SidebarGroup>
           </SidebarContent>
         </Sidebar>
-        <div className="flex flex-1 flex-col">
-          <header className="flex h-14 items-center justify-between border-b px-6">
+        <div className="flex flex-1 flex-col w-full">
+          <header className="flex h-14 items-center justify-between border-b px-4 lg:px-6">
             <SidebarTrigger />
             <div className="flex items-center gap-4 relative">
               {/* Notification Bell with Popover */}
@@ -114,7 +114,7 @@ export function DashboardShell() {
               </Avatar>
             </div>
           </header>
-          <main className="flex-1">
+          <main className="flex-1 p-4 lg:p-6">
             {currentView === "orders" && <DataTable />}
             {currentView === "inventory" && <InventoryView />}
             {currentView === "analytics" && <Analytics />}
