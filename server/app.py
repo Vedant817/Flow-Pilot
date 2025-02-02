@@ -1,6 +1,9 @@
 from flask import Flask # type: ignore
 import threading
 from file_monitor import start_monitoring
+from dbConfig import connect_db
+
+db = connect_db()
 
 app = Flask(__name__)
 
