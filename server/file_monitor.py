@@ -34,7 +34,6 @@ def read_excel_file():
     except Exception as e:
         print(f"Error reading the Excel file: {e}")
 
-
 def compare_changes(new_content):
     global previous_content
     changes = []
@@ -74,8 +73,7 @@ def handle_modified_file():
             order_details = extract_order_details(body)
             print(order_details)
             if order_details:
-                # print(f"Extracted Order Details for {email}:", order_details)
-                print('Order Details: ', order_details)
+                print(f"Extracted Order Details for {email}:", order_details)
             else:
                 print("No order details extracted.")
 
