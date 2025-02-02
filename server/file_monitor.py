@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_order_details
 
-excel_file_path = os.path.abspath(r'D:\Deloitte\Prototype\RPA\Order.xlsx')
+excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
 
 previous_content = []
@@ -64,10 +64,6 @@ def handle_modified_file():
     changes = compare_changes(new_content)
     
     if changes:
-        print("Detected changes in the file:")
-        for change in changes:
-            print(change)
-        
         with open('changes.json', 'w') as f:
             json.dump(changes, f, indent=4)
         
@@ -75,11 +71,11 @@ def handle_modified_file():
             email = change.get("Email")
             subject = change.get("Subject")
             body = change.get("Body")
-            print("Processing Email:", email)
-            print("Extracting from body:", body)
             order_details = extract_order_details(body)
+            print(order_details)
             if order_details:
-                print(f"Extracted Order Details for {email}:", order_details)
+                # print(f"Extracted Order Details for {email}:", order_details)
+                print('Order Details: ', order_details)
             else:
                 print("No order details extracted.")
 
