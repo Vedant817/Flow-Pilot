@@ -39,8 +39,6 @@ def extract_order_details(email_text):
         
         if "choices" in result and result["choices"]:
             content_str = result["choices"][0]["message"]["content"]
-            print('Content: ', content_str)
-            print("Extracted AI Response:", content_str)
             extracted_orders = json.loads(content_str)
             return extracted_orders.get("orders", [])
         else:
