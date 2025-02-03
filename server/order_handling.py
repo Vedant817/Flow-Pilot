@@ -4,12 +4,67 @@ import json
 from dbConfig import connect_db
 from datetime import datetime, timedelta
 from send_email import send_acknowledgment
+from send_email import send_email
 
 db = connect_db()
 
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
 order_collection = db['orders']
 inventory_collection = db['inventory']
+
+def validate_order_details_ai(order_details):
+    """
+    Uses AI21 to validate order details and determine if they are incomplete or incorrect.
+    Returns True if valid, False otherwise, along with an error message.
+    """
+    messages = [
+        UserMessage(
+            content=f"""
+            You are an AI assistant validating order details.
+            Check if the order contains incomplete, incorrect, or unclear details.
+            Always give errors in such that it can be sent through email and can be easily understood by the email reader and understand the issue.
+            **Order Details:**
+            {json.dumps(order_details, indent=2)}
+
+            **Expected JSON Output:**
+            {{
+                "valid": true/false,
+                "errors": ["Error message 1", "Error message 2"]
+            }}
+            """
+        )
+    ]
+    try:
+        response = client.chat.completions.create(
+            model="jamba-1.5-large",
+            messages=messages,
+            top_p=1.0
+        )
+        result = response.model_dump()
+        
+        if "choices" in result and result["choices"]:
+            content_str = result["choices"][0]["message"]["content"]
+            validation_result = json.loads(content_str)
+            return validation_result.get("valid", False), validation_result.get("errors", [])
+        else:
+            print("Error: No choices found in API response.")
+            return False, ["AI validation failed"]
+    except Exception as e:
+        print(f"Error validating order details: {e}")
+        return False, ["System error while validating order"]
+
+def send_order_issue_email(email, errors):
+    """
+    Sends an email notifying the user that their order could not be processed due to errors.
+    """
+    
+    error_message = "\n".join(errors)
+    body = f"Dear Customer,\n\nWe could not process your order due to the following issues:\n\n{error_message}\n\nPlease review and resend your order.\n\nThank you."
+    send_email(
+        subject="Order Processing Issue",
+        body=body,
+        recipient_email=email
+    )
 
 def extract_order_details_ai(email_text):
     """
@@ -86,7 +141,6 @@ def add_orders_to_collection(email, subject, date, time, order_details):
             "time": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%H:%M:%S")}
         }
     )
-    print(order_details)
     
     if existing_order:
         print("Duplicate entry detected. Order not added.")
@@ -106,8 +160,15 @@ def add_orders_to_collection(email, subject, date, time, order_details):
 
 def process_order_details(email, subject, date, time, order_details):
     """
-    Processes extracted order details and adds them to the database.
+    Processes extracted order details, validates them using AI, and adds them to the database.
+    Sends an email if the order is invalid.
     """
+    is_valid, errors = validate_order_details_ai(order_details)
+
+    if not is_valid:
+        send_order_issue_email(email, errors)
+        return  # Stop further processing
+
     structured_orders = []
     for order in order_details:
         structured_orders.append({
@@ -116,4 +177,4 @@ def process_order_details(email, subject, date, time, order_details):
         })
     
     if structured_orders:
-        add_orders_to_collection(email, subject, date, time, order_details=structured_orders)    
+        add_orders_to_collection(email, subject, date, time, order_details=structured_orders)   
