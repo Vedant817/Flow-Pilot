@@ -2,11 +2,14 @@ from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
 from dbConfig import connect_db
+from datetime import datetime, timedelta
+from send_email import send_acknowledgment
 
 db = connect_db()
 
 client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
 order_collection = db['orders']
+inventory_collection = db['inventory']
 
 def extract_order_details_ai(email_text):
     """
@@ -50,8 +53,20 @@ def extract_order_details_ai(email_text):
         print(f"Error extracting order details: {e}")
         return []
 
-from datetime import datetime, timedelta
-import json
+def check_inventory(order_details):
+    """
+    Checks if the inventory can fulfill the given order.
+    Returns True if order can be fulfilled, otherwise False.
+    """
+    for order in order_details:
+        product = order["product"]
+        quantity = order["quantity"]
+        
+        inventory_item = inventory_collection.find_one({"item": product})
+        if not inventory_item or inventory_item["quantity"] < quantity:
+            return False
+
+    return True
 
 def add_orders_to_collection(email, subject, date, time, order_details):
     """
@@ -74,19 +89,19 @@ def add_orders_to_collection(email, subject, date, time, order_details):
     
     if existing_order:
         print("Duplicate entry detected. Order not added.")
-    else:
-        formatted_entry = {
-            "email": email,
-            "subject": subject,
-            "date": date,
-            "time": time,
-            "products": order_details
-        }
-        order_collection.insert_one(formatted_entry)
-
-    # Optionally print current orders (without duplicates)
-    all_orders = list(order_collection.find({}, {"_id": 0}))
-
+    
+    can_fulfill = check_inventory(order_details=order_details)
+    
+    formatted_entry = {
+        "email": email,
+        "subject": subject,
+        "date": date,
+        "time": time,
+        "products": order_details,
+        "can_fulfill": can_fulfill
+    }
+    order_collection.insert_one(formatted_entry)
+    send_acknowledgment(formatted_entry)
 
 def process_order_details(email, subject, date, time, order_details):
     """
@@ -100,4 +115,4 @@ def process_order_details(email, subject, date, time, order_details):
         })
     
     if structured_orders:
-        add_orders_to_collection(email, subject, date, time, structured_orders)    
+        add_orders_to_collection(email, subject, date, time, order_details=structured_orders)    
