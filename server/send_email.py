@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import json
 from generate_invoice import generate_invoice
+import re
 
 load_dotenv()
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
@@ -45,7 +46,9 @@ def send_email(subject, body, recipient_email,attachment_path=None):
         print(f"Error sending email: {e}")
 
 def send_acknowledgment(order):
-    recipient_email = order["email"]
+    order_email = order["email"]
+    match = re.search(r'<([^<>]+)>', order_email)
+    recipient_email = match.group(1) if match else order_email
     order_status = order["can_fulfill"]
     attachment_path =  None
     

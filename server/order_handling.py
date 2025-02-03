@@ -86,6 +86,7 @@ def add_orders_to_collection(email, subject, date, time, order_details):
             "time": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%H:%M:%S")}
         }
     )
+    print(order_details)
     
     if existing_order:
         print("Duplicate entry detected. Order not added.")
