@@ -254,7 +254,7 @@ export const orders: Order[] = Array.from({ length: 500 }, (_, i) => {
             quantity,
             price: product.price,
             specification: "Standard",
-            status: Math.random() > 0.8 ? "Pending" : ("Filled" as const),
+            status: Math.random() > 0.8 ? "Pending" : ("Filled" as "Pending" | "Filled" | "Cancelled"),
         }
     })
 
