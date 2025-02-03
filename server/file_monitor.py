@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from emailContentExtract import extract_order_details
 from order_handling import process_order_details
 
-excel_file_path = os.path.abspath(r'D:\Deloitte\Prototype\RPA\Order.xlsx')
+excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
 
 previous_content = []
