@@ -63,7 +63,7 @@ def extract_text_from_image(image_path):
 
 # Send Data to Gemini API for Structuring
 def send_to_gemini(data):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
 You are an AI that extracts structured order details from the provided text and returns a valid JSON object. The response should strictly follow this schema:
@@ -97,14 +97,15 @@ Return only the JSON object as per the schema above.
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     
     response = requests.post(url, json=payload)
-    
+    # print(response.text)
     if response.status_code == 200:
         try:
             gemini_response = response.json()
             response_text = gemini_response.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
 
             if response_text:
-                return json.loads(response_text)  # Convert to dictionary
+                clean_json = response_text.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_json)  # Convert to dictionary
             else:
                 print("❌ Gemini API did not return valid structured data.")
                 return {}
