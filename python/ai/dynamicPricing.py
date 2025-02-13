@@ -23,8 +23,8 @@ gemini_model = genai.GenerativeModel("gemini-2.0-flash")  # ✅ Correct API usag
 def generate_price_adjustment_report():
     try:
         # Step 1: Fetch all orders & inventory data
-        orders = list(order_collection.find())
-        inventory = list(inventory_collection.find())
+        orders = list(order_collection.find({}, {"_id": 0}))  # Exclude `_id` field
+        inventory = list(inventory_collection.find({}, {"_id": 0}))
 
         # Step 2: Convert to DataFrame for analysis
         order_df = pd.DataFrame(orders)
@@ -39,7 +39,8 @@ def generate_price_adjustment_report():
                 product_qty = product.get("quantity", 0)
                 sales_data[product_name] = sales_data.get(product_name, 0) + product_qty
 
-        stock_data = {item["name"]: item["quantity"] for item in inventory}
+        stock_data = {item.get("name", "Unknown"): item.get("quantity", 0) for item in inventory}
+        price_data = {item.get("name", "Unknown"): item.get("price", "N/A") for item in inventory}
 
         # Step 4: Prepare AI Prompt for Pricing Strategy
         prompt = f"""
@@ -52,7 +53,7 @@ def generate_price_adjustment_report():
         {stock_data}
 
         **Current Product Prices**:
-        {[{'name': item['name'], 'price': item['price']} for item in inventory]}
+        {price_data}
 
         🔹 **Pricing Adjustment Goals**:
         1. If a product has **high demand but low stock**, suggest a **price increase**.
@@ -60,15 +61,30 @@ def generate_price_adjustment_report():
         3. If demand and supply are balanced, keep the price stable.
         4. Identify potential **seasonal trends** and suggest pricing strategies accordingly.
 
-        Generate a structured **dynamic pricing report** with recommendations.
+        🔹 **Strict JSON Output Format**:
+        {{
+            "adjustments": [
+                {{
+                    "product": "Product Name",
+                    "old_price": "Current Price",
+                    "new_price": "Suggested New Price",
+                    "reason": "Explanation"
+                }}
+            ]
+        }}
         """
 
         # Step 5: Query Gemini AI Model
         response = gemini_model.generate_content(prompt)  # ✅ Correct API call
-        return response.text
+        
+        # Step 6: Extract structured response
+        if response and response.text:
+            return response.text  # Gemini should return structured JSON
+        else:
+            return {"error": "No valid response from Gemini AI."}
 
     except Exception as e:
-        return f"Error generating pricing report: {str(e)}"
+        return {"error": f"Error generating pricing report: {str(e)}"}
 
 # ✅ API Route: Get Price Adjustment Report
 @app.route('/price-adjustment-report', methods=['GET'])
@@ -78,4 +94,4 @@ def price_adjustment_report():
 
 # ✅ Run Flask Server
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)  
