@@ -51,6 +51,7 @@ def send_acknowledgment(order):
     recipient_email = match.group(1) if match else order_email
     order_status = order["can_fulfill"]
     attachment_path =  None
+    print(recipient_email)
     
     if order_status:
         subject = "Order Confirmation"

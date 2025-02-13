@@ -163,11 +163,11 @@ def process_order_details(email, subject, date, time, order_details):
     Processes extracted order details, validates them using AI, and adds them to the database.
     Sends an email if the order is invalid.
     """
-    is_valid, errors = validate_order_details_ai(order_details)
+    # is_valid, errors = validate_order_details_ai(order_details)
 
-    if not is_valid:
-        send_order_issue_email(email, errors)
-        return  # Stop further processing
+    # if not is_valid:
+    #     send_order_issue_email(email, errors)
+    #     return  # Stop further processing
 
     structured_orders = []
     for order in order_details:
