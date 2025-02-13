@@ -11,3 +11,4 @@ mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[DATABASE_NAME]
 inventory_collection = db[COLLECTION_NAME]
 order_collection = db["orders"]
+feedback_collection = db["feedback"]  # ✅ New Feedback Collection
