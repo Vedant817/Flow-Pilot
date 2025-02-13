@@ -8,8 +8,9 @@ import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_order_details
 from order_handling import process_order_details
+from email_check import suspicious_email_check
 
-excel_file_path = os.path.abspath(r'D:\Deloitte\Prototype\RPA\Order.xlsx')
+excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
 
 previous_content = []
@@ -24,7 +25,7 @@ def read_excel_file():
         
         for row in sheet.iter_rows(min_row=2, values_only=True):
             if isinstance(row, tuple):
-                # Skip empty rows (rows where all values are None or empty strings)
+                #* Skip empty rows (rows where all values are None or empty strings)
                 if all(cell is None or cell == '' for cell in row):
                     continue
                 
@@ -73,11 +74,25 @@ def handle_modified_file():
             body = change.get("Body")
             date = change.get('Date')
             time = change.get('Time')
-            order_details = extract_order_details(body)
-            if order_details:
-                process_order_details(email, subject, date, time, order_details)
+            email_status = suspicious_email_check(email)
+            is_valid, status = email_status
+            if is_valid:
+                print('✅ Email is valid')
+                # order_details = extract_order_details(body)
+                # if order_details:
+                #     process_order_details(email, subject, date, time, order_details)
+                # else:
+                #     print("No order details extracted.")
             else:
-                print("No order details extracted.")
+                print('❌ Email is NOT valid - Status:', status)
+
+                if status == "Suspicious":
+                    print("⚠️ Warning: This email is flagged as suspicious.")
+                elif status == "Exception":
+                    print("❗ Error: There was an issue validating the email.")
+                else:
+                    print("ℹ️ Email is invalid or not recognized.")
+                pass #TODO Handle the case
 
 def start_monitoring():
     class ExcelFileHandler(FileSystemEventHandler):
