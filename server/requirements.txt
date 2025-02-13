@@ -5,3 +5,4 @@ ai21
 python-dotenv
 pymongo
 fpdf
+zerobouncesdk
