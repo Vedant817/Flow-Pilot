@@ -27,7 +27,7 @@ def generate_business_summary():
         orders = list(order_collection.find({}, {"_id": 0}))
         inventory = list(inventory_collection.find({}, {"_id": 0}))
 
-        # Step 1: Customer Insights
+        # Step 1: Customer Insights (Mapping Customers to Products)
         customer_orders = {cust["Email"]: [] for cust in customers}
         for order in orders:
             email = order.get("customerEmail", "")
@@ -70,24 +70,31 @@ def generate_business_summary():
         best_sellers = sorted(sales_data.items(), key=lambda x: x[1], reverse=True)[:5]
         low_sellers = sorted(sales_data.items(), key=lambda x: x[1])[:5]
 
-        # Step 4: Generate AI Summary
+        # Step 4: Generate AI Summary (Updated Prompt)
         prompt = f"""
-        You are an AI business analyst. Provide a structured JSON summary:
+        You are an AI business analyst. Provide a structured JSON summary of the business performance.
 
-        - **Customer Summary**:
-          - Identify **loyal, new, and occasional customers** based on order history.
-          - List **products bought by each customer**.
-        - **Inventory Analysis**:
-          - Highlight stock availability and pricing.
-        - **Sales Insights**:
-          - Identify **best-selling** and **low-selling** products.
+        🔹 **Customer Summary**:
+        - Identify **loyal, new, and occasional customers** based on their order history.
+        - Mention **products bought by each customer**.
+        - Include total orders placed per customer.
 
-        **Data:**
-        - Customers: {customer_summary}
-        - Inventory: {inventory_summary}
-        - Sales: Best-Sellers: {best_sellers}, Low-Sellers: {low_sellers}
+        🔹 **Inventory Analysis**:
+        - Highlight **stock availability & pricing**.
 
-        🔹 **JSON Format**:
+        🔹 **Sales Insights**:
+        - Identify **best-selling and low-selling products**.
+
+        **Data Provided**:
+        - **Customers & Orders**:
+          {customer_summary}
+        - **Inventory**:
+          {inventory_summary}
+        - **Sales Data**:
+          - Best-Sellers: {best_sellers}
+          - Low-Sellers: {low_sellers}
+
+        🔹 **Output Strict JSON Format**:
         {{
             "customers": [...],
             "inventory": [...],
