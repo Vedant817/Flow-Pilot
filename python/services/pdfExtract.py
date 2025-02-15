@@ -14,7 +14,7 @@ reader = easyocr.Reader(['en'])
 sample_email_data = {
     "customer_name": "Vishal Mahajan",
     "email": "vmahajan_be22@thapar.edu",
-    "body": "Hello, I would like to order 2 MacBook and 1 iPhone\n",
+    "body": "Hello, I would like to order two MackBook and one iPhone\n",
     "Date": "2025-02-01",
     "Time": "14:12:54"
 }
@@ -66,8 +66,10 @@ def send_to_gemini(data):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
-You are an AI that extracts structured order details from the provided text and returns a valid JSON object. The response should strictly follow this schema:
+You are an AI that extracts **structured order details** from the provided text and returns a valid JSON object.  
+Your primary task is to **accurately extract product details, even if they are misspelled**, using intelligent spelling correction.
 
+### **STRICT RESPONSE FORMAT (MUST FOLLOW THIS JSON SCHEMA)**:
 {{
     "Customer Name": "string",
     "Email": "string",
@@ -81,17 +83,18 @@ You are an AI that extracts structured order details from the provided text and 
     ]
 }}
 
-### Instructions:
-1. **Ensure the "Products" array is never empty.** If no products are found, return `"Products": []` but prioritize extracting products correctly.
-2. **Extract product names and quantities accurately** from the given data. If quantity is missing, assume it as `1`.
-3. **Use the latest date and time found in the text** for `"Date"` and `"Time"`.
-4. **Do not include unnecessary text** in the JSON. **Only return valid JSON** with no explanations or markdown formatting.
+### **STRICT RULES & INSTRUCTIONS:**
+1. **Ensure the "Products" array is never empty.** If no valid products are found, return `"Products": []`.
+2. **Correct spelling mistakes** in product names using context and database references.
+3. **Infer missing quantities**: If a quantity is missing, assume `1` by default.
+4. **Use the most recent date & time found in the text** for `"Date"` and `"Time"`.
+5. **Remove unnecessary text, explanations, or markdown formatting.** **Return only a valid JSON object.**
+6. **If a product is ambiguous**, use the most probable correct name based on similarity matching.
 
-### Input:
+### **INPUT TEXT**:
 {data}
 
-### Expected Output:
-Return only the JSON object as per the schema above.
+### **STRICTLY RETURN ONLY THIS JSON STRUCTURE AS OUTPUT**:
 """
 
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
