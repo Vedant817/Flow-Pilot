@@ -6,9 +6,10 @@ import os
 import threading
 import json
 from datetime import datetime, timedelta
-from emailContentExtract import extract_order_details
-from order_handling import process_order_details
+from emailContentExtract import extract_email_details
+from order_handling import process_order_details, process_order_change, process_complaint, process_other_email
 from email_check import suspicious_email_check
+from email_classification import classify_email
 
 excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
@@ -63,36 +64,57 @@ def handle_modified_file():
         return
     
     changes = compare_changes(new_content)
+    changes_file = "changes.json"
     
-    if changes:
-        with open('changes.json', 'w') as f:
-            json.dump(changes, f, indent=4)
-        
-        for change in changes:
-            email = change.get("Email")
-            subject = change.get("Subject")
-            body = change.get("Body")
-            date = change.get('Date')
-            time = change.get('Time')
-            email_status = suspicious_email_check(email)
-            is_valid, status = email_status
-            if is_valid:
-                print('✅ Email is valid')
-                # order_details = extract_order_details(body)
-                # if order_details:
-                #     process_order_details(email, subject, date, time, order_details)
-                # else:
-                #     print("No order details extracted.")
-            else:
-                print('❌ Email is NOT valid - Status:', status)
-
-                if status == "Suspicious":
-                    print("⚠️ Warning: This email is flagged as suspicious.")
-                elif status == "Exception":
-                    print("❗ Error: There was an issue validating the email.")
-                else:
-                    print("ℹ️ Email is invalid or not recognized.")
-                pass #TODO Handle the case
+    try:
+        if changes:
+            with open(changes_file, 'w') as f:
+                json.dump(changes, f, indent=4)
+            
+            for change in changes:
+                email = change.get("Email")
+                subject = change.get("Subject")
+                body = change.get("Body")
+                date = change.get('Date')
+                time = change.get('Time')
+                email_status = suspicious_email_check(email)
+                is_valid, status = email_status
+                if is_valid:
+                    email_type, email_type_status = classify_email(body)
+                    if(email_type_status == 200):
+                        if email_type == "Order":
+                            order_details = extract_email_details(body)
+                            if order_details:
+                                process_order_details(email, subject, date, time, order_details)
+                            else:
+                                print("No order details extracted from Order email.")
+                        
+                        elif email_type == "Change of Order":
+                            order_details = extract_email_details(body)
+                            if order_details:
+                                process_order_change(email, subject, date, time, order_details)
+                            else:
+                                print("No order details extracted from Change of Order email.")
+                        
+                        elif email_type == "Complaint":
+                            process_complaint(email, subject, body, date, time)
+                        
+                        elif email_type == "Track & Trace":  # Other
+                            process_other_email(email, subject, body, date, time)
+                    else:
+                        print(f"Failed to classify email. Status: {email_type_status}")
+                else: #TODO Handle the case
+                    print('❌ Email is NOT valid - Status:', status)
+                    if status == "Suspicious":
+                        print("⚠️ Warning: This email is flagged as suspicious.")
+                    elif status == "Exception":
+                        print("❗ Error: There was an issue validating the email.")
+                    else:
+                        print("ℹ️ Email is invalid or not recognized.")
+                    pass
+    finally:
+        if os.path.exists(changes_file):
+            os.remove(changes_file)
 
 def start_monitoring():
     class ExcelFileHandler(FileSystemEventHandler):

@@ -62,3 +62,16 @@ def send_acknowledgment(order):
         body = f"Dear Customer,\n\nWe regret to inform you that we cannot fulfill your order due to insufficient stock.\n\nOrder Details:\n{json.dumps(order['products'], indent=2)}\n\nWe apologize for the inconvenience."
     
     send_email(subject, body=body, recipient_email=recipient_email, attachment_path=attachment_path)
+    
+def send_order_issue_email(email, errors):
+    """
+    Sends an email notifying the user that their order could not be processed due to errors.
+    """
+    
+    error_message = "\n".join(errors)
+    body = f"Dear Customer,\n\nWe could not process your order due to the following issues:\n\n{error_message}\n\nPlease review and resend your order.\n\nThank you."
+    send_email(
+        subject="Order Processing Issue",
+        body=body,
+        recipient_email=email
+    )

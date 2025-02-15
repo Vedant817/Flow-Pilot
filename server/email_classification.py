@@ -18,4 +18,5 @@ def classify_email(body):
     }
     
     response = requests.post(LEVITY_API_URL, json=payload, headers=headers)
-    return response.json()['labels'][0]['value'], response.status_code
+    result = response.json()
+    return result['labels'][0]['value'], response.status_code

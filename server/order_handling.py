@@ -3,14 +3,19 @@ from ai21.models.chat import UserMessage
 import json
 from dbConfig import connect_db
 from datetime import datetime, timedelta
-from send_email import send_acknowledgment
-from send_email import send_email
+from send_email import send_acknowledgment, send_email, send_order_issue_email
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 db = connect_db()
 
-client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
+API_KEY = os.getenv("AI21KEY")
+
+client = AI21Client(api_key=API_KEY)
 order_collection = db['orders']
 inventory_collection = db['inventory']
+customers_collection = db['customers']
 
 def validate_order_details_ai(order_details):
     """
@@ -22,7 +27,8 @@ def validate_order_details_ai(order_details):
             content=f"""
             You are an AI assistant validating order details.
             Check if the order contains incomplete, incorrect, or unclear details.
-            Always give errors in such that it can be sent through email and can be easily understood by the email reader and understand the issue.
+            Always return errors in simple, easy-to-read format.
+
             **Order Details:**
             {json.dumps(order_details, indent=2)}
 
@@ -41,7 +47,7 @@ def validate_order_details_ai(order_details):
             top_p=1.0
         )
         result = response.model_dump()
-        
+
         if "choices" in result and result["choices"]:
             content_str = result["choices"][0]["message"]["content"]
             validation_result = json.loads(content_str)
@@ -52,19 +58,6 @@ def validate_order_details_ai(order_details):
     except Exception as e:
         print(f"Error validating order details: {e}")
         return False, ["System error while validating order"]
-
-def send_order_issue_email(email, errors):
-    """
-    Sends an email notifying the user that their order could not be processed due to errors.
-    """
-    
-    error_message = "\n".join(errors)
-    body = f"Dear Customer,\n\nWe could not process your order due to the following issues:\n\n{error_message}\n\nPlease review and resend your order.\n\nThank you."
-    send_email(
-        subject="Order Processing Issue",
-        body=body,
-        recipient_email=email
-    )
 
 def extract_order_details_ai(email_text):
     """
@@ -116,22 +109,27 @@ def check_inventory(order_details):
     for order in order_details:
         product = order["product"]
         quantity = order["quantity"]
-        
+
         inventory_item = inventory_collection.find_one({"item": product})
         if not inventory_item or inventory_item["quantity"] < quantity:
             return False
 
     return True
 
-def add_orders_to_collection(email, subject, date, time, order_details):
+def get_customer_from_db(email):
+    """
+    Fetches customer details from the database using email.
+    Returns customer details if found, otherwise None.
+    """
+    return customers_collection.find_one({"email": email})
+
+def add_orders_to_collection(email, subject, date, time, customer_details, order_details):
     """
     Adds extracted order details to the MongoDB orders collection if no duplicate
     within 5 minutes.
     """
-    # Combine the date and time to create a datetime object for comparison
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
-    
-    # Check if there is an existing entry within 5 minutes
+
     existing_order = order_collection.find_one(
         {
             "email": email,
@@ -141,13 +139,15 @@ def add_orders_to_collection(email, subject, date, time, order_details):
             "time": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%H:%M:%S")}
         }
     )
-    
+
     if existing_order:
         print("Duplicate entry detected. Order not added.")
-    
+        return
+
     can_fulfill = check_inventory(order_details=order_details)
-    
+
     formatted_entry = {
+        "customer": customer_details,
         "email": email,
         "subject": subject,
         "date": date,
@@ -161,20 +161,47 @@ def add_orders_to_collection(email, subject, date, time, order_details):
 def process_order_details(email, subject, date, time, order_details):
     """
     Processes extracted order details, validates them using AI, and adds them to the database.
-    Sends an email if the order is invalid.
+    Checks if the customer exists and fills missing details if needed.
     """
-    # is_valid, errors = validate_order_details_ai(order_details)
+    customer_details = order_details.get("customer", None)
+    orders = order_details.get("orders", None)
 
+    if not orders:
+        send_order_issue_email(email, ["No order details were found in your email. Please send a valid order."])
+        return
+
+    is_valid, errors = validate_order_details_ai(orders)
+
+    print('Is valid:', is_valid)
+    print('Errors:', errors)
     # if not is_valid:
     #     send_order_issue_email(email, errors)
-    #     return  # Stop further processing
+    #     return
 
-    structured_orders = []
-    for order in order_details:
-        structured_orders.append({
-            "product": order["product"],
-            "quantity": order["quantity"]
-        })
-    
-    if structured_orders:
-        add_orders_to_collection(email, subject, date, time, order_details=structured_orders)   
+    # existing_customer = get_customer_from_db(email)
+
+    # if existing_customer:
+    #     if not customer_details or not all(k in customer_details for k in ["name", "email", "phone"]):
+    #         customer_details = {
+    #             "name": existing_customer.get("name", ""),
+    #             "email": existing_customer.get("email", ""),
+    #             "phone": existing_customer.get("phone", "")
+    #         }
+        
+    #     if not all(customer_details.values()):
+    #         send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
+    #         return
+    # else:
+    #     send_order_issue_email(email, ["We could not find your details in our system. Please register first."])
+    #     return
+
+    # add_orders_to_collection(email, subject, date, time, customer_details, orders)
+
+def process_order_change(email, subject, date, time, order_details):
+    pass
+
+def process_complaint(email, subject, body, date, time):
+    pass
+
+def process_other_email(email, subject, body, date, time):
+    pass
