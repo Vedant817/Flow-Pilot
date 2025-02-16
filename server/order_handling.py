@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from send_email import send_acknowledgment, send_email, send_order_issue_email
 import os
 from dotenv import load_dotenv
+from gemini_config import gemini_model
+import re
 
 load_dotenv()
 db = connect_db()
@@ -18,46 +20,39 @@ inventory_collection = db['inventory']
 customers_collection = db['customers']
 
 def validate_order_details_ai(order_details):
-    """
-    Uses AI21 to validate order details and determine if they are incomplete or incorrect.
-    Returns True if valid, False otherwise, along with an error message.
-    """
-    messages = [
-        UserMessage(
-            content=f"""
-            You are an AI assistant validating order details.
-            Check if the order contains incomplete, incorrect, or unclear details.
-            Always return errors in simple, easy-to-read format.
+    prompt = f"""
+    You are an AI assistant validating order details.
+    Your task is to check if the order contains incomplete, incorrect, or unclear details.
 
-            **Order Details:**
-            {json.dumps(order_details, indent=2)}
+    **Validation Criteria:**
+    - Ensure that each item has a product name and quantity.
+    - The price is not required.
+    - If any required detail is missing or unclear, list it as an error.
 
-            **Expected JSON Output:**
-            {{
-                "valid": true/false,
-                "errors": ["Error message 1", "Error message 2"]
-            }}
-            """
-        )
-    ]
+    **Order Details:**
+    {json.dumps(order_details, indent=2)}
+
+    **Expected JSON Output (Strict Format, No Explanation):**
+    {{
+        "valid": true/false,
+        "errors": ["Missing quantity for product X"]
+    }}
+    """
+
     try:
-        response = client.chat.completions.create(
-            model="jamba-1.5-large",
-            messages=messages,
-            top_p=1.0
-        )
-        result = response.model_dump()
+        response = gemini_model.generate_content(prompt)
+        ai_response = response.text.strip()
 
-        if "choices" in result and result["choices"]:
-            content_str = result["choices"][0]["message"]["content"]
-            validation_result = json.loads(content_str)
+        clean_response = re.sub(r"```json|```", "", ai_response).strip()
+
+        try:
+            validation_result = json.loads(clean_response)
             return validation_result.get("valid", False), validation_result.get("errors", [])
-        else:
-            print("Error: No choices found in API response.")
-            return False, ["AI validation failed"]
+        except json.JSONDecodeError as e:
+            return False, [f"Invalid AI response format. JSON Parsing Error: {str(e)}"]
+
     except Exception as e:
-        print(f"Error validating order details: {e}")
-        return False, ["System error while validating order"]
+        return False, [f"System error while validating order: {str(e)}"]
 
 def extract_order_details_ai(email_text):
     """
@@ -117,23 +112,14 @@ def check_inventory(order_details):
     return True
 
 def get_customer_from_db(email):
-    """
-    Fetches customer details from the database using email.
-    Returns customer details if found, otherwise None.
-    """
     return customers_collection.find_one({"email": email})
 
-def add_orders_to_collection(email, subject, date, time, customer_details, order_details):
-    """
-    Adds extracted order details to the MongoDB orders collection if no duplicate
-    within 5 minutes.
-    """
+def add_orders_to_collection(email, date, time, customer_details, order_details):
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
 
     existing_order = order_collection.find_one(
         {
             "email": email,
-            "subject": subject,
             "products": order_details,
             "date": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%Y-%m-%d")},
             "time": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%H:%M:%S")}
@@ -149,20 +135,16 @@ def add_orders_to_collection(email, subject, date, time, customer_details, order
     formatted_entry = {
         "customer": customer_details,
         "email": email,
-        "subject": subject,
         "date": date,
         "time": time,
         "products": order_details,
         "can_fulfill": can_fulfill
-    }
+    } #TODO: Update the inventory after order is added
     order_collection.insert_one(formatted_entry)
-    send_acknowledgment(formatted_entry)
+    print('Order added to collection.')
+    # send_acknowledgment(formatted_entry) #TODO: Uncomment this line to send acknowledgment email, Make sure to update the email template
 
 def process_order_details(email, subject, date, time, order_details):
-    """
-    Processes extracted order details, validates them using AI, and adds them to the database.
-    Checks if the customer exists and fills missing details if needed.
-    """
     customer_details = order_details.get("customer", None)
     orders = order_details.get("orders", None)
 
@@ -172,30 +154,29 @@ def process_order_details(email, subject, date, time, order_details):
 
     is_valid, errors = validate_order_details_ai(orders)
 
-    print('Is valid:', is_valid)
-    print('Errors:', errors)
-    # if not is_valid:
-    #     send_order_issue_email(email, errors)
-    #     return
+    if not is_valid:
+        send_order_issue_email(email, errors)
+        return
 
-    # existing_customer = get_customer_from_db(email)
+    existing_customer = get_customer_from_db(email)
 
-    # if existing_customer:
-    #     if not customer_details or not all(k in customer_details for k in ["name", "email", "phone"]):
-    #         customer_details = {
-    #             "name": existing_customer.get("name", ""),
-    #             "email": existing_customer.get("email", ""),
-    #             "phone": existing_customer.get("phone", "")
-    #         }
+    if existing_customer:
+        if not customer_details or not all(k in customer_details for k in ["name", "email", "phone"]):
+            customer_details = {
+                "name": existing_customer.get("name", ""),
+                "email": existing_customer.get("email", ""),
+                "phone": existing_customer.get("phone", ""),
+                "address": existing_customer.get("address", "")
+            }
         
-    #     if not all(customer_details.values()):
-    #         send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
-    #         return
-    # else:
-    #     send_order_issue_email(email, ["We could not find your details in our system. Please register first."])
-    #     return
-
-    # add_orders_to_collection(email, subject, date, time, customer_details, orders)
+        if all(customer_details.values()):
+            print("Customer details are complete. Proceeding with order processing.")
+            add_orders_to_collection(email, date, time, customer_details, orders)
+        else:
+            send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
+    else:
+        send_order_issue_email(email, ["We could not find your details in our system. Please provides all the details regarding the contact details."])
+        return
 
 def process_order_change(email, subject, date, time, order_details):
     pass

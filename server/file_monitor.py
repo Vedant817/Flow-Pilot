@@ -26,7 +26,6 @@ def read_excel_file():
         
         for row in sheet.iter_rows(min_row=2, values_only=True):
             if isinstance(row, tuple):
-                #* Skip empty rows (rows where all values are None or empty strings)
                 if all(cell is None or cell == '' for cell in row):
                     continue
                 
@@ -71,7 +70,7 @@ def handle_modified_file():
             with open(changes_file, 'w') as f:
                 json.dump(changes, f, indent=4)
             
-            for change in changes:
+            for change in changes: #TODO: Handle the case of file extraction
                 email = change.get("Email")
                 subject = change.get("Subject")
                 body = change.get("Body")
@@ -82,14 +81,14 @@ def handle_modified_file():
                 if is_valid:
                     email_type, email_type_status = classify_email(body)
                     if(email_type_status == 200):
-                        if email_type == "Order":
+                        if email_type == "Order confirmation":
                             order_details = extract_email_details(body)
                             if order_details:
                                 process_order_details(email, subject, date, time, order_details)
                             else:
                                 print("No order details extracted from Order email.")
                         
-                        elif email_type == "Change of Order":
+                        elif email_type == "Change of Order":  #! I'm here
                             order_details = extract_email_details(body)
                             if order_details:
                                 process_order_change(email, subject, date, time, order_details)
@@ -99,7 +98,7 @@ def handle_modified_file():
                         elif email_type == "Complaint":
                             process_complaint(email, subject, body, date, time)
                         
-                        elif email_type == "Track & Trace":  # Other
+                        elif email_type == "Track & Trace":
                             process_other_email(email, subject, body, date, time)
                     else:
                         print(f"Failed to classify email. Status: {email_type_status}")
