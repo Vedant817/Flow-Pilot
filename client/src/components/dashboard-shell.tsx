@@ -26,8 +26,9 @@ import { ChatbotView } from "./chatbot-view";
 import { motion } from "framer-motion";
 import { FeedbackSection } from "./feedback-section";
 import { InventoryForecasting } from "./inventory-forecasting";
+import { DeadStock } from "./deadstock";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting";
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock";
 
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
@@ -36,6 +37,7 @@ const navigationItems = [
   { label: "Chatbot", icon: MessageSquare, view: "chatbot" as const, color: "text-orange-600" },
   { label: "Feedback", icon: Star, view: "feedback" as const, color: "text-yellow-600" },
   { label: "Inventory Forecasting", icon: Box, view: "inventory-forecasting" as const, color: "text-green-600" },
+  { label: "Deadstock", icon: Star, view: "deadstock" as const, color: "text-red-600" },
 ];
 
 export function DashboardShell() {
@@ -155,6 +157,7 @@ export function DashboardShell() {
     {currentView === "chatbot" && <ChatbotView />}
     {currentView === "feedback" && <FeedbackSection />}
     {currentView === "inventory-forecasting" && <InventoryForecasting />}
+    {currentView === "deadstock" && <DeadStock/>}
   </motion.div>
 </main>
 
