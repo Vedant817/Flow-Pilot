@@ -6,6 +6,7 @@ import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import re
 from flask import Flask, jsonify
+from flask_cors import CORS
 from python.ai.deadstock import identify_deadstocks
 from python.ai.dynamicPricing import generate_pricing_suggestions
 from python.ai.freeProduct import assign_free_products
@@ -19,6 +20,7 @@ from python.ai.sentimentAnalysis import generate_feedback_report
 
 # ✅ Initialize Flask App
 app = Flask(__name__)
+CORS(app)
 
 # ✅ Connect to MongoDB
 MONGO_URI = os.getenv("MONGO_URI")

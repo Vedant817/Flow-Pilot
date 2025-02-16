@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { BarChart3, Box, MessageSquare, Search, ShoppingCart, Zap, BellRing } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useState } from "react";
+import Link from "next/link";
+import { BarChart3, Box, MessageSquare, Search, ShoppingCart, Zap, BellRing, Star } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Sidebar,
   SidebarContent,
@@ -18,26 +18,28 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { DataTable } from "./data-table"
-import { InventoryView } from "./inventory-view"
-import { Analytics } from "./analytics"
-import { ChatbotView } from "./chatbot-view"
-import { motion } from "framer-motion"
+} from "@/components/ui/sidebar";
+import { DataTable } from "./data-table";
+import { InventoryView } from "./inventory-view";
+import { Analytics } from "./analytics";
+import { ChatbotView } from "./chatbot-view";
+import { motion } from "framer-motion";
+import { FeedbackSection } from "./feedback-section";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot"
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback";
 
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
   { label: "Inventory", icon: Box, view: "inventory" as const, count: "150", color: "text-green-600" },
-  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600", subsections: ["Sales", "Customer Trends", "Revenue"] },
+  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600", subsections: ["Sales", "Customer Trends", "Revenue", "Feedback"] },
   { label: "Chatbot", icon: MessageSquare, view: "chatbot" as const, color: "text-orange-600" },
-]
+  { label: "Feedback", icon: Star, view: "feedback" as const, color: "text-yellow-600" },
+];
 
 export function DashboardShell() {
-  const [search, setSearch] = useState("")
-  const [currentView, setCurrentView] = useState<View>("orders")
-  const [currentSubsection, setCurrentSubsection] = useState<string | null>(null)
+  const [search, setSearch] = useState("");
+  const [currentView, setCurrentView] = useState<View>("orders");
+  const [currentSubsection, setCurrentSubsection] = useState<string | null>(null);
 
   return (
     <SidebarProvider>
@@ -71,10 +73,7 @@ export function DashboardShell() {
                 <SidebarMenu>
                   {navigationItems.map((item) => (
                     <SidebarMenuItem key={item.label}>
-                      <motion.div
-                        whileHover={{ x: 5 }}
-                        transition={{ duration: 0.2 }}
-                      >
+                      <motion.div whileHover={{ x: 5 }} transition={{ duration: 0.2 }}>
                         <Button
                           variant="ghost"
                           onClick={() => {
@@ -82,9 +81,7 @@ export function DashboardShell() {
                             if (item.subsections) setCurrentSubsection(item.subsections[0]);
                           }}
                           className={`w-full justify-start gap-3 ${
-                            currentView === item.view
-                              ? 'bg-blue-50 text-blue-600'
-                              : 'hover:bg-gray-100'
+                            currentView === item.view ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
                           }`}
                         >
                           <item.icon className={`h-5 w-5 ${item.color}`} />
@@ -95,22 +92,6 @@ export function DashboardShell() {
                             </span>
                           )}
                         </Button>
-                        {item.subsections && currentView === item.view && (
-                          <div className="ml-6 mt-2 space-y-1">
-                            {item.subsections.map((sub) => (
-                              <Button
-                                key={sub}
-                                variant="ghost"
-                                className={`w-full justify-start pl-10 ${
-                                  currentSubsection === sub ? 'text-blue-600 font-bold' : 'hover:bg-gray-100'
-                                }`}
-                                onClick={() => setCurrentSubsection(sub)}
-                              >
-                                {sub}
-                              </Button>
-                            ))}
-                          </div>
-                        )}
                       </motion.div>
                     </SidebarMenuItem>
                   ))}
@@ -137,9 +118,7 @@ export function DashboardShell() {
                 <PopoverContent>
                   <div className="space-y-2">
                     <h3 className="font-medium">Notifications</h3>
-                    <div className="space-y-1">
-                      {/* Add notification items here */}
-                    </div>
+                    <div className="space-y-1">{/* Add notification items here */}</div>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -151,19 +130,16 @@ export function DashboardShell() {
           </header>
 
           <main className="flex-1 overflow-auto p-6 h-full">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               {currentView === "orders" && <DataTable />}
               {currentView === "inventory" && <InventoryView />}
               {currentView === "analytics" && <Analytics subsection={currentSubsection} />}
               {currentView === "chatbot" && <ChatbotView />}
+              {currentView === "feedback" && <FeedbackSection />}
             </motion.div>
           </main>
         </div>
       </div>
     </SidebarProvider>
-  )
+  );
 }
