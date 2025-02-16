@@ -17,6 +17,7 @@ from python.ai.loyaltyRewards import assign_loyalty_rewards
 from python.ai.personalisedEmail import generate_personalized_offers
 from python.ai.priorOrder import prioritize_orders
 from python.ai.sentimentAnalysis import generate_feedback_report
+from python.ai.partners import recommend_partner_products
 
 # ✅ Initialize Flask App
 app = Flask(__name__)
@@ -88,6 +89,11 @@ def get_prioritized_orders():
 def feedback_report():
     report = generate_feedback_report()
     return jsonify({"feedback_report": report})
+
+# @app.route('/partner-product-recommendations', methods=['GET'])
+# def get_partner_product_recommendations():
+#     recommendations_list = recommend_partner_products()
+#     return jsonify(recommendations_list)
 
 # ✅ Run Flask Server
 if __name__ == '__main__':
