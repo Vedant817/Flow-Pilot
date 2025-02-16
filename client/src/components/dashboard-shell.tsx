@@ -31,8 +31,9 @@ import { LimitedTimeDeals } from "./limited-time-deals";
 import { FreeProductsOffer } from "./free-products-offer";
 import { PriceAdjustments } from "./price-adjustment";
 import {PersonalizedOffers} from "./personalized-offers";
+import { LoyaltyRewards } from "./loyalty-rewards";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments" | "personalized-offers";
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments" | "personalized-offers"|"loyalty-rewards";
 
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
@@ -46,6 +47,7 @@ const navigationItems = [
   { label: "Free Products Offer", icon: Star, view: "free-products-offer" as const, color: "text-purple-600" },
   { label: "Price Adjustments", icon: Box, view: "price-adjustments" as const, color: "text-blue-600" },
   { label: "Personalized Offers", icon: BarChart3, view: "personalized-offers" as const, color: "text-green-600" },
+  { label: "Loyalty Rewards", icon: Star, view: "loyalty-rewards" as const, color: "text-yellow-900" },
 ];
 
 export function DashboardShell() {
@@ -170,6 +172,7 @@ export function DashboardShell() {
     {currentView === "free-products-offer" && <FreeProductsOffer/>}
     {currentView === "price-adjustments" && <PriceAdjustments/>}
     {currentView === "personalized-offers" && <PersonalizedOffers/>}
+    {currentView === "loyalty-rewards" && <LoyaltyRewards/>}
   </motion.div>
 </main>
 
