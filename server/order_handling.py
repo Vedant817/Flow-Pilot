@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 from gemini_config import gemini_model
 import re
+from pymongo import DESCENDING
 
 load_dotenv()
 db = connect_db()
@@ -97,10 +98,6 @@ def extract_order_details_ai(email_text):
         return []
 
 def check_inventory(order_details):
-    """
-    Checks if the inventory can fulfill the given order.
-    Returns True if order can be fulfilled, otherwise False.
-    """
     for order in order_details:
         product = order["product"]
         quantity = order["quantity"]
@@ -133,18 +130,21 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
     can_fulfill = check_inventory(order_details=order_details)
 
     formatted_entry = {
-        "customer": customer_details,
+        "name": customer_details['name'],
+        "phone": customer_details['phone'],
         "email": email,
         "date": date,
         "time": time,
         "products": order_details,
-        "can_fulfill": can_fulfill
+        "status": "pending fulfillment",
+        "orderLink": ""
+        # "can_fulfill": can_fulfill
     } #TODO: Update the inventory after order is added
     order_collection.insert_one(formatted_entry)
     print('Order added to collection.')
     # send_acknowledgment(formatted_entry) #TODO: Uncomment this line to send acknowledgment email, Make sure to update the email template
 
-def process_order_details(email, subject, date, time, order_details):
+def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
     orders = order_details.get("orders", None)
 
@@ -178,8 +178,39 @@ def process_order_details(email, subject, date, time, order_details):
         send_order_issue_email(email, ["We could not find your details in our system. Please provides all the details regarding the contact details."])
         return
 
-def process_order_change(email, subject, date, time, order_details):
-    pass
+def process_order_change(email, date, time, order_details):
+    try:
+        latest_order = order_collection.find_one({"email": email}, sort=[("date", DESCENDING), ("time", DESCENDING)])
+        if not latest_order:
+            process_order_details(email, date, time, order_details)
+            return
+
+        if latest_order.get("status") not in ["pending fulfillment", "partially fulfilled"]:
+            process_order_details(email, date, time, order_details)
+            return
+        
+        existing_products = {item["product"]: item["quantity"] for item in latest_order["products"]}
+        
+        for new_item in order_details.get("orders", []):
+            product_name = new_item["product"]
+            quantity = new_item["quantity"]
+            
+            if product_name in existing_products:
+                existing_products[product_name] += quantity
+            else:
+                existing_products[product_name] = quantity
+
+        updated_products = [{"name": name, "quantity": qty} for name, qty in existing_products.items()]
+        order_collection.update_one(
+            {"_id": latest_order["_id"]},
+            {"$set": {"products": updated_products}}
+        )
+        
+        # send_acknowledgment({"email": email, "message": "Your order has been updated successfully."}) #TODO: Send customer acknowledgment email
+    
+    except Exception as e:
+        print(f"Error updating order: {e}")
+        # send_order_issue_email(email, ["An error occurred while updating your order."])
 
 def process_complaint(email, subject, body, date, time):
     pass
