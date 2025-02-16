@@ -2,6 +2,9 @@ import requests
 from dotenv import load_dotenv
 import os
 from dbConfig import connect_db
+from gemini_config import gemini_model
+import re
+import uuid
 
 load_dotenv()
 db = connect_db()
@@ -9,6 +12,24 @@ feedback_collection = db["feedback"]
 
 SURVEY_ID = os.getenv("FORMBRICKS_SURVEY_ID")
 API_KEY = os.getenv("FORMBRICKS_API_KEY")
+
+def extract_review(body):
+    prompt = f"""
+    Extract the review from the following text:
+    ---
+    {body}
+    ---
+    If no review is found, return "No review".
+    """
+    
+    try:
+        response = gemini_model.generate_content(prompt)
+        ai_response = response.text.strip()
+        clean_response = re.sub(r"```json|```", "", ai_response).strip()
+        
+        return clean_response if clean_response.lower() != "no review" else None
+    except Exception as e:
+        return None
 
 def fetch_feedback():
     url = f"https://app.formbricks.com/api/v1/management/responses?surveyId={SURVEY_ID}"
@@ -43,7 +64,22 @@ def store_feedback(responses):
     if new_responses:
         feedback_collection.insert_many(new_responses)
 
-    return {"message": "Processed", "new_entries": len(new_responses)}
+    all_feedbacks = list(feedback_collection.find({}, {"_id": 0}))
+    return {"feedbacks": all_feedbacks}
 
-def process_complaint(email, subject, body, date, time):
-    pass
+def process_complaint(email, body, date, time):
+    review = extract_review(body)
+
+    if not review:
+        return {"message": "No review found, not stored"}
+
+    feedback_entry = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "review": review,
+        "createdAt": f"{date} {time}"
+    }
+    
+    feedback_collection.insert_one(feedback_entry)
+    
+    return {"message": "Feedback stored successfully"}

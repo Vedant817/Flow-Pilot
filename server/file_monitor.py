@@ -7,9 +7,10 @@ import threading
 import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_email_details
-from order_handling import process_order_details, process_order_change, process_complaint, process_other_email
+from order_handling import process_order_details, process_order_change, process_other_email
 from email_check import suspicious_email_check
 from email_classification import classify_email
+from feedback_handle import process_complaint
 
 excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
@@ -84,19 +85,19 @@ def handle_modified_file():
                         if email_type == "Order confirmation":
                             order_details = extract_email_details(body)
                             if order_details:
-                                process_order_details(email, subject, date, time, order_details)
+                                process_order_details(email, date, time, order_details)
                             else:
                                 print("No order details extracted from Order email.")
                         
-                        elif email_type == "Change of Order":  #! I'm here
+                        elif email_type == "Change to order":
                             order_details = extract_email_details(body)
                             if order_details:
-                                process_order_change(email, subject, date, time, order_details)
+                                process_order_change(email, date, time, order_details)
                             else:
                                 print("No order details extracted from Change of Order email.")
                         
-                        elif email_type == "Complaint":
-                            process_complaint(email, subject, body, date, time)
+                        elif email_type == "Complaint": #! I'm here
+                            process_complaint(email, body, date, time)
                         
                         elif email_type == "Track & Trace":
                             process_other_email(email, subject, body, date, time)
