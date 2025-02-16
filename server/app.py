@@ -1,8 +1,8 @@
-from flask import Flask, request, jsonify # type: ignore
+from flask import Flask, jsonify # type: ignore
 import threading
 from file_monitor import start_monitoring
 from dbConfig import connect_db
-from feedback_handle import process_feedback
+from feedback_handle import fetch_feedback, store_feedback
 
 db = connect_db()
 
@@ -20,10 +20,11 @@ def index():
     return 'File Monitoring is Already Running!', 200
 
 @app.route('/get-feedback')
-def feedback():
+def get_feedback():
     try:
-        response = process_feedback()
-        return jsonify(response[0]), 200
+        feedback_data = fetch_feedback()
+        response = store_feedback(feedback_data)
+        return jsonify(response), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
