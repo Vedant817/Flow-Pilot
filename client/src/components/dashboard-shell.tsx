@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { lazy, useState } from "react";
 import Link from "next/link";
 import { BarChart3, Box, MessageSquare, Search, ShoppingCart, Zap, BellRing, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,8 +30,9 @@ import { DeadStock } from "./deadstock";
 import { LimitedTimeDeals } from "./limited-time-deals";
 import { FreeProductsOffer } from "./free-products-offer";
 import { PriceAdjustments } from "./price-adjustment";
+import {PersonalizedOffers} from "./personalized-offers";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments";
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments" | "personalized-offers";
 
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
@@ -44,6 +45,7 @@ const navigationItems = [
   { label: "Limited Time Deals", icon:MessageSquare, view: "limited-time-deals" as const, color: "text-yellow-600" },
   { label: "Free Products Offer", icon: Star, view: "free-products-offer" as const, color: "text-purple-600" },
   { label: "Price Adjustments", icon: Box, view: "price-adjustments" as const, color: "text-blue-600" },
+  { label: "Personalized Offers", icon: BarChart3, view: "personalized-offers" as const, color: "text-green-600" },
 ];
 
 export function DashboardShell() {
@@ -167,6 +169,7 @@ export function DashboardShell() {
     {currentView === "limited-time-deals" && <LimitedTimeDeals/>}
     {currentView === "free-products-offer" && <FreeProductsOffer/>}
     {currentView === "price-adjustments" && <PriceAdjustments/>}
+    {currentView === "personalized-offers" && <PersonalizedOffers/>}
   </motion.div>
 </main>
 
