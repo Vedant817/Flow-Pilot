@@ -25,15 +25,17 @@ import { Analytics } from "./analytics";
 import { ChatbotView } from "./chatbot-view";
 import { motion } from "framer-motion";
 import { FeedbackSection } from "./feedback-section";
+import { InventoryForecasting } from "./inventory-forecasting";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback";
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting";
 
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
   { label: "Inventory", icon: Box, view: "inventory" as const, count: "150", color: "text-green-600" },
-  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600", subsections: ["Sales", "Customer Trends", "Revenue", "Feedback"] },
+  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600", subsections: ["Sales", "Customer Trends", "Revenue"] },
   { label: "Chatbot", icon: MessageSquare, view: "chatbot" as const, color: "text-orange-600" },
   { label: "Feedback", icon: Star, view: "feedback" as const, color: "text-yellow-600" },
+  { label: "Inventory Forecasting", icon: Box, view: "inventory-forecasting" as const, color: "text-green-600" },
 ];
 
 export function DashboardShell() {
@@ -128,16 +130,34 @@ export function DashboardShell() {
               </Avatar>
             </div>
           </header>
-
           <main className="flex-1 overflow-auto p-6 h-full">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              {currentView === "orders" && <DataTable />}
-              {currentView === "inventory" && <InventoryView />}
-              {currentView === "analytics" && <Analytics subsection={currentSubsection} />}
-              {currentView === "chatbot" && <ChatbotView />}
-              {currentView === "feedback" && <FeedbackSection />}
-            </motion.div>
-          </main>
+  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+    {currentView === "orders" && <DataTable />}
+    {currentView === "inventory" && <InventoryView />}
+    
+    {currentView === "analytics" && (
+      <div>
+        <div className="flex gap-4 mb-4">
+          {navigationItems.find((item) => item.view === "analytics")?.subsections?.map((sub) => (
+            <Button
+              key={sub}
+              variant={currentSubsection === sub ? "default" : "outline"}
+              onClick={() => setCurrentSubsection(sub)}
+            >
+              {sub}
+            </Button>
+          ))}
+        </div>
+        <Analytics subsection={currentSubsection} />
+      </div>
+    )}
+
+    {currentView === "chatbot" && <ChatbotView />}
+    {currentView === "feedback" && <FeedbackSection />}
+    {currentView === "inventory-forecasting" && <InventoryForecasting />}
+  </motion.div>
+</main>
+
         </div>
       </div>
     </SidebarProvider>
