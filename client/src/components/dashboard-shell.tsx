@@ -30,13 +30,14 @@ type View = "orders" | "inventory" | "analytics" | "chatbot"
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
   { label: "Inventory", icon: Box, view: "inventory" as const, count: "150", color: "text-green-600" },
-  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600" },
+  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600", subsections: ["Sales", "Customer Trends", "Revenue"] },
   { label: "Chatbot", icon: MessageSquare, view: "chatbot" as const, color: "text-orange-600" },
 ]
 
 export function DashboardShell() {
   const [search, setSearch] = useState("")
   const [currentView, setCurrentView] = useState<View>("orders")
+  const [currentSubsection, setCurrentSubsection] = useState<string | null>(null)
 
   return (
     <SidebarProvider>
@@ -76,7 +77,10 @@ export function DashboardShell() {
                       >
                         <Button
                           variant="ghost"
-                          onClick={() => setCurrentView(item.view)}
+                          onClick={() => {
+                            setCurrentView(item.view);
+                            if (item.subsections) setCurrentSubsection(item.subsections[0]);
+                          }}
                           className={`w-full justify-start gap-3 ${
                             currentView === item.view
                               ? 'bg-blue-50 text-blue-600'
@@ -91,6 +95,22 @@ export function DashboardShell() {
                             </span>
                           )}
                         </Button>
+                        {item.subsections && currentView === item.view && (
+                          <div className="ml-6 mt-2 space-y-1">
+                            {item.subsections.map((sub) => (
+                              <Button
+                                key={sub}
+                                variant="ghost"
+                                className={`w-full justify-start pl-10 ${
+                                  currentSubsection === sub ? 'text-blue-600 font-bold' : 'hover:bg-gray-100'
+                                }`}
+                                onClick={() => setCurrentSubsection(sub)}
+                              >
+                                {sub}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
                       </motion.div>
                     </SidebarMenuItem>
                   ))}
@@ -130,7 +150,7 @@ export function DashboardShell() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-6 h-full">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -138,7 +158,7 @@ export function DashboardShell() {
             >
               {currentView === "orders" && <DataTable />}
               {currentView === "inventory" && <InventoryView />}
-              {currentView === "analytics" && <Analytics />}
+              {currentView === "analytics" && <Analytics subsection={currentSubsection} />}
               {currentView === "chatbot" && <ChatbotView />}
             </motion.div>
           </main>
