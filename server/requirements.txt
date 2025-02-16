@@ -6,3 +6,4 @@ python-dotenv
 pymongo
 fpdf
 zerobouncesdk
+google-genai
