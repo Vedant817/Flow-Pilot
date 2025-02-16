@@ -41,7 +41,7 @@ def generate_pricing_suggestions():
             demand = sales_data.get(name, 0)
 
             # ✅ Dynamic Pricing Strategy
-            if demand > 10 and stock < 5:  # High demand, low supply
+            if demand > 5 and stock < 35:  # High demand, low supply
                 new_price = round(old_price * 1.2, 2)  # Increase by 20%
             elif demand < 3 and stock > 20:  # Low demand, high supply
                 new_price = round(old_price * 0.85, 2)  # Decrease by 15%
@@ -56,19 +56,26 @@ def generate_pricing_suggestions():
 
         # Step 3: Generate AI Summary
         prompt = f"""
-        You are an AI business analyst. Based on demand and stock levels, suggest new pricing for each product.
-        - Maintain previous prices for reference.
-        
-        **Pricing Suggestions (Old vs. New Price)**:
-        {price_suggestions}
+You are an AI business analyst. Your task is to analyze product demand, stock levels, and suggest new pricing for products.
+Only include products where the new price is different from the old price.
 
-        Provide the output in JSON format:
-        {{
-            "pricing_recommendations": [
-                {{"Product": "Product Name", "Old Price": Old_Price, "New Price": New_Price}}
-            ]
-        }}
-        """
+- Use the given **pricing suggestions**.
+- Exclude products where the **new price** is the same as the **old price**.
+- Provide the response in **valid JSON format**.
+
+### Input Pricing Data:
+{price_suggestions}
+
+### Expected JSON Output Format:
+{{
+    "pricing_recommendations": [
+        {{"Product": "Product Name", "Old Price": Old_Price, "New Price": New_Price}}
+    ]
+}}
+
+Return only the adjusted prices in JSON format.
+"""
+
 
         response = gemini_model.generate_content(prompt)
         return response.text if response and response.text else {"error": "No response from AI"}
