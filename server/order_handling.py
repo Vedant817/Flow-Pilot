@@ -211,6 +211,3 @@ def process_order_change(email, date, time, order_details):
     except Exception as e:
         print(f"Error updating order: {e}")
         # send_order_issue_email(email, ["An error occurred while updating your order."])
-
-def process_other_email(email, subject, body, date, time):
-    pass

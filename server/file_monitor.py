@@ -7,7 +7,7 @@ import threading
 import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_email_details
-from order_handling import process_order_details, process_order_change, process_other_email
+from order_handling import process_order_details, process_order_change
 from email_check import suspicious_email_check
 from email_classification import classify_email
 from feedback_handle import process_complaint
@@ -99,8 +99,6 @@ def handle_modified_file():
                         elif email_type == "Complaint": #! I'm here
                             process_complaint(email, body, date, time)
                         
-                        elif email_type == "Track & Trace":
-                            process_other_email(email, subject, body, date, time)
                     else:
                         print(f"Failed to classify email. Status: {email_type_status}")
                 else: #TODO Handle the case
