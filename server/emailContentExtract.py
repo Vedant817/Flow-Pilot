@@ -1,31 +1,46 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
+import os
+from dotenv import load_dotenv
 
-client = AI21Client(api_key="D1BceAJqiz4b6oKoPjzTcM2OduvgVcye")
+load_dotenv()
 
-def extract_order_details(email_text):
+API_KEY = os.getenv("AI21KEY")
+
+client = AI21Client(api_key=API_KEY)
+
+def extract_email_details(email_text):
     """
-    Extracts structured order details from an email.
-    Returns a list of products and quantities.
+    Extracts structured order and customer details from an email.
+    Returns a dictionary with order details and customer information.
+    If details are missing, returns null for those fields.
     """
     messages = [
-            UserMessage(
-                content=f"""
-                You are an AI assistant extracting order details from an email.
-                Extract and return only in JSON format:
+        UserMessage(
+            content=f"""
+            You are an AI assistant extracting order and customer details from an email.
+            Extract and return only in JSON format.
 
-                **Email:**
-                "{email_text}"
+            **Email:**
+            "{email_text}"
 
-                **Expected JSON Output:**
-                {{
-                    "orders": [
-                        {{"product": "Product Name", "quantity": Number}}
-                    ]
-                }}
-                """
-            )
+            **Expected JSON Output:**
+            {{
+                "customer": {{
+                    "name": "Customer Name",
+                    "email": "customer@example.com",
+                    "phone": "123-456-7890"
+                }},
+                "orders": [
+                    {{"product": "Product Name", "quantity": Number}}
+                ]
+            }}
+
+            If customer details are not provided, set "customer" as null.
+            If order details are not provided, set "orders" as null.
+            """
+        )
     ]
     
     try:
@@ -36,14 +51,18 @@ def extract_order_details(email_text):
         )
 
         result = response.model_dump()
-        
+
         if "choices" in result and result["choices"]:
             content_str = result["choices"][0]["message"]["content"]
-            extracted_orders = json.loads(content_str)
-            return extracted_orders.get("orders", [])
+            extracted_data = json.loads(content_str)
+            
+            return {
+                "customer": extracted_data.get("customer", None),
+                "orders": extracted_data.get("orders", None)
+            }
         else:
             print("Error: No choices found in API response.")
-            return []
+            return {"customer": None, "orders": None}
     except Exception as e:
-        print(f"Error extracting order details: {e}")
-        return []
+        print(f"Error extracting email details: {e}")
+        return {"customer": None, "orders": None}
