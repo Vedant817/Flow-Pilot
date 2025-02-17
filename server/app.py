@@ -4,10 +4,16 @@ from file_monitor import start_monitoring
 from dbConfig import connect_db
 from feedback_handle import fetch_feedback, store_feedback
 from chatbot import ask_bot
+from flask_cors import CORS
 
 db = connect_db()
 
 app = Flask(__name__)
+CORS(app, resources={
+    r"/*": {
+        "origins": "*"
+    }
+})
 
 def start_monitoring_thread():
     if not any(thread.name == "FileMonitorThread" for thread in threading.enumerate()):
@@ -29,14 +35,13 @@ def get_feedback():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/chatbot')
+@app.route('/chatbot', methods=['POST'])
 def chat():
     query = request.args.get('query')
     if not query:
         return jsonify({"error": "Query parameter is required"}), 400
     
     response = ask_bot(query)
-    print(response)
     return jsonify({"response": response})
 
 if __name__ == '__main__':

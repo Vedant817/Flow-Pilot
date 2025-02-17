@@ -12,33 +12,8 @@ interface Message {
   timestamp: string;
 }
 
-const initialMessages: Message[] = [
-  {
-    role: "assistant",
-    content:
-      "Hello! I'm your order management assistant. How can I help you today?",
-    timestamp: new Date().toLocaleTimeString(),
-  },
-  {
-    role: "user",
-    content: "What was the most sold product in the last 6 months?",
-    timestamp: new Date().toLocaleTimeString(),
-  },
-  {
-    role: "assistant",
-    content:
-      "Based on our sales data for the last 6 months, the most sold product is the 'Premium Laptop'. Here's a quick summary:\n\n" +
-      "- Product: Premium Laptop\n" +
-      "- Total Units Sold: 1,250\n" +
-      "- Revenue Generated: $1,624,875\n" +
-      "- Peak Month: March 2024 with 275 units sold\n\n" +
-      "This product has consistently outperformed others in our electronics category. Is there any specific information about this product or its sales trend you'd like to know?",
-    timestamp: new Date().toLocaleTimeString(),
-  },
-];
-
 export function ChatbotView() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -51,29 +26,37 @@ export function ChatbotView() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
+  
     const newUserMessage: Message = {
       role: "user",
       content: input.trim(),
       timestamp: new Date().toLocaleTimeString(),
     };
-
+  
     setMessages((prev) => [...prev, newUserMessage]);
     setInput("");
     setIsTyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => {
-      const newAssistantMessage: Message = {
+  
+    try {
+      const res = await fetch(`http://localhost:5000/chatbot?query=${encodeURIComponent(input.trim())}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+  
+      const data = await res.json();
+      const botResponse: Message = {
         role: "assistant",
-        content:
-          "I'm analyzing your request. Here's what I found in our order management system...",
+        content: data.response.response || "I'm sorry, I couldn't process that.",
         timestamp: new Date().toLocaleTimeString(),
       };
-      setMessages((prev) => [...prev, newAssistantMessage]);
+  
+      setMessages((prev) => [...prev, botResponse]);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
       setIsTyping(false);
-    }, 1000);
-  };
+    }
+  };  
 
   return (
     <div className="flex flex-col bg-background border rounded-lg shadow-lg min-h-full w-full pb-6">
@@ -89,7 +72,7 @@ export function ChatbotView() {
           <Card
             key={i}
             className={`
-                            max-w-[80%] p-4 transition-all duration-200 ease-in-out 
+                            max-w-[80%] p-4 transition-all duration-200 ease-in-out min-h-full 
                             ${
                               message.role === "assistant"
                                 ? "ml-0 bg-muted hover:bg-muted/80 m-4"

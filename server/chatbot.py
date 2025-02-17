@@ -1,5 +1,4 @@
 import os
-import sys
 from dbConfig import connect_db
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
@@ -7,7 +6,6 @@ from langchain_chroma import Chroma
 from langchain.schema import Document
 from google.cloud import aiplatform
 from langchain_google_vertexai import VertexAIEmbeddings
-import google.generativeai as genai
 import pandas as pd
 from gemini_config import gemini_model
 

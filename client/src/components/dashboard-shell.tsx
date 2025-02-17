@@ -30,10 +30,10 @@ import { DeadStock } from "./deadstock";
 import { LimitedTimeDeals } from "./limited-time-deals";
 import { FreeProductsOffer } from "./free-products-offer";
 import { PriceAdjustments } from "./price-adjustment";
-import {PersonalizedOffers} from "./personalized-offers";
+import { PersonalizedOffers } from "./personalized-offers";
 import { LoyaltyRewards } from "./loyalty-rewards";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments" | "personalized-offers"|"loyalty-rewards";
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting" | "deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments" | "personalized-offers" | "loyalty-rewards";
 
 const navigationItems = [
   { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
@@ -43,7 +43,7 @@ const navigationItems = [
   { label: "Feedback", icon: Star, view: "feedback" as const, color: "text-yellow-600" },
   { label: "Inventory Forecasting", icon: Box, view: "inventory-forecasting" as const, color: "text-green-600" },
   { label: "Deadstock", icon: Star, view: "deadstock" as const, color: "text-red-600" },
-  { label: "Limited Time Deals", icon:MessageSquare, view: "limited-time-deals" as const, color: "text-yellow-600" },
+  { label: "Limited Time Deals", icon: MessageSquare, view: "limited-time-deals" as const, color: "text-yellow-600" },
   { label: "Free Products Offer", icon: Star, view: "free-products-offer" as const, color: "text-purple-600" },
   { label: "Price Adjustments", icon: Box, view: "price-adjustments" as const, color: "text-blue-600" },
   { label: "Personalized Offers", icon: BarChart3, view: "personalized-offers" as const, color: "text-green-600" },
@@ -69,7 +69,7 @@ export function DashboardShell() {
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <div className="py-6 px-4">
+              <div className="pt-4 px-4">
                 <div className="flex items-center gap-2 relative">
                   <Input
                     placeholder="Search..."
@@ -94,9 +94,8 @@ export function DashboardShell() {
                             setCurrentView(item.view);
                             if (item.subsections) setCurrentSubsection(item.subsections[0]);
                           }}
-                          className={`w-full justify-start gap-3 ${
-                            currentView === item.view ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
-                          }`}
+                          className={`w-full justify-start gap-3 ${currentView === item.view ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
+                            }`}
                         >
                           <item.icon className={`h-5 w-5 ${item.color}`} />
                           <span>{item.label}</span>
@@ -117,64 +116,42 @@ export function DashboardShell() {
 
         <div className="flex flex-1 flex-col">
           <header className="flex h-16 items-center justify-between border-b bg-white px-6 shadow-sm">
-            <SidebarTrigger className="lg:hidden" />
-            <div className="flex items-center gap-4">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
-                    <BellRing className="h-6 w-6" />
-                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Notifications</h3>
-                    <div className="space-y-1">{/* Add notification items here */}</div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <Avatar>
-                <AvatarImage src="/placeholder-user.jpg" alt="User" />
-                <AvatarFallback>AD</AvatarFallback>
-              </Avatar>
-            </div>
+            <SidebarTrigger className="" />
+            
           </header>
-          <main className="flex-1 overflow-auto p-6 h-full">
-  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-    {currentView === "orders" && <DataTable />}
-    {currentView === "inventory" && <InventoryView />}
-    
-    {currentView === "analytics" && (
-      <div>
-        <div className="flex gap-4 mb-4">
-          {navigationItems.find((item) => item.view === "analytics")?.subsections?.map((sub) => (
-            <Button
-              key={sub}
-              variant={currentSubsection === sub ? "default" : "outline"}
-              onClick={() => setCurrentSubsection(sub)}
-            >
-              {sub}
-            </Button>
-          ))}
-        </div>
-        <Analytics subsection={currentSubsection} />
-      </div>
-    )}
+          <main className="flex-1 overflow-auto p-6 min-h-[calc(100vh-16px)]">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              {currentView === "orders" && <DataTable />}
+              {currentView === "inventory" && <InventoryView />}
 
-    {currentView === "chatbot" && <ChatbotView />}
-    {currentView === "feedback" && <FeedbackSection />}
-    {currentView === "inventory-forecasting" && <InventoryForecasting />}
-    {currentView === "deadstock" && <DeadStock/>}
-    {currentView === "limited-time-deals" && <LimitedTimeDeals/>}
-    {currentView === "free-products-offer" && <FreeProductsOffer/>}
-    {currentView === "price-adjustments" && <PriceAdjustments/>}
-    {currentView === "personalized-offers" && <PersonalizedOffers/>}
-    {currentView === "loyalty-rewards" && <LoyaltyRewards/>}
-  </motion.div>
-</main>
+              {currentView === "analytics" && (
+                <div>
+                  <div className="flex gap-4 mb-4">
+                    {navigationItems.find((item) => item.view === "analytics")?.subsections?.map((sub) => (
+                      <Button
+                        key={sub}
+                        variant={currentSubsection === sub ? "default" : "outline"}
+                        onClick={() => setCurrentSubsection(sub)}
+                      >
+                        {sub}
+                      </Button>
+                    ))}
+                  </div>
+                  <Analytics subsection={currentSubsection} />
+                </div>
+              )}
+
+              {currentView === "chatbot" && <ChatbotView />}
+              {currentView === "feedback" && <FeedbackSection />}
+              {currentView === "inventory-forecasting" && <InventoryForecasting />}
+              {currentView === "deadstock" && <DeadStock />}
+              {currentView === "limited-time-deals" && <LimitedTimeDeals />}
+              {currentView === "free-products-offer" && <FreeProductsOffer />}
+              {currentView === "price-adjustments" && <PriceAdjustments />}
+              {currentView === "personalized-offers" && <PersonalizedOffers />}
+              {currentView === "loyalty-rewards" && <LoyaltyRewards />}
+            </motion.div>
+          </main>
 
         </div>
       </div>

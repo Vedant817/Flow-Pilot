@@ -14,3 +14,4 @@ langchain_chroma
 python-Levenshtein
 langchain_google_vertexai
 pypdf
+Flask-Cors
