@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { BarChart3, Box, MessageSquare, Search, ShoppingCart, ZapIcon, BellRing } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { lazy, useState } from "react";
+import Link from "next/link";
+import { BarChart3, Box, MessageSquare, Search, ShoppingCart, Zap, BellRing, Star } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Sidebar,
   SidebarContent,
@@ -15,52 +15,69 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { DataTable } from "./data-table"
-import InventoryView from "./inventory-view"
-import { Analytics } from "./analytics"
-import ChatbotView from "./chatbot-view"
+} from "@/components/ui/sidebar";
+import { DataTable } from "./data-table";
+import { InventoryView } from "./inventory-view";
+import { Analytics } from "./analytics";
+import { ChatbotView } from "./chatbot-view";
+import { motion } from "framer-motion";
+import { FeedbackSection } from "./feedback-section";
+import { InventoryForecasting } from "./inventory-forecasting";
+import { DeadStock } from "./deadstock";
+import { LimitedTimeDeals } from "./limited-time-deals";
+import { FreeProductsOffer } from "./free-products-offer";
+import { PriceAdjustments } from "./price-adjustment";
+import {PersonalizedOffers} from "./personalized-offers";
+import { LoyaltyRewards } from "./loyalty-rewards";
 
-type View = "orders" | "inventory" | "analytics" | "chatbot"
+type View = "orders" | "inventory" | "analytics" | "chatbot" | "feedback" | "inventory-forecasting"|"deadstock" | "limited-time-deals" | "free-products-offer" | "price-adjustments" | "personalized-offers"|"loyalty-rewards";
 
 const navigationItems = [
-  { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25" },
-  { label: "Inventory", icon: Box, view: "inventory" as const, count: "150" },
-  { label: "Analytics", icon: BarChart3, view: "analytics" as const },
-  { label: "Chatbot", icon: MessageSquare, view: "chatbot" as const },
-]
+  { label: "Orders", icon: ShoppingCart, view: "orders" as const, count: "25", color: "text-blue-600" },
+  { label: "Inventory", icon: Box, view: "inventory" as const, count: "150", color: "text-green-600" },
+  { label: "Analytics", icon: BarChart3, view: "analytics" as const, color: "text-purple-600", subsections: ["Sales", "Customer Trends", "Revenue"] },
+  { label: "Chatbot", icon: MessageSquare, view: "chatbot" as const, color: "text-orange-600" },
+  { label: "Feedback", icon: Star, view: "feedback" as const, color: "text-yellow-600" },
+  { label: "Inventory Forecasting", icon: Box, view: "inventory-forecasting" as const, color: "text-green-600" },
+  { label: "Deadstock", icon: Star, view: "deadstock" as const, color: "text-red-600" },
+  { label: "Limited Time Deals", icon:MessageSquare, view: "limited-time-deals" as const, color: "text-yellow-600" },
+  { label: "Free Products Offer", icon: Star, view: "free-products-offer" as const, color: "text-purple-600" },
+  { label: "Price Adjustments", icon: Box, view: "price-adjustments" as const, color: "text-blue-600" },
+  { label: "Personalized Offers", icon: BarChart3, view: "personalized-offers" as const, color: "text-green-600" },
+  { label: "Loyalty Rewards", icon: Star, view: "loyalty-rewards" as const, color: "text-yellow-900" },
+];
 
 export function DashboardShell() {
-  const [search, setSearch] = useState("")
-  const [currentView, setCurrentView] = useState<View>("orders")
+  const [search, setSearch] = useState("");
+  const [currentView, setCurrentView] = useState<View>("orders");
+  const [currentSubsection, setCurrentSubsection] = useState<string | null>(null);
 
   return (
-    <SidebarProvider className="w-full">
-      <div className="flex min-h-screen md:flex-1 flex-col lg:flex-row">
-        <Sidebar className="border-r">
-          <SidebarHeader className="border-b p-4">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <ZapIcon className="h-6 w-6" />
-              Order Management
+    <SidebarProvider>
+      <div className="flex min-h-screen md:flex-1 flex-col lg:flex-row bg-gray-50">
+        <Sidebar className="border-r bg-white shadow-sm">
+          <SidebarHeader className="border-b p-6">
+            <Link href="/" className="flex items-center gap-3 font-bold text-xl hover:text-blue-600 transition-colors">
+              <Zap className="h-7 w-7 text-blue-600" />
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text">
+                Order Management
+              </span>
             </Link>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <div className="py-4 px-2 pb-0">
-                <div className="flex items-center gap-2">
+              <div className="py-6 px-4">
+                <div className="flex items-center gap-2 relative">
                   <Input
                     placeholder="Search..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="h-9"
+                    className="h-10 pl-10 rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                   />
-                  <Button variant="ghost" size="icon" className="h-9 w-9 border">
-                    <Search className="h-4 w-4" />
-                  </Button>
+                  <Search className="h-4 w-4 absolute left-3 text-gray-400" />
                 </div>
               </div>
             </SidebarGroup>
@@ -70,11 +87,26 @@ export function DashboardShell() {
                 <SidebarMenu>
                   {navigationItems.map((item) => (
                     <SidebarMenuItem key={item.label}>
-                      <SidebarMenuButton onClick={() => setCurrentView(item.view)} isActive={currentView === item.view}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.label}</span>
-                        {item.count && <span className="ml-auto text-xs text-muted-foreground">{item.count}</span>}
-                      </SidebarMenuButton>
+                      <motion.div whileHover={{ x: 5 }} transition={{ duration: 0.2 }}>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setCurrentView(item.view);
+                            if (item.subsections) setCurrentSubsection(item.subsections[0]);
+                          }}
+                          className={`w-full justify-start gap-3 ${
+                            currentView === item.view ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
+                          }`}
+                        >
+                          <item.icon className={`h-5 w-5 ${item.color}`} />
+                          <span>{item.label}</span>
+                          {item.count && (
+                            <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-0.5 text-xs">
+                              {item.count}
+                            </span>
+                          )}
+                        </Button>
+                      </motion.div>
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -82,46 +114,70 @@ export function DashboardShell() {
             </SidebarGroup>
           </SidebarContent>
         </Sidebar>
-        <div className="flex flex-1 flex-col w-full">
-          <header className="flex h-14 items-center justify-between border-b px-4 lg:px-6">
-            <SidebarTrigger />
-            <div className="flex items-center gap-4 relative">
-              {/* Notification Bell with Popover */}
+
+        <div className="flex flex-1 flex-col">
+          <header className="flex h-16 items-center justify-between border-b bg-white px-6 shadow-sm">
+            <SidebarTrigger className="lg:hidden" />
+            <div className="flex items-center gap-4">
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className="relative p-2 rounded-full hover:bg-gray-200">
-                    <BellRing className="h-6 w-6 text-gray-600 hover:text-gray-800" />
-                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <BellRing className="h-6 w-6" />
+                    <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
                     </span>
-                  </button>
+                  </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 p-4 bg-white shadow-lg rounded-md">
-                  <h3 className="text-sm font-semibold text-gray-700">Offers & Vouchers</h3>
-                  <ul className="mt-2 space-y-2">
-                    <li className="p-2 bg-gray-100 rounded-md text-sm">🎉 Get 20% off on your next purchase!</li>
-                    <li className="p-2 bg-gray-100 rounded-md text-sm">🚀 Free shipping on orders above Rs 999!</li>
-                    <li className="p-2 bg-gray-100 rounded-md text-sm">🔖 Exclusive deal: Buy 1 Get 1 Free!</li>
-                  </ul>
+                <PopoverContent>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Notifications</h3>
+                    <div className="space-y-1">{/* Add notification items here */}</div>
+                  </div>
                 </PopoverContent>
               </Popover>
-
-              {/* User Avatar */}
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="/placeholder-user.jpg" />
-                <AvatarFallback>U</AvatarFallback>
+              <Avatar>
+                <AvatarImage src="/placeholder-user.jpg" alt="User" />
+                <AvatarFallback>AD</AvatarFallback>
               </Avatar>
             </div>
           </header>
-          <main className="flex-1 p-4 lg:p-6">
-            {currentView === "orders" && <DataTable />}
-            {currentView === "inventory" && <InventoryView />}
-            {currentView === "analytics" && <Analytics />}
-            {currentView === "chatbot" && <ChatbotView />}
-          </main>
+          <main className="flex-1 overflow-auto p-6 h-full">
+  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+    {currentView === "orders" && <DataTable />}
+    {currentView === "inventory" && <InventoryView />}
+    
+    {currentView === "analytics" && (
+      <div>
+        <div className="flex gap-4 mb-4">
+          {navigationItems.find((item) => item.view === "analytics")?.subsections?.map((sub) => (
+            <Button
+              key={sub}
+              variant={currentSubsection === sub ? "default" : "outline"}
+              onClick={() => setCurrentSubsection(sub)}
+            >
+              {sub}
+            </Button>
+          ))}
+        </div>
+        <Analytics subsection={currentSubsection} />
+      </div>
+    )}
+
+    {currentView === "chatbot" && <ChatbotView />}
+    {currentView === "feedback" && <FeedbackSection />}
+    {currentView === "inventory-forecasting" && <InventoryForecasting />}
+    {currentView === "deadstock" && <DeadStock/>}
+    {currentView === "limited-time-deals" && <LimitedTimeDeals/>}
+    {currentView === "free-products-offer" && <FreeProductsOffer/>}
+    {currentView === "price-adjustments" && <PriceAdjustments/>}
+    {currentView === "personalized-offers" && <PersonalizedOffers/>}
+    {currentView === "loyalty-rewards" && <LoyaltyRewards/>}
+  </motion.div>
+</main>
+
         </div>
       </div>
     </SidebarProvider>
-  )
+  );
 }
