@@ -1,8 +1,9 @@
-from flask import Flask, jsonify # type: ignore
+from flask import Flask, jsonify, request # type: ignore
 import threading
 from file_monitor import start_monitoring
 from dbConfig import connect_db
 from feedback_handle import fetch_feedback, store_feedback
+from chatbot import ask_bot
 
 db = connect_db()
 
@@ -27,6 +28,16 @@ def get_feedback():
         return jsonify(response), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/chatbot')
+def chat():
+    query = request.args.get('query')
+    if not query:
+        return jsonify({"error": "Query parameter is required"}), 400
+    
+    response = ask_bot(query)
+    print(response)
+    return jsonify({"response": response})
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True)

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
+from fuzzywuzzy import process
 
 load_dotenv()
 db = connect_db()
@@ -19,6 +20,54 @@ client = AI21Client(api_key=API_KEY)
 order_collection = db['orders']
 inventory_collection = db['inventory']
 customers_collection = db['customers']
+
+def fetch_inventory_items():
+    inventory_items = inventory_collection.find({}, {"_id": 0, "name": 1})
+    return {item["name"] for item in inventory_items}
+
+def correct_product_names(order_details, inventory_items):
+    """
+    Corrects product names using Gemini AI by comparing with inventory items
+    """
+    try:
+        # Create a prompt for the model
+        inventory_list = "\n".join(inventory_items)
+        orders_list = "\n".join([f"- {order['product']}" for order in order_details])
+        
+        prompt = f"""
+        Here is our inventory list:
+        {inventory_list}
+
+        And here are the ordered products:
+        {orders_list}
+
+        For each ordered product, find the closest matching product from our inventory.
+        Return only the corrected product names, one per line.
+        """
+
+        response = gemini_model.generate_content(prompt)
+        ai_response = response.text.strip()
+
+        # Remove any leading dashes and extra whitespace from each product name
+        corrected_product_names = [name.lstrip("- ").strip() for name in ai_response.split("\n") if name.strip()]
+
+        # Create new order details with corrected product names
+        corrected_orders = []
+        for i, order in enumerate(order_details):
+            if i < len(corrected_product_names):
+                corrected_orders.append({
+                    "product": corrected_product_names[i],
+                    "quantity": order["quantity"]
+                })
+            else:
+                corrected_orders.append(order)  # Keep original if no correction available
+
+    except Exception as e:
+        print(f"Error correcting product names: {e}")
+        corrected_orders = order_details  # Return original input in case of an error
+
+    print('Corrected Orders:', corrected_orders)
+    return corrected_orders
 
 def validate_order_details_ai(order_details):
     prompt = f"""
@@ -112,12 +161,28 @@ def get_customer_from_db(email):
     return customers_collection.find_one({"email": email})
 
 def add_orders_to_collection(email, date, time, customer_details, order_details):
+    inventory_items = fetch_inventory_items()
+    print('Inventory items fetched.', inventory_items)
+    print('Order details:', order_details)
+    corrected_orders = correct_product_names(order_details, inventory_items)
+    print(corrected_orders)
+    unknown_products = [
+        order["product"] for order in corrected_orders if order["product"] not in inventory_items
+    ]
+
+    if unknown_products:
+        print('Unknown products found. Order not added.')
+        # send_order_issue_email( #TODO: Send customized msg
+        #     email, [f"The following products are not in our inventory: {', '.join(unknown_products)}"]
+        # )
+        return
+    
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
 
     existing_order = order_collection.find_one(
         {
             "email": email,
-            "products": order_details,
+            "products": corrected_orders,
             "date": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%Y-%m-%d")},
             "time": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%H:%M:%S")}
         }
@@ -127,7 +192,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         print("Duplicate entry detected. Order not added.")
         return
 
-    can_fulfill = check_inventory(order_details=order_details)
+    can_fulfill = check_inventory(order_details=corrected_orders)
 
     formatted_entry = {
         "name": customer_details['name'],
@@ -135,7 +200,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         "email": email,
         "date": date,
         "time": time,
-        "products": order_details,
+        "products": corrected_orders,
         "status": "pending fulfillment",
         "orderLink": ""
         # "can_fulfill": can_fulfill
