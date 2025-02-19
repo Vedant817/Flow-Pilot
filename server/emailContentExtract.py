@@ -31,6 +31,7 @@ def extract_email_details(email_text):
                     "name": "Customer Name",
                     "email": "customer@example.com",
                     "phone": "123-456-7890"
+                    "address: "123 Main Street Los Angeles, CA 90001 USA"
                 }},
                 "orders": [
                     {{"product": "Product Name", "quantity": Number}}

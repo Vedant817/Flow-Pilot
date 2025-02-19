@@ -10,6 +10,7 @@ from gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
 from fuzzywuzzy import process
+from bson import ObjectId
 
 load_dotenv()
 db = connect_db()
@@ -162,10 +163,7 @@ def get_customer_from_db(email):
 
 def add_orders_to_collection(email, date, time, customer_details, order_details):
     inventory_items = fetch_inventory_items()
-    print('Inventory items fetched.', inventory_items)
-    print('Order details:', order_details)
     corrected_orders = correct_product_names(order_details, inventory_items)
-    print(corrected_orders)
     unknown_products = [
         order["product"] for order in corrected_orders if order["product"] not in inventory_items
     ]
@@ -175,7 +173,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         # send_order_issue_email( #TODO: Send customized msg
         #     email, [f"The following products are not in our inventory: {', '.join(unknown_products)}"]
         # )
-        return
+        return None
     
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
 
@@ -200,10 +198,9 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         "email": email,
         "date": date,
         "time": time,
-        "products": corrected_orders,
+        "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
         "status": "pending fulfillment",
         "orderLink": ""
-        # "can_fulfill": can_fulfill
     } #TODO: Update the inventory after order is added
     order_collection.insert_one(formatted_entry)
     print('Order added to collection.')
@@ -211,16 +208,19 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
 
 def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
+    print('Customer Details: ',customer_details)
     orders = order_details.get("orders", None)
 
     if not orders:
-        send_order_issue_email(email, ["No order details were found in your email. Please send a valid order."])
+        print("No order details found in email.")
+        # send_order_issue_email(email, ["No order details were found in your email. Please send a valid order."])
         return
 
     is_valid, errors = validate_order_details_ai(orders)
 
     if not is_valid:
-        send_order_issue_email(email, errors)
+        print("Order details are invalid. Sending issue email.")
+        # send_order_issue_email(email, errors)
         return
 
     existing_customer = get_customer_from_db(email)
@@ -236,12 +236,45 @@ def process_order_details(email, date, time, order_details):
         
         if all(customer_details.values()):
             print("Customer details are complete. Proceeding with order processing.")
-            add_orders_to_collection(email, date, time, customer_details, orders)
+            order_id = add_orders_to_collection(email, date, time, customer_details, orders)
+
+            if order_id:
+                customers_collection.update_one(
+                    {"email": email},
+                    {"$push": {"past_orders": order_id}}
+                )
         else:
-            send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
+            print("Customer details are incomplete. Sending issue email.")
+            # send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
     else:
-        send_order_issue_email(email, ["We could not find your details in our system. Please provides all the details regarding the contact details."])
-        return
+        if customer_details and all(k in customer_details for k in ["name", "email", "phone", "address"]):
+            print("New customer detected. Creating customer entry in the database.")
+
+            new_customer = {
+                "name": customer_details["name"],
+                "email": customer_details["email"],
+                "phone": customer_details["phone"],
+                "address": customer_details["address"],
+                "past_orders": [],
+                "created_at": datetime.utcnow()
+            }
+            customer_id = customers_collection.insert_one(new_customer).inserted_id
+
+            print("New customer added to database. Proceeding with order processing.")
+            order_id = add_orders_to_collection(email, date, time, customer_details, orders)
+
+            if order_id:
+                customers_collection.update_one(
+                    {"_id": customer_id},
+                    {"$push": {"past_orders": order_id}}
+                )
+
+        else:
+            print("Customer details are incomplete. Sending issue email.")
+            # send_order_issue_email(email, [
+            #     "We could not find your details in our system, and the provided details are incomplete."
+            #     "Please provide your name, email, phone, and address to create an account and process your order."
+            # ])
 
 def process_order_change(email, date, time, order_details):
     try:
