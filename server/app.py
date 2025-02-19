@@ -44,5 +44,16 @@ def chat():
     response = ask_bot(query)
     return jsonify({"response": response})
 
+@app.route('/get-inventory')
+def get_inventory():
+    try:
+        inventory_collection = db['inventory']
+        inventory_items = list(inventory_collection.find({}, {'_id': 0}))
+        print(inventory_items)
+        return jsonify(inventory_items), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True)
