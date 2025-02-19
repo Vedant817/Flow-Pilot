@@ -12,6 +12,14 @@ interface Message {
   timestamp: string;
 }
 
+const initialMessages: Message[] = [
+  {
+    role: "assistant",
+    content: "Hello! I'm your order management assistant. How can I help you today?",
+    timestamp: new Date().toLocaleTimeString(),
+  },
+];
+
 export function ChatbotView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -36,27 +44,36 @@ export function ChatbotView() {
     setMessages((prev) => [...prev, newUserMessage]);
     setInput("");
     setIsTyping(true);
-  
+
     try {
-      const res = await fetch(`http://localhost:5000/chatbot?query=${encodeURIComponent(input.trim())}`, {
+      const response = await fetch("http://0.0.0.1:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input.trim() }),
       });
-  
-      const data = await res.json();
-      const botResponse: Message = {
+
+      const data = await response.json();
+      const newAssistantMessage: Message = {
         role: "assistant",
-        content: data.response.response || "I'm sorry, I couldn't process that.",
+        content: data.response, // Response from FastAPI
         timestamp: new Date().toLocaleTimeString(),
       };
-  
-      setMessages((prev) => [...prev, botResponse]);
+
+      setMessages((prev) => [...prev, newAssistantMessage]);
     } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setIsTyping(false);
+      console.error("Error fetching chatbot response:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Sorry, I couldn't fetch a response. Please try again later.",
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
     }
-  };  
+
+    setIsTyping(false);
+  };
 
   return (
     <div className="flex flex-col bg-background border rounded-lg shadow-lg min-h-full w-full pb-6">
@@ -71,21 +88,12 @@ export function ChatbotView() {
         {messages.map((message, i) => (
           <Card
             key={i}
-            className={`
-                            max-w-[80%] p-4 transition-all duration-200 ease-in-out min-h-full 
-                            ${
-                              message.role === "assistant"
-                                ? "ml-0 bg-muted hover:bg-muted/80 m-4"
-                                : "ml-auto bg-primary text-primary-foreground hover:bg-primary/90"
-                            }
-                        `}
+            className={`max-w-[80%] p-4 transition-all duration-200 ease-in-out 
+              ${message.role === "assistant" ? "ml-0 bg-muted hover:bg-muted/80 m-4" : 
+              "ml-auto bg-primary text-primary-foreground hover:bg-primary/90"}`}
           >
             <div className="flex items-start gap-2">
-              {message.role === "assistant" ? (
-                <Bot className="h-5 w-5 mt-1" />
-              ) : (
-                <User className="h-5 w-5 mt-1" />
-              )}
+              {message.role === "assistant" ? <Bot className="h-5 w-5 mt-1" /> : <User className="h-5 w-5 mt-1" />}
               <div className="space-y-1">
                 <div className="whitespace-pre-wrap">{message.content}</div>
                 <div className="text-xs opacity-50">{message.timestamp}</div>
@@ -93,11 +101,7 @@ export function ChatbotView() {
             </div>
           </Card>
         ))}
-        {isTyping && (
-          <div className="text-sm text-muted-foreground ml-2">
-            Assistant is typing...
-          </div>
-        )}
+        {isTyping && <div className="text-sm text-muted-foreground ml-2">Assistant is typing...</div>}
       </ScrollArea>
 
       <form
@@ -114,11 +118,7 @@ export function ChatbotView() {
             placeholder="Type your message..."
             className="flex-1"
           />
-          <Button
-            type="submit"
-            className="px-4"
-            disabled={!input.trim() || isTyping}
-          >
+          <Button type="submit" className="px-4" disabled={!input.trim() || isTyping}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
