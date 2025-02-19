@@ -10,7 +10,7 @@ export default function DashboardStats() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="bg-gray-800 p-4 rounded-lg">
+          <div key={stat.label} className="bg-gray-900 p-4 rounded-lg">
             <h3 className="text-gray-400 text-sm">{stat.label}</h3>
             <div className="flex items-center mt-2">
               <span className="text-2xl font-bold">{stat.value}</span>
