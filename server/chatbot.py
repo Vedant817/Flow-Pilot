@@ -9,6 +9,7 @@ from google.cloud import aiplatform
 from langchain_google_vertexai import VertexAIEmbeddings
 import pandas as pd
 from gemini_config import gemini_model
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 load_dotenv()
 db = connect_db()
@@ -34,44 +35,46 @@ def load_pdf(file_path):
     pages = loader.load()
     return [page.page_content for page in pages]
 
-pdf_texts = load_pdf(r"C:\Users\vedan\Downloads\EmailAutomation\server\attachments\business report.pdf")
-
 def build_records():
     records = []
-    
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=100
+    )
+
     for idx, record in df.iterrows():
-        rec = {
-            "id": f"record_{idx}",
-            "text": str(record.to_dict()),
-            "source": "database",
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }
-        records.append(rec)
-    
-    for idx, text in enumerate(pdf_texts):
-        rec = {
-            "id": f"pdf_{idx}",
-            "text": text,
-            "source": "pdf",
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }
-        records.append(rec)
+        text = str(record.to_dict())
+        chunks = text_splitter.split_text(text)
+
+        for chunk_idx, chunk in enumerate(chunks):
+            records.append({
+                "id": f"record_{idx}_chunk_{chunk_idx}",
+                "text": chunk,
+                "source": "database",
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            })
+
     return records
 
 all_records = build_records()
 
 def build_documents(records):
     docs = []
+    
     for rec in records:
-        # Here you can also add logic to chunk long texts if necessary
+        metadata = {
+            "id": rec["id"],
+            "source": rec["source"],
+            "timestamp": rec["timestamp"],
+            "priority": "high" if rec["source"] == "pdf" else "normal",
+            "record_type": rec["source"],
+        }
+
         docs.append(Document(
             page_content=rec["text"],
-            metadata={
-                "id": rec["id"],
-                "source": rec["source"],
-                "timestamp": rec["timestamp"]
-            }
+            metadata=metadata
         ))
+
     return docs
 
 docs = build_documents(all_records)
@@ -83,13 +86,18 @@ vector_store = Chroma(
 )
 
 def upsert_documents(new_docs):
-    """
-    Upsert documents into the vector store. This function assumes that your vector
-    store library supports an upsert method. If not, you may need to implement logic
-    to check for existing docs and update them accordingly.
-    """
     try:
-        vector_store.add_documents(new_docs)
+        existing_docs = vector_store.get()["documents"]
+        existing_ids = {doc.metadata["id"] for doc in existing_docs}
+
+        new_filtered_docs = [doc for doc in new_docs if doc.metadata["id"] not in existing_ids]
+        
+        if new_filtered_docs:
+            vector_store.add_documents(new_filtered_docs)
+            print(f"Added {len(new_filtered_docs)} new documents to vector store.")
+        else:
+            print("No new documents to add.")
+    
     except Exception as e:
         print("Error during upsert:", e)
 
@@ -98,7 +106,15 @@ upsert_documents(docs)
 def retrieve_similar_docs(query, k=5):
     if not vector_store:
         return []
-    return vector_store.similarity_search(query, k=k)
+
+    results = vector_store.similarity_search(query, k=k)
+
+    sorted_results = sorted(results, key=lambda doc: (
+        doc.metadata.get("priority", "normal") == "high",
+        doc.metadata.get("timestamp", "")
+    ), reverse=True)
+
+    return sorted_results[:k]
 
 def ask_bot(query):
     relevant_docs = retrieve_similar_docs(query, k=5)
