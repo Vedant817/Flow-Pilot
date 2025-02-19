@@ -34,7 +34,7 @@ export default function Sidebar() {
                  className={`flex items-center p-3 rounded-lg mb-2 
                             ${item.active ? 'bg-[#00E676]' : 'hover:bg-gray-900'}`}>
               <span>{item.icon}</span>
-              <span className="ml-3">{item.label}</span>
+              <span className="ml-3 text-white">{item.label}</span>
               {item.badge && (
                 <span className="ml-auto bg-red-500 px-2 rounded-full text-sm">
                   {item.badge}
