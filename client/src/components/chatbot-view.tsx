@@ -15,24 +15,7 @@ interface Message {
 const initialMessages: Message[] = [
   {
     role: "assistant",
-    content:
-      "Hello! I'm your order management assistant. How can I help you today?",
-    timestamp: new Date().toLocaleTimeString(),
-  },
-  {
-    role: "user",
-    content: "What was the most sold product in the last 6 months?",
-    timestamp: new Date().toLocaleTimeString(),
-  },
-  {
-    role: "assistant",
-    content:
-      "Based on our sales data for the last 6 months, the most sold product is the 'Premium Laptop'. Here's a quick summary:\n\n" +
-      "- Product: Premium Laptop\n" +
-      "- Total Units Sold: 1,250\n" +
-      "- Revenue Generated: $1,624,875\n" +
-      "- Peak Month: March 2024 with 275 units sold\n\n" +
-      "This product has consistently outperformed others in our electronics category. Is there any specific information about this product or its sales trend you'd like to know?",
+    content: "Hello! I'm your order management assistant. How can I help you today?",
     timestamp: new Date().toLocaleTimeString(),
   },
 ];
@@ -62,17 +45,34 @@ export function ChatbotView() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
+    try {
+      const response = await fetch("http://0.0.0.1:8000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input.trim() }),
+      });
+
+      const data = await response.json();
       const newAssistantMessage: Message = {
         role: "assistant",
-        content:
-          "I'm analyzing your request. Here's what I found in our order management system...",
+        content: data.response, // Response from FastAPI
         timestamp: new Date().toLocaleTimeString(),
       };
+
       setMessages((prev) => [...prev, newAssistantMessage]);
-      setIsTyping(false);
-    }, 1000);
+    } catch (error) {
+      console.error("Error fetching chatbot response:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Sorry, I couldn't fetch a response. Please try again later.",
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
+    }
+
+    setIsTyping(false);
   };
 
   return (
@@ -88,21 +88,12 @@ export function ChatbotView() {
         {messages.map((message, i) => (
           <Card
             key={i}
-            className={`
-                            max-w-[80%] p-4 transition-all duration-200 ease-in-out 
-                            ${
-                              message.role === "assistant"
-                                ? "ml-0 bg-muted hover:bg-muted/80 m-4"
-                                : "ml-auto bg-primary text-primary-foreground hover:bg-primary/90"
-                            }
-                        `}
+            className={`max-w-[80%] p-4 transition-all duration-200 ease-in-out 
+              ${message.role === "assistant" ? "ml-0 bg-muted hover:bg-muted/80 m-4" : 
+              "ml-auto bg-primary text-primary-foreground hover:bg-primary/90"}`}
           >
             <div className="flex items-start gap-2">
-              {message.role === "assistant" ? (
-                <Bot className="h-5 w-5 mt-1" />
-              ) : (
-                <User className="h-5 w-5 mt-1" />
-              )}
+              {message.role === "assistant" ? <Bot className="h-5 w-5 mt-1" /> : <User className="h-5 w-5 mt-1" />}
               <div className="space-y-1">
                 <div className="whitespace-pre-wrap">{message.content}</div>
                 <div className="text-xs opacity-50">{message.timestamp}</div>
@@ -110,11 +101,7 @@ export function ChatbotView() {
             </div>
           </Card>
         ))}
-        {isTyping && (
-          <div className="text-sm text-muted-foreground ml-2">
-            Assistant is typing...
-          </div>
-        )}
+        {isTyping && <div className="text-sm text-muted-foreground ml-2">Assistant is typing...</div>}
       </ScrollArea>
 
       <form
@@ -131,11 +118,7 @@ export function ChatbotView() {
             placeholder="Type your message..."
             className="flex-1"
           />
-          <Button
-            type="submit"
-            className="px-4"
-            disabled={!input.trim() || isTyping}
-          >
+          <Button type="submit" className="px-4" disabled={!input.trim() || isTyping}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
