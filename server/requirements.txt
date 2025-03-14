@@ -7,3 +7,11 @@ pymongo
 fpdf
 zerobouncesdk
 google-genai
+pandas
+langchain
+langchain-community
+langchain_chroma
+python-Levenshtein
+langchain_google_vertexai
+pypdf
+Flask-Cors
