@@ -96,7 +96,7 @@ def handle_modified_file():
                             else:
                                 print("No order details extracted from Change of Order email.")
                         
-                        elif email_type == "Complaint": #! I'm here
+                        elif email_type == "Complaint":
                             process_complaint(email, body, date, time)
                         
                     else:
