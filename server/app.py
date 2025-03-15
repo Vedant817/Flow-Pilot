@@ -5,6 +5,7 @@ from dbConfig import connect_db
 from feedback_handle import fetch_feedback, store_feedback
 from chatbot import ask_bot
 from flask_cors import CORS
+from bson.objectid import ObjectId
 
 db = connect_db()
 
@@ -54,6 +55,31 @@ def get_inventory():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/orders/<order_id>', methods=['GET'])
+def get_order_info(order_id):
+    try:
+        order_collection = db['orders']
+        order = order_collection.find_one({"_id": ObjectId(order_id)})
+        
+        if not order:
+            return jsonify({"error": "Order not found"}), 404
+        
+        order_data = {
+            "id": str(order["_id"]),
+            "name": order["name"],
+            "phone": order["phone"],
+            "email": order["email"],
+            "date": order["date"],
+            "time": order["time"],
+            "products": order["products"],
+            "status": order["status"],
+            "orderLink": order["orderLink"]
+        }
+        
+        return jsonify(order_data), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True)
