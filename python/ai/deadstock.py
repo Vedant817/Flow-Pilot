@@ -56,7 +56,6 @@ def identify_deadstocks():
               "name": "...",
               "inventory": ...,
               "sales": ...,
-              "status": "Low sales"
             }}
           ]
         }}
