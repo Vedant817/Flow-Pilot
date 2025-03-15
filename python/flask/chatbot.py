@@ -1,6 +1,7 @@
 import os
 import datetime
 import sys
+import shutil
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
@@ -9,7 +10,6 @@ from langchain_chroma import Chroma
 from langchain.schema import Document
 from google.cloud import aiplatform
 from langchain_google_vertexai import VertexAIEmbeddings
-import pandas as pd
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from python.db.configdb import connect_db
 from python.db.gemini_config import gemini_model
@@ -38,12 +38,8 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"D:\Deloitte\Prototype\python\se
 aiplatform.init(project=PROJECT_ID, location="us-central1")
 embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
-# Initialize Vector Store
-vector_store = Chroma(
-    collection_name="customer",
-    embedding_function=embeddings,
-    persist_directory="./chroma_langchain_db",
-)
+# Vector Store Directory
+VECTOR_STORE_DIR = "./chroma_langchain_db"
 
 # Function to Load PDFs & Text Files
 def load_documents_from_folder(folder_path):
@@ -112,30 +108,32 @@ def build_documents(records):
     
     return docs
 
-# Upsert Documents into Vector Store
-def upsert_documents(new_docs):
-    try:
-        existing_docs = vector_store.get()["documents"]
-        existing_ids = {doc["id"] for doc in existing_docs}  # Fix: Accessing ID correctly
-        
-        new_filtered_docs = [doc for doc in new_docs if doc.metadata["id"] not in existing_ids]
-
-        if new_filtered_docs:
-            vector_store.add_documents(new_filtered_docs)
-            print(f"Added {len(new_filtered_docs)} new documents to vector store.")
-        else:
-            print("No new documents to add.")
-
-    except Exception as e:
-        print("Error during upsert:", e)
-
 # Refresh & Update Vector Store (MongoDB + Folder Documents)
 def refresh_data_and_update_vector_store():
-    print("Loading data from MongoDB...")
+    global vector_store  # Ensure we update the global vector store reference
+
+    print("🔄 Clearing existing vector store...")
+    # Delete the existing vector store directory
+    if os.path.exists(VECTOR_STORE_DIR):
+        shutil.rmtree(VECTOR_STORE_DIR)  # Delete the old vector store
+
+    print("📥 Loading data from MongoDB...")
     data = get_all_data()
     
-    print("Loading documents from folder...")
+    print("📂 Loading documents from folder...")
     folder_documents = load_documents_from_folder(DOCUMENTS_FOLDER)
+    
+    # Process folder documents with metadata
+    processed_folder_docs = []
+    for idx, doc in enumerate(folder_documents):
+        doc.metadata.update({
+            "id": f"pdf_doc_{idx}",
+            "source": "pdf",
+            "record_type": "technical_docs",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "priority": "high"
+        })
+        processed_folder_docs.append(doc)
 
     # Convert database records into document format
     all_records = (
@@ -145,12 +143,22 @@ def refresh_data_and_update_vector_store():
         build_records_from_collection(data["feedback"], "feedback")
     )
     
-    # Convert records and folder documents to LangChain Documents
+    # Convert records to LangChain Documents
     db_documents = build_documents(all_records)
-    all_documents = db_documents + folder_documents
+    all_documents = db_documents + processed_folder_docs
 
-    print(f"Total documents to upsert: {len(all_documents)}")
-    upsert_documents(all_documents)
+    print(f"📊 Total documents to add: {len(all_documents)}")
+
+    print("🆕 Reinitializing vector store...")
+    vector_store = Chroma(
+        collection_name="customer",
+        embedding_function=embeddings,
+        persist_directory=VECTOR_STORE_DIR,
+    )
+
+    print("📌 Adding new documents to vector store...")
+    vector_store.add_documents(all_documents)
+    print("✅ Vector store updated successfully.")
 
 # Retrieve Similar Documents
 def retrieve_similar_docs(query, k=5):
@@ -210,7 +218,7 @@ def chatbot_response():
 @app.route("/refresh", methods=["POST"])
 def refresh_data():
     refresh_data_and_update_vector_store()
-    return jsonify({"message": "Data refreshed and updated in vector store."})
+    return jsonify({"message": "✅ Data refreshed and updated in vector store."})
 
 # Run the Flask App
 if __name__ == "__main__":
