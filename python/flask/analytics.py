@@ -16,7 +16,7 @@ from python.ai.limitedTime import generate_limited_time_deals
 from python.ai.loyaltyRewards import assign_loyalty_rewards
 from python.ai.personalisedEmail import generate_personalized_offers
 from python.ai.priorOrder import prioritize_orders
-from python.ai.sentimentAnalysis import generate_feedback_report
+# from python.ai.sentimentAnalysis import generate_feedback_report
 from python.ai.partners import recommend_partner_products
 
 # ✅ Initialize Flask App
