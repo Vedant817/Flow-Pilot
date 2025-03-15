@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 interface ProductItem {
-    product: string;
+    name: string;
     quantity: number;
 }
 
@@ -37,6 +37,7 @@ export default function OrderTrackingPage() {
 
                 const data = await response.json();
                 setOrder(data);
+                console.log(data);
                 setError(null);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -53,7 +54,7 @@ export default function OrderTrackingPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-screen bg-[#0A0A0A] text-white">
+            <div className="flex justify-center items-center min-h-screen bg-[#0A0A0A] text-white h-screen w-full">
                 <p className="text-xl">Loading order information...</p>
             </div>
         );
@@ -121,7 +122,7 @@ export default function OrderTrackingPage() {
                             <tbody>
                                 {order.products.map((item, index) => (
                                     <tr key={index} className="border-b border-[#333333] hover:bg-[#1A1A1A] transition-colors">
-                                        <td className="p-3 text-[#E0E0E0]">{item.product}</td>
+                                        <td className="p-3 text-[#E0E0E0]">{item.name}</td>
                                         <td className="p-3 text-[#E0E0E0]">{item.quantity}</td>
                                     </tr>
                                 ))}
