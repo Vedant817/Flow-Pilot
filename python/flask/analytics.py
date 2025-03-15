@@ -18,6 +18,7 @@ from python.ai.personalisedEmail import generate_personalized_offers
 from python.ai.priorOrder import prioritize_orders
 # from python.ai.sentimentAnalysis import generate_feedback_report
 from python.ai.partners import recommend_partner_products
+from python.ai.urgentRestock import get_urgent_restocking
 
 # ✅ Initialize Flask App
 app = Flask(__name__)
@@ -89,6 +90,11 @@ def get_prioritized_orders():
 def feedback_report():
     report = generate_feedback_report()
     return jsonify({"feedback_report": report})
+
+@app.route('/urgent-restocking', methods=['GET'])
+def urgent_restocking():
+    restocking_data = get_urgent_restocking()
+    return jsonify(restocking_data)
 
 # @app.route('/partner-product-recommendations', methods=['GET'])
 # def get_partner_product_recommendations():

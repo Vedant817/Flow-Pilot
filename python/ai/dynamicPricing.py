@@ -1,6 +1,7 @@
 import os
 import pymongo
 import google.generativeai as genai
+import json
 from flask import Flask, jsonify
 
 # ✅ Initialize Flask App
@@ -48,46 +49,24 @@ def generate_pricing_suggestions():
             else:
                 new_price = old_price  # Keep unchanged
 
-            price_suggestions.append({
-                "Product": name,
-                "Old Price": old_price,
-                "New Price": new_price
-            })
+            if new_price != old_price:  # Only include changed prices
+                price_suggestions.append({
+                    "Product": name,
+                    "Old Price": old_price,
+                    "New Price": new_price
+                })
 
-        # Step 3: Generate AI Summary
-        prompt = f"""
-You are an AI business analyst. Your task is to analyze product demand, stock levels, and suggest new pricing for products.
-Only include products where the new price is different from the old price.
-
-- Use the given **pricing suggestions**.
-- Exclude products where the **new price** is the same as the **old price**.
-- Provide the response in **valid JSON format**.
-
-### Input Pricing Data:
-{price_suggestions}
-
-### Expected JSON Output Format:
-{{
-    "pricing_recommendations": [
-        {{"Product": "Product Name", "Old Price": Old_Price, "New Price": New_Price}}
-    ]
-}}
-
-Return only the adjusted prices in JSON format.
-"""
-
-
-        response = gemini_model.generate_content(prompt)
-        return response.text if response and response.text else {"error": "No response from AI"}
+        # Return results directly without AI processing
+        return {"pricing_recommendations": price_suggestions}
 
     except Exception as e:
         return {"error": f"Error generating pricing suggestions: {str(e)}"}
 
 # ✅ API Route: Get Pricing Suggestions
-@app.route('/pricing_suggestions', methods=['GET'])
+@app.route('/dynamic_pricing', methods=['GET'])
 def pricing_summary():
     suggestions = generate_pricing_suggestions()
-    return jsonify({"pricing_recommendations": suggestions})
+    return jsonify(suggestions)
 
 # ✅ Run Flask Server
 if __name__ == '__main__':
