@@ -1,13 +1,12 @@
 import requests
 from dotenv import load_dotenv
 import os
-from dbConfig import connect_db
-from gemini_config import gemini_model
+from config.dbConfig import db
+from config.gemini_config import gemini_model
 import re
 import uuid
 
 load_dotenv()
-db = connect_db()
 feedback_collection = db["feedback"]
 
 SURVEY_ID = os.getenv("FORMBRICKS_SURVEY_ID")

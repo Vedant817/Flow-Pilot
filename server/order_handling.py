@@ -1,20 +1,16 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
-from dbConfig import connect_db
+from config.dbConfig import db
 from datetime import datetime, timedelta
 from send_email import send_acknowledgment, send_email, send_order_issue_email
 import os
 from dotenv import load_dotenv
-from gemini_config import gemini_model
+from config.gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
-from fuzzywuzzy import process
-from bson import ObjectId
 
 load_dotenv()
-db = connect_db()
-
 API_KEY = os.getenv("AI21KEY")
 
 client = AI21Client(api_key=API_KEY)

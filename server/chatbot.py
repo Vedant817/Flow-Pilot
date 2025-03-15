@@ -1,6 +1,6 @@
 import os
 import datetime
-from dbConfig import connect_db
+from config.dbConfig import db
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
@@ -8,12 +8,11 @@ from langchain.schema import Document
 from google.cloud import aiplatform
 from langchain_google_vertexai import VertexAIEmbeddings
 import pandas as pd
-from gemini_config import gemini_model
+from config.gemini_config import gemini_model
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import glob
 
 load_dotenv()
-db = connect_db()
 inventory_collection = db["inventory"]
 feedback_collection = db["feedback"]
 orders_collection = db["orders"]

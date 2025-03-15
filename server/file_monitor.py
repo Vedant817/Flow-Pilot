@@ -3,7 +3,6 @@ import openpyxl
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import os
-import threading
 import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_email_details
