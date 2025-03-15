@@ -49,20 +49,37 @@ def send_acknowledgment(order):
     order_email = order["email"]
     match = re.search(r'<([^<>]+)>', order_email)
     recipient_email = match.group(1) if match else order_email
-    order_status = order["can_fulfill"]
-    attachment_path =  None
-    print(recipient_email)
     
-    if order_status:
-        subject = "Order Confirmation"
-        body = f"Dear Customer,\n\nYour order has been placed successfully! We will process your order soon.\n\nOrder Details:\n{json.dumps(order['products'], indent=2)}\n\nThank you for shopping with us!"
-        attachment_path = generate_invoice(order)
-    else:
-        subject = "Order Update"
-        body = f"Dear Customer,\n\nWe regret to inform you that we cannot fulfill your order due to insufficient stock.\n\nOrder Details:\n{json.dumps(order['products'], indent=2)}\n\nWe apologize for the inconvenience."
+    product_list = "\n".join([f"- {item['name']}: {item['quantity']} units" for item in order['products']])
     
-    send_email(subject, body=body, recipient_email=recipient_email, attachment_path=attachment_path)
+    order_id = str(order["_id"])
+    tracking_url = f"http://localhost:3000/track-order/{order_id}"
     
+    subject = "Order Confirmation - Thank You!"
+    
+    body = f"""Dear {order['name']},
+
+    Thank you for your order! We have received your request and it is currently pending fulfillment.
+    
+    Order Details:
+    {product_list}
+    
+    Order Date: {order['date']} at {order['time']}
+    
+    You can track your order status at any time using this link:
+    {tracking_url}
+    
+    We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
+    
+    Thank you for shopping with us!
+    
+    Best regards,
+    The Sales Team
+    """
+    
+    send_email(subject=subject, body=body, recipient_email=recipient_email)
+    print(f"Order acknowledgment sent to {recipient_email}")
+
 def send_order_issue_email(email, errors):
     """
     Sends an email notifying the user that their order could not be processed due to errors.

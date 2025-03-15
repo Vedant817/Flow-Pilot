@@ -204,7 +204,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
     } #TODO: Update the inventory after order is added
     order_collection.insert_one(formatted_entry)
     print('Order added to collection.')
-    # send_acknowledgment(formatted_entry) #TODO: Uncomment this line to send acknowledgment email, Make sure to update the email template
+    send_acknowledgment(formatted_entry)
 
 def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
