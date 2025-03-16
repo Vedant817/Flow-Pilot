@@ -28,9 +28,6 @@ interface DeadstockItem {
   sales: number;
 }
 
-interface DeadstockResponse {
-  deadstocks: DeadstockItem[];
-}
 interface ErrorStateProps {
   onRetry: () => void;
   message?: string;
@@ -92,23 +89,42 @@ function useDeadstockData() {
   const fetchReport = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(false);
-
+  
     try {
       const response = await fetch(`${API_ENDPOINT}/analytics/deadstocks`, {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
       });
-
+  
       if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-      const data: DeadstockResponse = await response.json();
-      const deadstocksData = data.deadstocks || [];
-      
-      setDeadstocks(deadstocksData);
-      cacheData(deadstocksData);
+  
+      const data = await response.json();
+  
+      if (data.error && data.response_text) {
+        try {
+          const jsonMatch = data.response_text.match(/```json\s*([\s\S]*?)\s*```/);
+  
+          if (jsonMatch && jsonMatch[1]) {
+            const extractedData = JSON.parse(jsonMatch[1].trim());
+            setDeadstocks(extractedData.deadstocks || []);
+            cacheData(extractedData.deadstocks || []);
+          } else {
+            const extractedData = JSON.parse(data.response_text.trim());
+            setDeadstocks(extractedData.deadstocks || []);
+            cacheData(extractedData.deadstocks || []);
+          }
+        } catch (jsonError) {
+          console.error("Failed to parse JSON:", jsonError);
+          setError(true);
+        }
+      } else {
+        const deadstocksData = data.deadstocks || [];
+        setDeadstocks(deadstocksData);
+        cacheData(deadstocksData);
+      }
     } catch (error) {
       console.error("Error fetching deadstock report:", error);
       setError(true);
-
+  
       const cachedData = getCachedData();
       if (cachedData) setDeadstocks(cachedData);
     } finally {
@@ -140,7 +156,6 @@ function useDeadstockData() {
     }
   };
 
-  // Initialize data on component mount
   useEffect(() => {
     const cachedData = getCachedData();
     
