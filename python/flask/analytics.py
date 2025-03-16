@@ -19,6 +19,7 @@ from python.ai.priorOrder import prioritize_orders
 # from python.ai.sentimentAnalysis import generate_feedback_report
 from python.ai.partners import recommend_partner_products
 from python.ai.urgentRestock import get_urgent_restocking
+from python.api.frequentCustomer import generate_customer_insights
 
 # ✅ Initialize Flask App
 app = Flask(__name__)
@@ -95,6 +96,11 @@ def feedback_report():
 def urgent_restocking():
     restocking_data = get_urgent_restocking()
     return jsonify(restocking_data)
+
+@app.route('/customer-insights', methods=['GET'])
+def customer_insights():
+    insights = generate_customer_insights()
+    return jsonify(insights)
 
 # @app.route('/partner-product-recommendations', methods=['GET'])
 # def get_partner_product_recommendations():
