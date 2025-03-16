@@ -13,13 +13,15 @@ def identify_deadstocks():
 
         product_sales = {}
         for order in orders:
-            for product in order.get("products", []):
-                product_name = product["name"]
-                quantity = product["quantity"]
-                if product_name in product_sales:
-                    product_sales[product_name] += quantity
-                else:
-                    product_sales[product_name] = quantity
+            if "products" in order and isinstance(order["products"], list):
+                for product in order["products"]:
+                    if isinstance(product, dict) and "name" in product:
+                        product_name = product["name"]
+                        quantity = product.get("quantity", 1)
+                        if product_name in product_sales:
+                            product_sales[product_name] += quantity
+                        else:
+                            product_sales[product_name] = quantity
 
         prompt = f"""
         You are an AI inventory analyst. Identify **deadstocks** (products with very low sales but high inventory).
@@ -47,13 +49,23 @@ def identify_deadstocks():
         response = gemini_model.generate_content(prompt)
         ai_response = response.text.strip()
 
-        clean_response = re.sub(r"```json|```", "", ai_response).strip()
+        clean_response = re.sub(r'``````', '', ai_response).strip()
 
         try:
             deadstocks = json.loads(clean_response)
             return {"deadstocks": deadstocks.get("deadstocks", [])}
         except json.JSONDecodeError as e:
-            return {"error": f"Invalid AI response format. JSON Parsing Error: {str(e)}", "response_text": ai_response}
+            try:
+                match = re.search(r'``````', ai_response, re.DOTALL)
+                if match:
+                    json_str = match.group(1).strip()
+                    deadstocks = json.loads(json_str)
+                    return {"deadstocks": deadstocks.get("deadstocks", [])}
+                else:
+                    return {"error": f"Invalid AI response format. JSON Parsing Error: {str(e)}", "response_text": ai_response}
+            except Exception as inner_e:
+                return {"error": f"Failed to parse JSON: {str(inner_e)}", "response_text": ai_response}
 
     except Exception as e:
-        return {"error": f"Error analyzing deadstocks: {str(e)}"}
+        import traceback
+        return {"error": f"Error analyzing deadstocks: {str(e)}", "traceback": traceback.format_exc()}
