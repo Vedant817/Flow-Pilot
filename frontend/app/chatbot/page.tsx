@@ -216,7 +216,7 @@ export default function AISidebar() {
       draggable: true,
       theme: "dark",
     });
-  }, [setMessages]);
+  }, []);
 
   return (
     <div className="w-full bg-[#141414] h-screen flex flex-col">

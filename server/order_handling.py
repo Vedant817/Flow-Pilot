@@ -96,10 +96,6 @@ def validate_order_details_ai(order_details):
         return False, [f"System error while validating order: {str(e)}"]
 
 def extract_order_details_ai(email_text):
-    """
-    Extracts structured order details from an email using AI21.
-    Returns a list of products and quantities.
-    """
     messages = [
         UserMessage(
             content=f"""
@@ -160,9 +156,6 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
 
     if unknown_products:
         print('Unknown products found. Order not added.')
-        # send_order_issue_email( #TODO: Send customized msg
-        #     email, [f"The following products are not in our inventory: {', '.join(unknown_products)}"]
-        # )
         return None
     
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
@@ -178,9 +171,31 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
 
     if existing_order:
         print("Duplicate entry detected. Order not added.")
-        return
+        return None
 
     can_fulfill = check_inventory(order_details=corrected_orders)
+    if not can_fulfill:
+        formatted_entry = {
+            "name": customer_details['name'],
+            "phone": customer_details['phone'],
+            "email": email,
+            "date": date,
+            "time": time,
+            "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
+            "status": "pending inventory",
+            "orderLink": ""
+        }
+        result = order_collection.insert_one(formatted_entry)
+        order_id = str(result.inserted_id)
+        
+        order_collection.update_one(
+            {"_id": result.inserted_id},
+            {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
+        )
+        
+        print("Order added with pending inventory status.")
+        send_acknowledgment(formatted_entry, message="Some items are currently out of stock. Your order will take additional time to be completed.")
+        return order_id
 
     formatted_entry = {
         "name": customer_details['name'],
@@ -191,14 +206,29 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
         "status": "pending fulfillment",
         "orderLink": ""
-    } #TODO: Update the inventory after order is added
-    order_collection.insert_one(formatted_entry)
-    print('Order added to collection.')
+    }
+    
+    result = order_collection.insert_one(formatted_entry)
+    order_id = str(result.inserted_id)
+    
+    order_collection.update_one(
+        {"_id": result.inserted_id},
+        {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
+    )
+    
+    for item in corrected_orders:
+        inventory_collection.update_one(
+            {"item": item["product"]},
+            {"$inc": {"quantity": -item["quantity"]}}
+        )
+    
+    print('Order added and inventory updated.')
     send_acknowledgment(formatted_entry)
+    return order_id
 
 def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
-    print('Customer Details: ',customer_details)
+    print('Customer Details: ', customer_details)
     orders = order_details.get("orders", None)
 
     if not orders:
@@ -207,39 +237,16 @@ def process_order_details(email, date, time, order_details):
         return
 
     is_valid, errors = validate_order_details_ai(orders)
-
     if not is_valid:
         print("Order details are invalid. Sending issue email.")
-        # send_order_issue_email(email, errors)
+        send_order_issue_email(email, errors)
         return
 
     existing_customer = get_customer_from_db(email)
+    customer_id = None
 
-    if existing_customer:
-        if not customer_details or not all(k in customer_details for k in ["name", "email", "phone"]):
-            customer_details = {
-                "name": existing_customer.get("name", ""),
-                "email": existing_customer.get("email", ""),
-                "phone": existing_customer.get("phone", ""),
-                "address": existing_customer.get("address", "")
-            }
-        
-        if all(customer_details.values()):
-            print("Customer details are complete. Proceeding with order processing.")
-            order_id = add_orders_to_collection(email, date, time, customer_details, orders)
-
-            if order_id:
-                customers_collection.update_one(
-                    {"email": email},
-                    {"$push": {"past_orders": order_id}}
-                )
-        else:
-            print("Customer details are incomplete. Sending issue email.")
-            send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
-    else:
+    if not existing_customer:
         if customer_details and all(k in customer_details for k in ["name", "email", "phone", "address"]):
-            print("New customer detected. Creating customer entry in the database.")
-
             new_customer = {
                 "name": customer_details["name"],
                 "email": customer_details["email"],
@@ -248,23 +255,45 @@ def process_order_details(email, date, time, order_details):
                 "past_orders": [],
                 "created_at": datetime.utcnow()
             }
-            customer_id = customers_collection.insert_one(new_customer).inserted_id
-
-            print("New customer added to database. Proceeding with order processing.")
-            order_id = add_orders_to_collection(email, date, time, customer_details, orders)
-
-            if order_id:
-                customers_collection.update_one(
-                    {"_id": customer_id},
-                    {"$push": {"past_orders": order_id}}
-                )
-
+            result = customers_collection.insert_one(new_customer)
+            customer_id = result.inserted_id
+            print("New customer created successfully.")
         else:
-            print("Customer details are incomplete. Sending issue email.")
+            print("Incomplete customer details for new customer.")
             send_order_issue_email(email, [
-                "We could not find your details in our system, and the provided details are incomplete."
+                "We could not find your details in our system, and the provided details are incomplete. "
                 "Please provide your name, email, phone, and address to create an account and process your order."
             ])
+            return
+    else:
+        customer_id = existing_customer["_id"]
+        if not customer_details or not all(k in customer_details for k in ["name", "email", "phone"]):
+            customer_details = {
+                "name": existing_customer.get("name", ""),
+                "email": existing_customer.get("email", ""),
+                "phone": existing_customer.get("phone", ""),
+                "address": existing_customer.get("address", "")
+            }
+
+    order_id = add_orders_to_collection(email, date, time, customer_details, orders)
+    
+    if order_id:
+        # Update to include more order details in past_orders
+        order_summary = {
+            "order_id": order_id,
+            "date": date,
+            "time": time,
+            "products": orders,
+            "status": "pending fulfillment"
+        }
+        
+        customers_collection.update_one(
+            {"_id": customer_id},
+            {"$push": {"past_orders": order_summary}}
+        )
+        print(f"Order {order_id} processed successfully.")
+    else:
+        print("Order processing failed.")
 
 def process_order_change(email, date, time, order_details):
     print('Processing order change...')
@@ -342,10 +371,6 @@ def get_ai_order_updates(previous_order, new_order_details):
         return merge_orders_fallback(previous_order, new_order_details)
 
 def merge_orders_fallback(previous_order, new_order_details):
-    """
-    Fallback method to merge orders if AI processing fails.
-    Simply adds new quantities to existing items or adds new items.
-    """
     existing_products = {item["name"]: item["quantity"] for item in previous_order.get("products", [])}
     
     for new_item in new_order_details.get("orders", []):

@@ -73,7 +73,6 @@ def handle_modified_file():
             
             for change in changes:
                 email = change.get("Email")
-                subject = change.get("Subject")
                 body = change.get("Body")
                 date = change.get('Date')
                 time = change.get('Time')
@@ -143,4 +142,13 @@ def start_monitoring():
     except KeyboardInterrupt:
         observer.stop()
         print("Stopped monitoring.")
-    observer.join()
+    except OSError as e:
+        if hasattr(e, 'winerror') and e.winerror == 10038:
+            print("Socket error detected. Restarting monitoring...")
+            observer.stop()
+            time.sleep(1)
+            start_monitoring()
+        else:
+            raise
+    finally:
+        observer.join()
