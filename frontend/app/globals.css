@@ -70,3 +70,29 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* For Webkit browsers like Chrome, Safari, newer versions of Edge */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1A1A1A;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00E676;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00c462;
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #00E676 #1A1A1A;
+}
