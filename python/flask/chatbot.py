@@ -60,7 +60,7 @@ def process_pdf(pdf_path):
                 "id": f"pdf_chunk_{i}",
                 "source": "User Manual",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "priority": "medium"
+                "priority": "medium "
             }
             docs.append(Document(  # This should be inside the loop
                 page_content=doc.page_content,
