@@ -60,7 +60,7 @@ def process_pdf(pdf_path):
                 "id": f"pdf_chunk_{i}",
                 "source": "User Manual",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "priority": "high"
+                "priority": "medium"
             }
             docs.append(Document(  # This should be inside the loop
                 page_content=doc.page_content,
@@ -190,7 +190,7 @@ def retrieve_similar_docs(query, k=10):
         sorted_results = sorted(results, key=lambda doc: (
             "User Manual" in doc.metadata.get("source", ""),  # Prioritize PDF
             doc.metadata.get("source", "") in ["orders", "inventory", "analytics"],  # Other categories
-            doc.metadata.get("priority", "normal") == "high",
+            doc.metadata.get("priority", "normal") == "medium",
             doc.metadata.get("timestamp", "")
         ), reverse=True)
 
