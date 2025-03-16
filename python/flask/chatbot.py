@@ -2,7 +2,8 @@ import os
 import sys
 from datetime import datetime, timezone
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-
+from flask import session
+import uuid
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from python.db.configdb import connect_db
@@ -24,6 +25,8 @@ inventory_collection = db["inventory"]
 feedback_collection = db["feedback"]
 orders_collection = db["orders"]
 customers_collection = db["customers"]
+chat_history_collection = db["chat_history"]
+
 
 # Google Cloud Configuration
 PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
@@ -33,11 +36,34 @@ embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
 # Flask App Initialization
 app = Flask(__name__)
-
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "sexyflasky")
 # Load Data from MongoDB
 def load_collection_data(collection):
     return list(collection.find({}, {"_id": 0}))
 
+def store_chat_history(session_id, query, response):
+    """Store chat interactions in MongoDB using session ID"""
+    chat_history_collection.insert_one({
+        "session_id": session_id,
+        "query": query,
+        "response": response,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+def get_chat_history(session_id, limit=10):
+    """Retrieve chat history for a specific session"""
+    history = list(chat_history_collection.find(
+        {"session_id": session_id}, 
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(limit))
+    
+    return history
+
+@app.before_request
+def before_request():
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+        
 # ✅ Step 1: Extract and Verify PDF Content
 def process_pdf(pdf_path):
     print("\n📌 Processing PDF:", pdf_path)
@@ -60,7 +86,7 @@ def process_pdf(pdf_path):
                 "id": f"pdf_chunk_{i}",
                 "source": "User Manual",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "priority": "medium "
+                "priority": "medium"
             }
             docs.append(Document(  # This should be inside the loop
                 page_content=doc.page_content,
@@ -209,10 +235,26 @@ def retrieve_similar_docs(query, k=10):
 def ask_bot():
     data = request.json
     query = data.get("query", "").strip()
+    
+    # Get or create session ID
+    session_id = session.get('session_id')
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        session['session_id'] = session_id
 
     if not query:
         return jsonify({"error": "Query is required"}), 400
 
+    # Get chat history for context
+    chat_history = get_chat_history(session_id)
+    history_text = ""
+    
+    if chat_history:
+        history_text = "Previous conversation:\n"
+        for entry in reversed(chat_history):  # Chronological order
+            history_text += f"User: {entry['query']}\nAssistant: {entry['response']}\n\n"
+
+    # Get relevant documents
     relevant_docs = retrieve_similar_docs(query, k=10)
     context = "\n\n".join([doc.page_content for doc in relevant_docs])
 
@@ -223,7 +265,10 @@ You are an AI assistant with expertise in:
 - **Product Analytics**
 - **User Manual Navigation**
 
-Use the **provided context** to answer the query accurately.
+Use the **provided context and chat history** to answer the query accurately.
+
+**Chat History:**
+{history_text}
 
 **Context:**
 {context}
@@ -235,16 +280,34 @@ Use the **provided context** to answer the query accurately.
 1. If the context contains relevant **order, inventory, analytics, or PDF** information, answer directly.
 2. If missing details, **explain what additional info is needed**.
 3. **Do not ask the user to check the documentation—assume you are the documentation.**
+4. Reference previous conversations when relevant.
 
 **Answer:**
 """
 
     response = gemini_model.generate_content(prompt)
+    response_text = response.text.strip() if hasattr(response, "text") else ""
+
+    # Store the interaction in chat history
+    if response_text:
+        store_chat_history(session_id, query, response_text)
 
     if response and hasattr(response, "text"):
-        return jsonify({"response": response.text.strip()})
+        return jsonify({"response": response_text, "session_id": session_id})
     else:
         return jsonify({"error": "Invalid response format from Google Vertex AI"}), 500
+
+@app.route("/chat-history", methods=["GET"])
+def get_session_chat_history():
+    session_id = session.get('session_id')
+    if not session_id:
+        return jsonify({"error": "No active session"}), 400
+        
+    limit = int(request.args.get("limit", 10))
+    
+    history = get_chat_history(session_id, limit)
+    
+    return jsonify({"history": history, "session_id": session_id})
 
 # ✅ Step 8: Run Flask App
 if __name__ == "__main__":
