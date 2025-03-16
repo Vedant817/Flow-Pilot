@@ -62,7 +62,6 @@ def get_inventory():
 @app.route('/orders/<order_id>', methods=['GET'])
 def get_order_info(order_id):
     try:
-        # Ensure valid ObjectId
         if not ObjectId.is_valid(order_id):
             return jsonify({"error": "Invalid order ID"}), 400
 
@@ -72,7 +71,6 @@ def get_order_info(order_id):
         if not order:
             return jsonify({"error": "Order not found"}), 404
 
-        # Convert MongoDB document to JSON-friendly format
         order_data = {
             "id": str(order["_id"]),
             "name": order.get("name", ""),
@@ -122,7 +120,6 @@ def get_orders():
 @app.route('/update-status', methods=['PUT', 'OPTIONS'])
 def handle_status_update():
     if request.method == 'OPTIONS':
-        # Handle preflight request
         return '', 200
         
     data = request.get_json()
@@ -132,7 +129,6 @@ def handle_status_update():
     if not order_id or not new_status:
         return jsonify({"error": "Order ID and status are required"}), 400
         
-    # Call the existing function to update status
     orders_collection = db['orders']
     result = orders_collection.update_one(
         {"orderLink": order_id},
@@ -142,7 +138,6 @@ def handle_status_update():
     if result.modified_count == 0:
         return jsonify({"error": "Order not found or status not changed"}), 404
     
-    # Check if status is changed to fulfilled, then send invoice
     if new_status == "fulfilled":
         send_invoice(order_id)
         

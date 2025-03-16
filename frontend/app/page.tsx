@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useCallback, useMemo, memo, useEffect } from 'react'
-import { Search} from 'lucide-react'
+import { Search } from 'lucide-react'
 import axios from 'axios';
 import { OrderDetails } from '@/lib/constants/types';
 
@@ -39,18 +39,18 @@ interface ActionButtonProps {
 const OrderRow = memo(({ order, index, onStatusChange }: OrderRowProps) => {
   const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
-    
+
     axios.put(`${process.env.NEXT_PUBLIC_API_URL}/update-status`, {
       orderId: order.orderLink || order.Order_Link || '',
       status: newStatus
     })
-    .then(response => {
-      console.log(response);
-      onStatusChange(order.orderLink || order.Order_Link || '', newStatus);
-    })
-    .catch(error => {
-      console.error('Error updating order status:', error);
-    })
+      .then(response => {
+        console.log(response);
+        onStatusChange(order.orderLink || order.Order_Link || '', newStatus);
+      })
+      .catch(error => {
+        console.error('Error updating order status:', error);
+      })
   }, [order, onStatusChange]);
 
   const orderLink = order.orderLink || order.Order_Link || '';
@@ -134,7 +134,7 @@ export default function OrdersPage() {
 
   const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setFilterText(e.target.value);
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   }, []);
 
   const handleStatusChange = useCallback((orderId: string, newStatus: string) => {
@@ -145,7 +145,6 @@ export default function OrdersPage() {
           : order
       )
     );
-    // Here you would typically make an API call to update the status on the backend
   }, []);
 
   const filteredOrders = useMemo(() => {
@@ -245,7 +244,6 @@ export default function OrdersPage() {
             </button>
 
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              // Show pages around current page
               let pageNum;
               if (totalPages <= 5) {
                 pageNum = i + 1;
