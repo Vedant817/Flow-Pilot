@@ -49,29 +49,105 @@ def send_acknowledgment(order):
     order_email = order["email"]
     match = re.search(r'<([^<>]+)>', order_email)
     recipient_email = match.group(1) if match else order_email
-    order_status = order["can_fulfill"]
-    attachment_path =  None
-    print(recipient_email)
     
-    if order_status:
-        subject = "Order Confirmation"
-        body = f"Dear Customer,\n\nYour order has been placed successfully! We will process your order soon.\n\nOrder Details:\n{json.dumps(order['products'], indent=2)}\n\nThank you for shopping with us!"
-        attachment_path = generate_invoice(order)
-    else:
-        subject = "Order Update"
-        body = f"Dear Customer,\n\nWe regret to inform you that we cannot fulfill your order due to insufficient stock.\n\nOrder Details:\n{json.dumps(order['products'], indent=2)}\n\nWe apologize for the inconvenience."
+    product_list = "\n".join([f"- {item['name']}: {item['quantity']} units" for item in order['products']])
     
-    send_email(subject, body=body, recipient_email=recipient_email, attachment_path=attachment_path)
+    order_id = str(order["_id"])
+    tracking_url = f"http://localhost:3000/track-order/{order_id}"
     
+    subject = "Order Confirmation - Thank You!"
+    
+    body = f"""Dear {order['name']},
+
+    Thank you for your order! We have received your request and it is currently pending fulfillment.
+    
+    Order Details:
+    {product_list}
+    
+    Order Date: {order['date']} at {order['time']}
+    
+    You can track your order status at any time using this link:
+    {tracking_url}
+    
+    We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
+    
+    Thank you for shopping with us!
+    
+    Best regards,
+    The Sales Team
+    """
+    
+    send_email(subject=subject, body=body, recipient_email=recipient_email)
+    print(f"Order acknowledgment sent to {recipient_email}")
+
+def send_order_update_confirmation(email, latest_order):
+    """
+    Sends a confirmation email when an order has been updated.
+    """
+    match = re.search(r'<([^<>]+)>', email)
+    recipient_email = match.group(1) if match else email
+    
+    order_id = str(latest_order["_id"])
+    tracking_url = f"http://localhost:3000/track-order/{order_id}"
+    
+    product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in latest_order['products']])
+    
+    subject = "Order Update Confirmation"
+    
+    body = f"""Dear Valued Customer,
+
+        Thank you for updating your order with us. Your changes have been successfully processed.
+
+        Updated Order Details:
+        {product_list}
+
+        Order Date: {latest_order['date']} at {latest_order['time']}
+
+        You can track your order status at any time using this link:
+        {tracking_url}
+
+        If you have any questions or need further assistance, please contact our customer support team.
+
+        Thank you for shopping with us!
+
+        Best regards,
+        The Sales Team
+        Our Company
+
+        ------------------------------------------
+        This is an automated message. Please do not reply directly to this email.
+    """
+    
+    send_email(subject=subject, body=body, recipient_email=recipient_email)
+    print(f"Order update confirmation sent to {recipient_email}")
+
 def send_order_issue_email(email, errors):
-    """
-    Sends an email notifying the user that their order could not be processed due to errors.
+    error_bullets = "\n".join([f"• {error}" for error in errors])
+    
+    body = f"""Dear Valued Customer,
+
+        Thank you for your recent order with us. We appreciate your business.
+
+        Unfortunately, we were unable to process your order due to the following issue(s):
+
+        {error_bullets}
+
+        We want to help you complete your purchase successfully. Please review these issues and resubmit your order at your earliest convenience.
+
+        If you need any assistance or have questions, please don't hesitate to contact our customer support team at support@ourcompany.com or call us at (555) 123-4567.
+
+        We apologize for any inconvenience this may have caused and look forward to serving you soon.
+
+        Best regards,
+        The Customer Service Team
+        Our Company
+
+        ------------------------------------------
+        This is an automated message. Please do not reply directly to this email.
     """
     
-    error_message = "\n".join(errors)
-    body = f"Dear Customer,\n\nWe could not process your order due to the following issues:\n\n{error_message}\n\nPlease review and resend your order.\n\nThank you."
     send_email(
-        subject="Order Processing Issue",
+        subject="Important: Action Required for Your Recent Order",
         body=body,
         recipient_email=email
     )

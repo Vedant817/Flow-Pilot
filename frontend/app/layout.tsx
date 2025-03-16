@@ -4,6 +4,7 @@ import "./globals.css";
 import dynamic from "next/dynamic";
 const Sidebar = dynamic(() => import("@/components/Sidebar"));
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,11 +33,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex bg-[#0A0A0A]`}
       >
         <Sidebar />
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

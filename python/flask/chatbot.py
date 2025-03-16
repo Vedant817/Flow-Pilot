@@ -16,7 +16,6 @@ import pandas as pd
 from python.db.gemini_config import gemini_model
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# Load environment variables
 load_dotenv()
 
 # Initialize database connection
@@ -30,7 +29,7 @@ chat_history_collection = db["chat_history"]
 
 # Google Cloud Configuration
 PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"D:\Deloitte\Prototype\python\services\fresh-airfoil-445517-q1-0df53973cc7e.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\vedan\Downloads\EmailAutomation\server\fresh-airfoil-445517-q1-0df53973cc7e.json"
 aiplatform.init(project=PROJECT_ID, location="us-central1")
 embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
@@ -39,7 +38,11 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "sexyflasky")
 # Load Data from MongoDB
 def load_collection_data(collection):
-    return list(collection.find({}, {"_id": 0}))
+    try:
+        return list(collection.find({}, {"_id": 0}))
+    except Exception as e:
+        print(f"Error loading from collection: {e}")
+        return []
 
 def store_chat_history(session_id, query, response):
     """Store chat interactions in MongoDB using session ID"""
@@ -122,6 +125,9 @@ def build_records_from_collection(data, collection_name):
         text = str(record)
         chunks = text_splitter.split_text(text)
         for chunk_idx, chunk in enumerate(chunks):
+            if not chunk or chunk.strip() == "":
+                continue
+                
             records.append({
                 "id": f"{collection_name}_{idx}_chunk_{chunk_idx}",
                 "text": chunk,
@@ -167,7 +173,7 @@ def build_documents(records):
             "source": rec["source"],
             "record_type": rec.get("record_type", "general"),
             "timestamp": rec["timestamp"],
-            "priority": "high" if rec["source"] in ["pdf", "technical_docs"] else "normal"
+            "priority": "high" if rec["source"] in ["pdf", "app_docs", "technical_docs"] else "normal"
         }
         docs.append(Document(
             page_content=rec["text"],

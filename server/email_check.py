@@ -1,8 +1,6 @@
 from zerobouncesdk import ZeroBounce, ZBException
 from dotenv import load_dotenv
 import os
-import json
-import re
 
 load_dotenv()
 

@@ -1,20 +1,16 @@
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
-from dbConfig import connect_db
+from config.dbConfig import db
 from datetime import datetime, timedelta
-from send_email import send_acknowledgment, send_email, send_order_issue_email
+from send_email import send_acknowledgment, send_order_update_confirmation, send_order_issue_email
 import os
 from dotenv import load_dotenv
-from gemini_config import gemini_model
+from config.gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
-from fuzzywuzzy import process
-from bson import ObjectId
 
 load_dotenv()
-db = connect_db()
-
 API_KEY = os.getenv("AI21KEY")
 
 client = AI21Client(api_key=API_KEY)
@@ -27,11 +23,7 @@ def fetch_inventory_items():
     return {item["name"] for item in inventory_items}
 
 def correct_product_names(order_details, inventory_items):
-    """
-    Corrects product names using Gemini AI by comparing with inventory items
-    """
     try:
-        # Create a prompt for the model
         inventory_list = "\n".join(inventory_items)
         orders_list = "\n".join([f"- {order['product']}" for order in order_details])
         
@@ -49,10 +41,8 @@ def correct_product_names(order_details, inventory_items):
         response = gemini_model.generate_content(prompt)
         ai_response = response.text.strip()
 
-        # Remove any leading dashes and extra whitespace from each product name
         corrected_product_names = [name.lstrip("- ").strip() for name in ai_response.split("\n") if name.strip()]
 
-        # Create new order details with corrected product names
         corrected_orders = []
         for i, order in enumerate(order_details):
             if i < len(corrected_product_names):
@@ -61,11 +51,11 @@ def correct_product_names(order_details, inventory_items):
                     "quantity": order["quantity"]
                 })
             else:
-                corrected_orders.append(order)  # Keep original if no correction available
+                corrected_orders.append(order)
 
     except Exception as e:
         print(f"Error correcting product names: {e}")
-        corrected_orders = order_details  # Return original input in case of an error
+        corrected_orders = order_details
 
     print('Corrected Orders:', corrected_orders)
     return corrected_orders
@@ -204,7 +194,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
     } #TODO: Update the inventory after order is added
     order_collection.insert_one(formatted_entry)
     print('Order added to collection.')
-    # send_acknowledgment(formatted_entry) #TODO: Uncomment this line to send acknowledgment email, Make sure to update the email template
+    send_acknowledgment(formatted_entry)
 
 def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
@@ -213,7 +203,7 @@ def process_order_details(email, date, time, order_details):
 
     if not orders:
         print("No order details found in email.")
-        # send_order_issue_email(email, ["No order details were found in your email. Please send a valid order."])
+        send_order_issue_email(email, ["No order details were found in your email. Please send a valid order."])
         return
 
     is_valid, errors = validate_order_details_ai(orders)
@@ -245,7 +235,7 @@ def process_order_details(email, date, time, order_details):
                 )
         else:
             print("Customer details are incomplete. Sending issue email.")
-            # send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
+            send_order_issue_email(email, ["Your customer details are incomplete. Please update your information."])
     else:
         if customer_details and all(k in customer_details for k in ["name", "email", "phone", "address"]):
             print("New customer detected. Creating customer entry in the database.")
@@ -271,12 +261,13 @@ def process_order_details(email, date, time, order_details):
 
         else:
             print("Customer details are incomplete. Sending issue email.")
-            # send_order_issue_email(email, [
-            #     "We could not find your details in our system, and the provided details are incomplete."
-            #     "Please provide your name, email, phone, and address to create an account and process your order."
-            # ])
+            send_order_issue_email(email, [
+                "We could not find your details in our system, and the provided details are incomplete."
+                "Please provide your name, email, phone, and address to create an account and process your order."
+            ])
 
 def process_order_change(email, date, time, order_details):
+    print('Processing order change...')
     try:
         latest_order = order_collection.find_one({"email": email}, sort=[("date", DESCENDING), ("time", DESCENDING)])
         if not latest_order:
@@ -287,25 +278,85 @@ def process_order_change(email, date, time, order_details):
             process_order_details(email, date, time, order_details)
             return
         
-        existing_products = {item["product"]: item["quantity"] for item in latest_order["products"]}
+        updated_products = get_ai_order_updates(latest_order, order_details)
         
-        for new_item in order_details.get("orders", []):
-            product_name = new_item["product"]
-            quantity = new_item["quantity"]
-            
-            if product_name in existing_products:
-                existing_products[product_name] += quantity
-            else:
-                existing_products[product_name] = quantity
-
-        updated_products = [{"name": name, "quantity": qty} for name, qty in existing_products.items()]
         order_collection.update_one(
             {"_id": latest_order["_id"]},
             {"$set": {"products": updated_products}}
         )
         
-        # send_acknowledgment({"email": email, "message": "Your order has been updated successfully."}) #TODO: Send customer acknowledgment email
+        updated_order = order_collection.find_one({"_id": latest_order["_id"]})
+        send_order_update_confirmation(email, updated_order)
     
     except Exception as e:
         print(f"Error updating order: {e}")
-        # send_order_issue_email(email, ["An error occurred while updating your order."])
+        send_order_issue_email(email, ["An error occurred while updating your order."])
+
+def get_ai_order_updates(previous_order, new_order_details):
+    """
+    Use AI to intelligently merge the previous order with the new order details.
+    Handles cases of adding new items, modifying quantities, and removing items.
+    """
+    try:
+        previous_products = previous_order.get("products", [])
+        previous_products_formatted = json.dumps(previous_products, indent=2)
+        
+        new_products = new_order_details.get("orders", [])
+        new_products_formatted = json.dumps(new_products, indent=2)
+        
+        prompt = f"""
+        You are an AI assistant helping with order updates.
+        
+        PREVIOUS ORDER:
+        {previous_products_formatted}
+        
+        REQUESTED CHANGES:
+        {new_products_formatted}
+        
+        Analyze these changes and determine the appropriate action for each item:
+        1. If an item in the requested changes already exists in the previous order, update its quantity accordingly.
+        2. If an item in the requested changes doesn't exist in the previous order, add it as a new item.
+        3. If the requested changes specify a quantity of 0 for an existing item, remove it from the order.
+        4. If an item in the previous order isn't mentioned in the requested changes, keep it unchanged.
+        
+        Return ONLY a valid JSON array of the updated products in this exact format:
+        [
+            {{"name": "Product Name", "quantity": Number}}
+        ]
+        """
+        
+        response = gemini_model.generate_content(prompt)
+        ai_response = response.text.strip()
+        
+        clean_response = re.sub(r"``````", "", ai_response).strip()
+        
+        try:
+            updated_products = json.loads(clean_response)
+            return updated_products
+        except json.JSONDecodeError as e:
+            print(f"Error parsing AI response: {e}")
+            return merge_orders_fallback(previous_order, new_order_details)
+            
+    except Exception as e:
+        print(f"Error in AI order update: {e}")
+        return merge_orders_fallback(previous_order, new_order_details)
+
+def merge_orders_fallback(previous_order, new_order_details):
+    """
+    Fallback method to merge orders if AI processing fails.
+    Simply adds new quantities to existing items or adds new items.
+    """
+    existing_products = {item["name"]: item["quantity"] for item in previous_order.get("products", [])}
+    
+    for new_item in new_order_details.get("orders", []):
+        product_name = new_item["product"]
+        quantity = new_item["quantity"]
+        
+        if quantity == 0 and product_name in existing_products:
+            del existing_products[product_name]
+        elif product_name in existing_products:
+            existing_products[product_name] = quantity
+        else:
+            existing_products[product_name] = quantity
+
+    return [{"name": name, "quantity": qty} for name, qty in existing_products.items()]

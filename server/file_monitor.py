@@ -3,7 +3,6 @@ import openpyxl
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import os
-import threading
 import json
 from datetime import datetime, timedelta
 from emailContentExtract import extract_email_details
@@ -11,6 +10,7 @@ from order_handling import process_order_details, process_order_change
 from email_check import suspicious_email_check
 from email_classification import classify_email
 from feedback_handle import process_complaint
+from file_processing import process_attachment
 
 excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
@@ -71,37 +71,49 @@ def handle_modified_file():
             with open(changes_file, 'w') as f:
                 json.dump(changes, f, indent=4)
             
-            for change in changes: #TODO: Handle the case of file extraction
+            for change in changes:
                 email = change.get("Email")
                 subject = change.get("Subject")
                 body = change.get("Body")
                 date = change.get('Date')
                 time = change.get('Time')
+                attachment_path = change.get('Attachment')
+                
                 email_status = suspicious_email_check(email)
                 is_valid, status = email_status
+                
                 if is_valid:
-                    email_type, email_type_status = classify_email(body)
-                    if(email_type_status == 200):
-                        if email_type == "Order confirmation":
-                            order_details = extract_email_details(body)
-                            if order_details:
-                                process_order_details(email, date, time, order_details)
-                            else:
-                                print("No order details extracted from Order email.")
-                        
-                        elif email_type == "Change to order":
-                            order_details = extract_email_details(body)
-                            if order_details:
-                                process_order_change(email, date, time, order_details)
-                            else:
-                                print("No order details extracted from Change of Order email.")
-                        
-                        elif email_type == "Complaint":
-                            process_complaint(email, body, date, time)
-                        
+                    structured_data = None
+                    if attachment_path and os.path.exists(attachment_path):
+                        print(f"Processing email with attachment: {attachment_path}")
+                        structured_data = process_attachment(attachment_path, body, email, date, time)
+                    
+                    if structured_data and structured_data.get('orders'):
+                        print("Successfully extracted order details from combined email and attachment")
+                        process_order_details(email, date, time, structured_data)
                     else:
-                        print(f"Failed to classify email. Status: {email_type_status}")
-                else: #TODO Handle the case
+                        print("No valid structured data from attachment, processing email body only")
+                        email_type, email_type_status = classify_email(body)
+                        if email_type_status == 200:
+                            if email_type == "Order confirmation":
+                                order_details = extract_email_details(body)
+                                if order_details:
+                                    process_order_details(email, date, time, order_details)
+                                else:
+                                    print("No order details extracted from Order email.")
+                            
+                            elif email_type == "Change to order":
+                                order_details = extract_email_details(body)
+                                if order_details:
+                                    process_order_change(email, date, time, order_details)
+                                else:
+                                    print("No order details extracted from Change of Order email.")
+                            
+                            elif email_type == "Complaint":
+                                process_complaint(email, body, date, time)
+                        else:
+                            print(f"Failed to classify email. Status: {email_type_status}")
+                else:
                     print('❌ Email is NOT valid - Status:', status)
                     if status == "Suspicious":
                         print("⚠️ Warning: This email is flagged as suspicious.")
@@ -109,7 +121,6 @@ def handle_modified_file():
                         print("❗ Error: There was an issue validating the email.")
                     else:
                         print("ℹ️ Email is invalid or not recognized.")
-                    pass
     finally:
         if os.path.exists(changes_file):
             os.remove(changes_file)
