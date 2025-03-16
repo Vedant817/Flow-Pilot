@@ -45,7 +45,7 @@ def send_email(subject, body, recipient_email,attachment_path=None):
     except Exception as e:
         print(f"Error sending email: {e}")
 
-def send_acknowledgment(order):
+def send_acknowledgment(order, message=""):
     order_email = order["email"]
     match = re.search(r'<([^<>]+)>', order_email)
     recipient_email = match.group(1) if match else order_email
@@ -69,6 +69,8 @@ def send_acknowledgment(order):
     You can track your order status at any time using this link:
     {tracking_url}
     
+    {message if message else ""}
+    
     We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
     
     Thank you for shopping with us!
@@ -81,9 +83,6 @@ def send_acknowledgment(order):
     print(f"Order acknowledgment sent to {recipient_email}")
 
 def send_order_update_confirmation(email, latest_order):
-    """
-    Sends a confirmation email when an order has been updated.
-    """
     match = re.search(r'<([^<>]+)>', email)
     recipient_email = match.group(1) if match else email
     
