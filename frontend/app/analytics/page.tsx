@@ -1,56 +1,7 @@
 'use client'
-import { useState, useMemo, useCallback, memo } from 'react'
-import dynamic from 'next/dynamic'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  ArcElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js'
-
-const Line = dynamic(() => import('react-chartjs-2').then((mod) => mod.Line), { ssr: false })
-const Pie = dynamic(() => import('react-chartjs-2').then((mod) => mod.Pie), { ssr: false })
-const Bar = dynamic(() => import('react-chartjs-2').then((mod) => mod.Bar), { ssr: false })
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  ArcElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-)
-
-const chartOptions = {
-  responsive: true,
-  scales: {
-    y: {
-      beginAtZero: true,
-      grid: { color: '#333' },
-      ticks: { color: '#fff' }
-    },
-    x: {
-      grid: { color: '#333' },
-      ticks: { color: '#fff' }
-    }
-  },
-  plugins: {
-    legend: { labels: { color: '#fff' } }
-  }
-}
-
-const MemoizedLine = memo(Line)
-const MemoizedPie = memo(Pie)
-const MemoizedBar = memo(Bar)
+import { useState, useCallback, memo } from 'react'
+import CustomerDashboard from './customer/page'
+import ProductDashboard from './product/page'
 
 const TabButton = memo(({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) => (
   <button 
@@ -64,51 +15,8 @@ const TabButton = memo(({ label, isActive, onClick }: { label: string; isActive:
 ))
 TabButton.displayName = 'TabButton'
 
-const ChartContainer = memo(({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="bg-[#1A1A1A] p-4 rounded-lg h-[350px]">
-    <h2 className="text-white mb-4">{title}</h2>
-    {children}
-  </div>
-))
-ChartContainer.displayName = 'ChartContainer'
-
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState('customer')
-
-  const orderTrendData = useMemo(() => ({
-    labels: ['2024-04-09', '2024-05-26', '2024-07-16', '2024-09-04', '2024-10-23', '2024-12-12', '2025-02-18'],
-    datasets: [{
-      label: 'Orders',
-      data: [2, 6, 4, 3, 5, 4, 2],
-      borderColor: '#00C853',
-      backgroundColor: 'rgba(0, 200, 83, 0.2)',
-      tension: 0.1
-    }]
-  }), [])
-
-  const orderStatusData = useMemo(() => ({
-    labels: ['Delivered', 'Shipped', 'Processing', 'Pending'],
-    datasets: [{
-      data: [24, 26, 25, 25],
-      backgroundColor: ['#B9F6CA', '#69F0AE', '#00E676', '#00C853']
-    }]
-  }), [])
-
-  const customerSpendingData = useMemo(() => ({
-    labels: ['Michael Wilson', 'Robert Johnson', 'David Miller', 'John Doe', 'James Taylor'],
-    datasets: [
-      {
-        label: 'Total Spent',
-        data: [20000, 15000, 14000, 12000, 10000],
-        backgroundColor: 'rgba(0, 200, 83, 0.8)',
-      },
-      {
-        label: 'Order Count',
-        data: [28, 21, 18, 15, 12],
-        backgroundColor: '#00E676',
-      }
-    ]
-  }), [])
 
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab)
@@ -133,27 +41,8 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8">
-          <ChartContainer title="Order Trend (Last 30 Days)">
-            <MemoizedLine data={orderTrendData} options={chartOptions} />
-          </ChartContainer>
-
-          <ChartContainer title="Order Status Distribution">
-            <MemoizedPie 
-              data={orderStatusData}
-              options={{
-                ...chartOptions,
-                plugins: {
-                  ...chartOptions.plugins,
-                  legend: { ...chartOptions.plugins.legend, position: 'right' as const }
-                }
-              }}
-            />
-          </ChartContainer>
-
-          <ChartContainer title="Top 10 Customers by Spending">
-            <MemoizedBar data={customerSpendingData} options={chartOptions} />
-          </ChartContainer>
+        <div className="mt-6">
+          {activeTab === 'customer' ? <CustomerDashboard /> : <ProductDashboard />}
         </div>
       </div>
     </div>
