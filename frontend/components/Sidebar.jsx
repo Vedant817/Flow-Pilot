@@ -1,5 +1,5 @@
 'use client'
-import { ShoppingBag, Package, BarChart2, Bot, MessageSquare } from "lucide-react";
+import { ShoppingBag, Package, BarChart2, Bot, MessageSquare, AlertTriangle } from "lucide-react";
 import { useState, useCallback, memo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -7,8 +7,9 @@ const MENU_ITEMS = [
   { id: 1, icon: <ShoppingBag size={20} />, label: "Orders", href: "/" },
   { id: 2, icon: <Package size={20} />, label: "Inventory", href: "/inventory" },
   { id: 3, icon: <BarChart2 size={20} />, label: "Analytics", href: "/analytics" },
+  { id: 4, icon: <AlertTriangle size={20} />, label: "Errors", href: "/errors" },
   { id: 5, icon: <MessageSquare size={20} />, label: "Feedback", href: "/feedback" },
-  { id: 4, icon: <Bot size={20} />, label: "Chatbot", href: "/chatbot" },
+  { id: 6, icon: <Bot size={20} />, label: "Chatbot", href: "/chatbot" },
 ];
 
 const MenuItem = memo(({ item, isActive, onClick }) => (
