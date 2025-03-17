@@ -57,26 +57,28 @@ def send_acknowledgment(order, message=""):
     
     subject = "Order Confirmation - Thank You!"
     
+    tracking_info = f"You can track your order status at any time using this link:\n{tracking_url}" if not message else ""
+    
     body = f"""Dear {order['name']},
 
-Thank you for your order! We have received your request, and it is currently pending fulfillment.
+            Thank you for your order! We have received your request, and it is currently pending fulfillment.
+            
+            Order Details:
+            {product_list}
 
-Order Details:
-{product_list}
+            Order Date: {order['date']} at {order['time']}
 
-Order Date: {order['date']} at {order['time']}
+            {tracking_info}
 
-{f"You can track your order status at any time using this link:" + "\n" + f"{tracking_url}" if not message else ""}
+            {message if message else ""}
 
-{message if message else ""}
+            We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
 
-We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
+            Thank you for shopping with us!
 
-Thank you for shopping with us!
-
-Best regards,  
-The Sales Team
-"""
+            Best regards,  
+            The Sales Team
+        """
     
     send_email(subject=subject, body=body, recipient_email=recipient_email)
     print(f"Order acknowledgment sent to {recipient_email}")
