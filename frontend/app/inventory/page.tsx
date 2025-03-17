@@ -214,7 +214,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [error]);
 
   useEffect(() => {
     fetchInventoryData();
