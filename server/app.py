@@ -110,14 +110,11 @@ def handle_exception(e):
 @app.route('/product-analytics', methods=['GET'])
 def get_product_analytics():
     try:
-        # Get date range for last 30 days
         thirty_days_ago = datetime.now() - timedelta(days=30)
         
-        # Query MongoDB collections
         orders_collection = db['orders']
         feedback_collection = db['feedback']
         
-        # Best selling products - aggregate from orders collection
         pipeline_best = [
             {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
             {"$unwind": "$products"},
@@ -127,7 +124,6 @@ def get_product_analytics():
         ]
         best_selling = list(orders_collection.aggregate(pipeline_best))
         
-        # Worst selling products
         pipeline_worst = [
             {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
             {"$unwind": "$products"},
@@ -137,7 +133,6 @@ def get_product_analytics():
         ]
         worst_selling = list(orders_collection.aggregate(pipeline_worst))
         
-        # Revenue per day
         pipeline_revenue = [
             {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
             {"$addFields": {
@@ -152,10 +147,8 @@ def get_product_analytics():
         ]
         revenue_per_day = list(orders_collection.aggregate(pipeline_revenue))
         
-        # Customer feedback
         recent_feedback = list(feedback_collection.find().sort("timestamp", -1).limit(5))
         
-        # Format the data for the frontend
         response_data = {
             'productSales': {
                 'bestSelling': [{'name': item['_id'], 'quantity': item['quantity']} for item in best_selling],
@@ -179,13 +172,10 @@ def get_product_analytics():
 @app.route('/customer-analytics', methods=['GET'])
 def get_customer_analytics():
     try:
-        # Get date range for last 30 days
         thirty_days_ago = datetime.now() - timedelta(days=30)
         
-        # Query MongoDB collections
         orders_collection = db['orders']
         
-        # Order trends
         pipeline_trends = [
             {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
             {"$group": {"_id": "$date", "count": {"$sum": 1}}},
@@ -193,7 +183,6 @@ def get_customer_analytics():
         ]
         order_trends = list(orders_collection.aggregate(pipeline_trends))
         
-        # Most frequent customers
         pipeline_frequent = [
             {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
             {"$group": {"_id": "$name", "order_count": {"$sum": 1}}},
@@ -202,7 +191,6 @@ def get_customer_analytics():
         ]
         frequent_customers = list(orders_collection.aggregate(pipeline_frequent))
         
-        # Top customers by spending
         pipeline_spenders = [
     {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
     {"$unwind": "$products"},
@@ -219,7 +207,6 @@ def get_customer_analytics():
 
         top_spenders = list(orders_collection.aggregate(pipeline_spenders))
         
-        # Format the data for the frontend
         response_data = {
             'orderTrends': {
                 'dates': [item['_id'] for item in order_trends],
