@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, memo } from 'react'
-import CustomerDashboard from './customer/page'
-import ProductDashboard from './product/page'
+import CustomerDashboard from '@/components/analytics/CustomerAnalytics'
+import ProductDashboard from '@/components/analytics/ProductAnalytics'
 
 const TabButton = memo(({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) => (
   <button 
