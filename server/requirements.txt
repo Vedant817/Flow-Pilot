@@ -20,3 +20,4 @@ easyocr
 fitz
 waitress
 gunicorn
+google-generativeai
