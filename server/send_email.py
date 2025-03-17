@@ -66,7 +66,7 @@ Order Details:
 
 Order Date: {order['date']} at {order['time']}
 
-{f"You can track your order status at any time using this link:\n{tracking_url}" if not message else ""}
+{f"You can track your order status at any time using this link:" + "\n" + f"{tracking_url}" if not message else ""}
 
 {message if message else ""}
 
@@ -76,7 +76,7 @@ Thank you for shopping with us!
 
 Best regards,  
 The Sales Team
-"""  
+"""
     
     send_email(subject=subject, body=body, recipient_email=recipient_email)
     print(f"Order acknowledgment sent to {recipient_email}")
