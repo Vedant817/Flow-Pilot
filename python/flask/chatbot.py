@@ -15,6 +15,7 @@ from langchain_google_vertexai import VertexAIEmbeddings
 import pandas as pd
 from python.db.gemini_config import gemini_model
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from python.flask.thread import call_routes
 
 load_dotenv()
 
@@ -315,6 +316,24 @@ def get_session_chat_history():
     
     return jsonify({"history": history, "session_id": session_id})
 
+@app.route("/end-session", methods=["POST"])
+def end_session():
+    session_id = session.get('session_id')
+    if not session_id:
+        return jsonify({"error": "No active session"}), 400
+    
+    # Clear chat history for this session
+    chat_history_collection.delete_many({"session_id": session_id})
+    
+    # Clear session
+    session.pop('session_id', None)
+    
+    return jsonify({"message": "Session ended and chat history cleared"})
+
+call_routes()
+
+
 # ✅ Step 8: Run Flask App
 if __name__ == "__main__":
     app.run(debug=True, port=5000, host="0.0.0.0")
+    

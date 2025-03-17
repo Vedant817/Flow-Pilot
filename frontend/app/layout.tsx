@@ -35,7 +35,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex bg-[#0A0A0A]`}
       >
-        <Sidebar />
+        {/* <Sidebar /> */}
         {children}
         <Analytics />
         <SpeedInsights />
