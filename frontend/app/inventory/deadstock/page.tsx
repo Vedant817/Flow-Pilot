@@ -197,9 +197,9 @@ export default function DeadstockAnalysis() {
     }
     
     return (
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg">
         <table className="w-full text-left border-collapse border border-gray-700 text-white">
-          <thead className="bg-[#252525] text-white text-lg">
+          <thead className="bg-[#252525] text-white text-lg sticky top-0">
             <tr>
               <th className="p-4 border border-gray-700">Product</th>
               <th className="p-4 border border-gray-700">Inventory</th>

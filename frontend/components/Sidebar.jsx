@@ -1,5 +1,5 @@
 'use client'
-import { ShoppingBag, Package, BarChart2, Bot } from "lucide-react";
+import { ShoppingBag, Package, BarChart2, Bot, MessageSquare } from "lucide-react";
 import { useState, useCallback, memo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -7,7 +7,8 @@ const MENU_ITEMS = [
   { id: 1, icon: <ShoppingBag size={20} />, label: "Orders", href: "/" },
   { id: 2, icon: <Package size={20} />, label: "Inventory", href: "/inventory" },
   { id: 3, icon: <BarChart2 size={20} />, label: "Analytics", href: "/analytics" },
-  { id: 4, icon: <Bot size={20} />, label: "Chatbot", href: "/chatbot" }
+  { id: 5, icon: <MessageSquare size={20} />, label: "Feedback", href: "/feedback" },
+  { id: 4, icon: <Bot size={20} />, label: "Chatbot", href: "/chatbot" },
 ];
 
 const MenuItem = memo(({ item, isActive, onClick }) => (
@@ -37,10 +38,10 @@ function Sidebar() {
       <div className="flex items-center mb-6">
         {/* Stylish Logo */}
         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E676] to-[#1A1A1A] flex items-center justify-center text-white font-bold text-xl shadow-lg">
-          SE
+          KE
         </div>
         <div className="ml-3">
-          <h2 className="text-white">Shresth</h2>
+          <h2 className="text-white">Kasukabe</h2>
           <p className="text-gray-400 text-sm">Electronics</p>
         </div>
       </div>
