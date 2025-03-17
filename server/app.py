@@ -12,7 +12,7 @@ from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
 from send_email import send_invoice
 import json
-
+from datetime import datetime, timedelta
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ObjectId):
@@ -106,6 +106,139 @@ def handle_exception(e):
     if isinstance(e, HTTPException):
         return jsonify({"error": e.description}), e.code
     return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
+@app.route('/product-analytics', methods=['GET'])
+def get_product_analytics():
+    try:
+        # Get date range for last 30 days
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        
+        # Query MongoDB collections
+        orders_collection = db['orders']
+        feedback_collection = db['feedback']
+        
+        # Best selling products - aggregate from orders collection
+        pipeline_best = [
+            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+            {"$unwind": "$products"},
+            {"$group": {"_id": "$products.name", "quantity": {"$sum": "$products.quantity"}}},
+            {"$sort": {"quantity": -1}},
+            {"$limit": 5}
+        ]
+        best_selling = list(orders_collection.aggregate(pipeline_best))
+        
+        # Worst selling products
+        pipeline_worst = [
+            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+            {"$unwind": "$products"},
+            {"$group": {"_id": "$products.name", "quantity": {"$sum": "$products.quantity"}}},
+            {"$sort": {"quantity": 1}},
+            {"$limit": 5}
+        ]
+        worst_selling = list(orders_collection.aggregate(pipeline_worst))
+        
+        # Revenue per day
+        pipeline_revenue = [
+            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+            {"$addFields": {
+                "total_amount": {"$sum": {"$map": {
+                    "input": "$products",
+                    "as": "product",
+                    "in": {"$multiply": ["$$product.price", "$$product.quantity"]}
+                }}}
+            }},
+            {"$group": {"_id": "$date", "revenue": {"$sum": "$total_amount"}}},
+            {"$sort": {"_id": 1}}
+        ]
+        revenue_per_day = list(orders_collection.aggregate(pipeline_revenue))
+        
+        # Customer feedback
+        recent_feedback = list(feedback_collection.find().sort("timestamp", -1).limit(5))
+        
+        # Format the data for the frontend
+        response_data = {
+            'productSales': {
+                'bestSelling': [{'name': item['_id'], 'quantity': item['quantity']} for item in best_selling],
+                'worstSelling': [{'name': item['_id'], 'quantity': item['quantity']} for item in worst_selling]
+            },
+            'revenuePerDay': [{'date': item['_id'], 'revenue': item['revenue']} for item in revenue_per_day],
+            'customerFeedback': [
+                {
+                    'name': item.get('customer_name', 'Anonymous'),
+                    'feedback': item.get('text', ''),
+                    'sentiment': item.get('sentiment', 'neutral')
+                } for item in recent_feedback
+            ]
+        }
+        
+        return jsonify(response_data)
+    except Exception as e:
+        print(f"Error in product analytics: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/customer-analytics', methods=['GET'])
+def get_customer_analytics():
+    try:
+        # Get date range for last 30 days
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        
+        # Query MongoDB collections
+        orders_collection = db['orders']
+        
+        # Order trends
+        pipeline_trends = [
+            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+            {"$group": {"_id": "$date", "count": {"$sum": 1}}},
+            {"$sort": {"_id": 1}}
+        ]
+        order_trends = list(orders_collection.aggregate(pipeline_trends))
+        
+        # Most frequent customers
+        pipeline_frequent = [
+            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+            {"$group": {"_id": "$name", "order_count": {"$sum": 1}}},
+            {"$sort": {"order_count": -1}},
+            {"$limit": 10}
+        ]
+        frequent_customers = list(orders_collection.aggregate(pipeline_frequent))
+        
+        # Top customers by spending
+        pipeline_spenders = [
+    {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+    {"$unwind": "$products"},
+    {"$addFields": {
+        "item_total": {"$multiply": ["$products.price", "$products.quantity"]}
+    }},
+    {"$group": {
+        "_id": "$name", 
+        "total_spent": {"$sum": "$item_total"}
+    }},
+    {"$sort": {"total_spent": -1}},
+    {"$limit": 10}
+]
+
+        top_spenders = list(orders_collection.aggregate(pipeline_spenders))
+        
+        # Format the data for the frontend
+        response_data = {
+            'orderTrends': {
+                'dates': [item['_id'] for item in order_trends],
+                'counts': [item['count'] for item in order_trends]
+            },
+            'frequentCustomers': {
+                'names': [item['_id'] for item in frequent_customers],
+                'counts': [item['order_count'] for item in frequent_customers]
+            },
+            'topSpenders': {
+                'names': [item['_id'] for item in top_spenders],
+                'amounts': [item['total_spent'] for item in top_spenders]
+            }
+        }
+        
+        return jsonify(response_data)
+    except Exception as e:
+        print(f"Error in customer analytics: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 #? CRUD Endpoints
 @app.route('/get-orders', methods=['GET'])
