@@ -18,3 +18,5 @@ Flask-Cors
 PyMuPDF
 easyocr
 fitz
+waitress
+gunicorn
