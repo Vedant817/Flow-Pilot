@@ -96,3 +96,13 @@ body {
   scrollbar-width: thin;
   scrollbar-color: #00E676 #1A1A1A;
 }
+
+input {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.table-container {
+  overflow-x: auto;
+  width: 100%;
+}
