@@ -16,7 +16,7 @@ interface RevenuePerDayProps {
 export default function RevenuePerDay({ data }: RevenuePerDayProps) {
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const allZeros = data.every(item => item.revenue === 0);
@@ -37,42 +37,34 @@ export default function RevenuePerDay({ data }: RevenuePerDayProps) {
         backgroundColor: 'rgba(16, 185, 129, 0.5)',
         tension: 0.1,
         pointRadius: 4,
-        pointBackgroundColor: '#10b981',
+        pointBackgroundColor: "#10b981",
         fill: true,
-      }
-    ]
+      },
+    ],
   };
 
   const options: ChartOptions<'line'> = {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false, // Set false for better height control
     scales: {
       y: {
         beginAtZero: true,
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)'
-        },
+        grid: { color: "rgba(255, 255, 255, 0.1)" },
         ticks: {
-          color: 'rgba(255, 255, 255, 0.7)',
-          callback: function(value) {
-            return '$' + value.toLocaleString();
-          }
-        }
+          color: "rgba(255, 255, 255, 0.7)",
+          callback: function (value) {
+            return `$${value?.toLocaleString()}`;
+          },
+        },
       },
       x: {
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)'
-        },
-        ticks: {
-          color: 'rgba(255, 255, 255, 0.7)'
-        }
-      }
+        grid: { color: "rgba(255, 255, 255, 0.1)" },
+        ticks: { color: "rgba(255, 255, 255, 0.7)" },
+      },
     },
     plugins: {
       legend: {
-        labels: {
-          color: 'rgba(255, 255, 255, 0.7)'
-        }
+        labels: { color: "rgba(255, 255, 255, 0.7)" },
       },
       tooltip: {
         callbacks: {
@@ -88,7 +80,7 @@ export default function RevenuePerDay({ data }: RevenuePerDayProps) {
   };
 
   return (
-    <div>
+    <div className="w-full h-64">
       <Line data={chartData} options={options} />
       {allZeros && (
         <div className="text-yellow-500 text-center mt-2 text-sm">

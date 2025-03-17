@@ -28,9 +28,9 @@ export default function CustomerFeedback({ data }: CustomerFeedbackProps) {
       {
         data: Object.values(sentimentCounts),
         backgroundColor: [
-          'rgba(144, 238, 129, 0.8)',  // positive - green
-          'rgba(251, 191, 36, 0.8)',  // neutral - yellow
-          'rgba(239, 68, 68, 0.8)'    // negative - red
+          'rgba(144, 238, 129, 0.8)',
+          'rgba(251, 191, 36, 0.8)',
+          'rgba(239, 68, 68, 0.8)'
         ],
         borderColor: [
           'rgba(16, 185, 129, 1)',
@@ -47,7 +47,7 @@ export default function CustomerFeedback({ data }: CustomerFeedbackProps) {
     maintainAspectRatio: true,
     plugins: {
       legend: {
-        position: 'right',
+        position: 'right' as const,
         labels: {
           color: 'rgba(255, 255, 255, 0.7)',
           padding: 20,

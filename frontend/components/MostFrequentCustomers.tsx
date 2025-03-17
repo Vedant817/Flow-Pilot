@@ -26,7 +26,7 @@ export default function MostFrequentCustomers({ data }: MostFrequentCustomersPro
   const options = {
     indexAxis: 'x' as const,
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     scales: {
       y: {
         beginAtZero: true,
@@ -56,7 +56,7 @@ export default function MostFrequentCustomers({ data }: MostFrequentCustomersPro
   };
 
   return (
-    <div>
+    <div style={{ position: 'relative', height: '300px', width: '100%' }}>
       <Bar data={chartData} options={options} />
     </div>
   );
