@@ -1,14 +1,21 @@
 // components/CustomerFeedback.js
 "use client";
-import { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 
 Chart.register(...registerables);
 
-export default function CustomerFeedback({ data }) {
+interface FeedbackData {
+  sentiment: string;
+}
+
+interface CustomerFeedbackProps {
+  data: FeedbackData[];
+}
+
+export default function CustomerFeedback({ data }: CustomerFeedbackProps) {
   // Count sentiment distribution
-  const sentimentCounts = data.reduce((acc, item) => {
+  const sentimentCounts = data.reduce((acc: { [key: string]: number }, item) => {
     acc[item.sentiment] = (acc[item.sentiment] || 0) + 1;
     return acc;
   }, {});
@@ -35,7 +42,29 @@ export default function CustomerFeedback({ data }) {
     ]
   };
 
-  const options = {
+  interface ChartOptions {
+    responsive: boolean;
+    maintainAspectRatio: boolean;
+    plugins: {
+      legend: {
+        position: string;
+        labels: {
+          color: string;
+          padding: number;
+          font: {
+            size: number;
+          };
+        };
+      };
+      tooltip: {
+        callbacks: {
+          label: (context: any) => string;
+        };
+      };
+    };
+  }
+
+  const options: ChartOptions = {
     responsive: true,
     maintainAspectRatio: true,
     plugins: {
@@ -54,7 +83,7 @@ export default function CustomerFeedback({ data }) {
           label: function(context) {
             const label = context.label || '';
             const value = context.raw || 0;
-            const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+            const total = context.dataset.data.reduce((acc: number, val: number) => acc + val, 0);
             const percentage = Math.round((value / total) * 100);
             return `${label}: ${value} (${percentage}%)`;
           }

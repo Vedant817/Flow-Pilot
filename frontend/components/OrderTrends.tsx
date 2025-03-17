@@ -1,15 +1,24 @@
 // components/OrderTrends.js
 "use client";
-import { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
 Chart.register(...registerables);
 
-export default function OrderTrends({ data }) {
-  const chartRef = useRef(null);
+interface OrderTrendsProps {
+  data: {
+    dates: string[];
+    counts: number[];
+  };
+}
+
+export default function OrderTrends({ data }: OrderTrendsProps) {
   
-  const formatDate = (dateString) => {
+  interface FormatDate {
+    (dateString: string): string;
+  }
+
+  const formatDate: FormatDate = (dateString) => {
     const date = new Date(dateString);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };

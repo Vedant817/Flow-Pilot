@@ -9,18 +9,18 @@ export default function SignUp() {
     password: '',
     confirmPassword: ''
   });
-  const [error, setError] = useState('');
   const router = useRouter();
+  const [error] = useState<string | null>(null);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Add signup logic here
     // For now, just simulate a successful signup
-    router.push('/inventory');
+    router.push('/');
   };
 
   return (
@@ -56,7 +56,6 @@ export default function SignUp() {
         <div className="w-[450px] bg-[#111827] p-8 rounded-lg">
           <h2 className="text-2xl font-bold text-white mb-6">Create an Account</h2>
           {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
-          
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">Username</label>

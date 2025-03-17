@@ -1,12 +1,32 @@
 // app/page.js
 "use client";
 import { useEffect, useState } from 'react';
+
+interface ProductSales {
+  bestSelling: { name: string; quantity: number }[];
+  worstSelling: { name: string; quantity: number }[];
+}
+interface RevenuePerDay {
+  date: string;
+  revenue: number;
+}
+
+interface CustomerFeedback {
+  name: string;
+  feedback: string;
+  sentiment: string;
+}
+
 import BestWorstProducts from '../../../components/BestWorstProducts';
 import RevenuePerDay from '../../../components/RevenuePerDay';
 import CustomerFeedback from '../../../components/CustomerFeedback';
 
 export default function ProductDashboard() {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<{
+    productSales: ProductSales;
+    revenuePerDay: RevenuePerDay[];
+    customerFeedback: CustomerFeedback[];
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -82,22 +102,24 @@ export default function ProductDashboard() {
         <h1 className="text-2xl font-bold">Product Analytics</h1>
       </header>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">Best and Worst Selling Products</h2>
-          <BestWorstProducts data={data.productSales} />
+      {data && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Best and Worst Selling Products</h2>
+            <BestWorstProducts data={data.productSales} />
+          </div>
+          
+          <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Customer Feedback Sentiment</h2>
+            <CustomerFeedback data={data.customerFeedback} />
+          </div>
+          
+          <div className="bg-gray-950 p-4 rounded-lg shadow-lg lg:col-span-2">
+            <h2 className="text-lg font-semibold mb-4">Revenue Per Day (February 2024)</h2>
+            <RevenuePerDay data={data.revenuePerDay} />
+          </div>
         </div>
-        
-        <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">Customer Feedback Sentiment</h2>
-          <CustomerFeedback data={data.customerFeedback} />
-        </div>
-        
-        <div className="bg-gray-950 p-4 rounded-lg shadow-lg lg:col-span-2">
-          <h2 className="text-lg font-semibold mb-4">Revenue Per Day (February 2024)</h2>
-          <RevenuePerDay data={data.revenuePerDay} />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

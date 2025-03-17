@@ -1,12 +1,18 @@
 // components/TopCustomersBySpending.js
 "use client";
-import { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
 Chart.register(...registerables);
 
-export default function TopCustomersBySpending({ data }) {
+interface TopCustomersBySpendingProps {
+  data: {
+    names: string[];
+    amounts: number[];
+  };
+}
+
+export default function TopCustomersBySpending({ data }: TopCustomersBySpendingProps) {
   const chartData = {
     labels: data.names,
     datasets: [
@@ -20,7 +26,45 @@ export default function TopCustomersBySpending({ data }) {
     ]
   };
 
-  const options = {
+  interface ChartOptions {
+    indexAxis: 'x' | 'y' | undefined;
+    responsive: boolean;
+    maintainAspectRatio: boolean;
+    scales: {
+      y: {
+        beginAtZero: boolean;
+        grid: {
+          color: string;
+        };
+        ticks: {
+          color: string;
+          callback: (value: number) => string;
+        };
+      };
+      x: {
+        grid: {
+          color: string;
+        };
+        ticks: {
+          color: string;
+        };
+      };
+    };
+    plugins: {
+      legend: {
+        labels: {
+          color: string;
+        };
+      };
+      tooltip: {
+        callbacks: {
+          label: (context: { raw: number }) => string;
+        };
+      };
+    };
+  }
+
+  const options: ChartOptions = {
     indexAxis: 'x',
     responsive: true,
     maintainAspectRatio: true,
@@ -54,8 +98,8 @@ export default function TopCustomersBySpending({ data }) {
       },
       tooltip: {
         callbacks: {
-          label: function(context) {
-            return `Total Spent: $${context.raw.toLocaleString()}`;
+          label: function(tooltipItem) {
+            return `Total Spent: $${(tooltipItem.raw as number).toLocaleString()}`;
           }
         }
       }

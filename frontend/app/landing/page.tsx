@@ -1,23 +1,17 @@
 "use client";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart2,
-  Package,
   PieChart,
-  ShoppingBag,
   ArrowRight,
   Play,
   Database,
-  Shield,
-  Zap,
 } from "lucide-react";
-import Image from "next/image";
 
 export default function LandingPage() {
   const router = useRouter();
 
-  const navigateTo = (path) => {
+  const navigateTo = (path: string) => {
     router.push(path);
   };
 
@@ -368,7 +362,7 @@ export default function LandingPage() {
         What Our Customers Say
       </h2>
       <p className="text-gray-400 max-w-2xl mx-auto">
-        Don't just take our word for it. Here's what electronics retailers
+        Don&apos;t just take our word for it. Here&apos;s what electronics retailers
         have to say about our automated order processing system.
       </p>
     </div>
@@ -377,9 +371,9 @@ export default function LandingPage() {
       <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
         <div className="flex text-[#00E676] mb-4">★★★★★</div>
         <p className="text-gray-300 mb-6">
-          "The automated order processing system has transformed our operations.
-          We've reduced stockouts by 75% and improved cash flow
-          significantly."
+          &quot;The automated order processing system has transformed our operations.
+          We&apos;ve reduced stockouts by 75% and improved cash flow
+          significantly.&quot;
         </p>
         <div className="flex items-center">
           {/* <Image
@@ -399,8 +393,8 @@ export default function LandingPage() {
       <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
         <div className="flex text-[#00E676] mb-4">★★★★★</div>
         <p className="text-gray-300 mb-6">
-          "The analytics features alone are worth the investment. We can
-          now predict trends and stock accordingly. Game changer!"
+          &quot;The analytics features alone are worth the investment. We can
+          now predict trends and stock accordingly. Game changer!&quot;
         </p>
         <div className="flex items-center">
           {/* <Image 
@@ -420,9 +414,9 @@ export default function LandingPage() {
       <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
         <div className="flex text-[#00E676] mb-4">★★★★★</div>
         <p className="text-gray-300 mb-6">
-          "Implementation was smooth and the customer support is
+          &quot;Implementation was smooth and the customer support is
           exceptional. Our inventory accuracy has improved from 85% to
-          99%."
+          99%.&quot;
         </p>
         <div className="flex items-center">
           {/* <Image 

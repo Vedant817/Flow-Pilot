@@ -6,7 +6,22 @@ import MostFrequentCustomers from '../../../components/MostFrequentCustomers';
 import TopCustomersBySpending from '../../../components/TopCustomersBySpending';
 
 export default function CustomerDashboard() {
-  const [orderData, setOrderData] = useState(null);
+  interface OrderData {
+    orderTrends: {
+      dates: string[];
+      counts: number[];
+    };
+    frequentCustomers: {
+      names: string[];
+      counts: number[];
+    };
+    topSpenders: {
+      names: string[];
+      amounts: number[];
+    };
+  }
+
+  const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -63,25 +78,26 @@ export default function CustomerDashboard() {
       <h1 className="text-2xl font-bold">Customer Analytics</h1>
     </header>
   
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* First two divs take half the width each */}
-      <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
-        <h2 className="text-xl font-semibold mb-4">Order Trend (Last 30 Days)</h2>
-        <OrderTrends data={orderData.orderTrends} />
+    {orderData && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* First two divs take half the width each */}
+        <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
+          <h2 className="text-xl font-semibold mb-4">Order Trend (Last 30 Days)</h2>
+          <OrderTrends data={orderData.orderTrends} />
+        </div>
+    
+        <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
+          <h2 className="text-xl font-semibold mb-4">Top 10 Customers by Spending</h2>
+          <TopCustomersBySpending data={orderData.topSpenders} />
+        </div>
+    
+        {/* Last div takes full width */}
+        <div className="bg-gray-950 p-4 rounded-lg shadow-lg col-span-2">
+          <h2 className="text-lg font-semibold mb-4">Most Frequent Customers</h2>
+          <MostFrequentCustomers data={orderData.frequentCustomers} />
+        </div>
       </div>
-  
-      <div className="bg-gray-950 p-4 rounded-lg shadow-lg">
-        <h2 className="text-xl font-semibold mb-4">Top 10 Customers by Spending</h2>
-        <TopCustomersBySpending data={orderData.topSpenders} />
-      </div>
-  
-      {/* Last div takes full width */}
-      <div className="bg-gray-950 p-4 rounded-lg shadow-lg col-span-2">
-        <h2 className="text-lg font-semibold mb-4">Most Frequent Customers</h2>
-        <MostFrequentCustomers data={orderData.frequentCustomers} />
-      </div>
-
-    </div>
+    )}
   </div>
   
   );

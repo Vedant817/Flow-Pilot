@@ -7,7 +7,7 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const router = useRouter();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Add sign-in logic here
     // For now, just simulate a successful sign-in
@@ -97,7 +97,7 @@ export default function SignIn() {
           </form>
           
           <p className="mt-6 text-sm text-gray-400 text-center">
-            Don't have an account? <a href="/sign-up" className="text-[#00E676] hover:underline">Sign Up</a>
+            Don&apos;t have an account? <a href="/sign-up" className="text-[#00E676] hover:underline">Sign Up</a>
           </p>
         </div>
       </div>

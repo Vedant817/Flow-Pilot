@@ -1,12 +1,16 @@
 // components/MostFrequentCustomers.js
 "use client";
-import { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
 Chart.register(...registerables);
 
-export default function MostFrequentCustomers({ data }) {
+interface CustomerData {
+  names: string[];
+  counts: number[];
+}
+
+export default function MostFrequentCustomers({ data }: { data: CustomerData }) {
   const chartData = {
     labels: data.names,
     datasets: [
@@ -21,7 +25,7 @@ export default function MostFrequentCustomers({ data }) {
   };
 
   const options = {
-    indexAxis: 'x',
+    indexAxis: 'x' as const,
     responsive: true,
     maintainAspectRatio: true,
     scales: {
