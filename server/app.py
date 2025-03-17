@@ -6,14 +6,21 @@ from feedback_handle import fetch_feedback, store_feedback
 from chatbot import ask_bot
 from flask_cors import CORS
 from bson.objectid import ObjectId
-from bson.json_util import dumps
 from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
 from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
 from send_email import send_invoice
+import json
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
 
 app = Flask(__name__)
+app.json_encoder = JSONEncoder
 CORS(app, resources={
     r"/*": {
         "origins": "*"
@@ -48,16 +55,6 @@ def chat():
     
     response = ask_bot(query)
     return jsonify({"response": response})
-
-@app.route('/get-inventory')
-def get_inventory():
-    try:
-        inventory_collection = db['inventory']
-        inventory_items = list(inventory_collection.find({}, {'_id': 0}))
-        print(inventory_items)
-        return jsonify(inventory_items), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/orders/<order_id>', methods=['GET'])
 def get_order_info(order_id):
@@ -142,6 +139,94 @@ def handle_status_update():
         send_invoice(order_id)
         
     return jsonify({"success": True, "message": "Order status updated successfully"}), 200
+
+@app.route('/get-inventory')
+def get_inventory():
+    try:
+        inventory_collection = db['inventory']
+        inventory_items = list(inventory_collection.find({}, {}))
+        
+        for item in inventory_items:
+            item['_id'] = str(item['_id'])
+        
+        return jsonify(inventory_items), 200
+    except Exception as e:
+        print(f"Error retrieving inventory: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get-inventory/<item_id>', methods=['GET'])
+def get_inventory_item(item_id):
+    try:
+        inventory_collection = db['inventory']
+        item = inventory_collection.find_one({"_id": ObjectId(item_id)})
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
+            
+        item['_id'] = str(item['_id'])
+        return jsonify(item), 200
+    except Exception as e:
+        print(f"Error retrieving item: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/add-inventory', methods=['POST'])
+def add_inventory():
+    try:
+        inventory_collection = db['inventory']
+        data = request.json
+        
+        required_fields = ['name', 'category', 'price', 'quantity', 'warehouse_location', 'stock_alert_level']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        result = inventory_collection.insert_one(data)
+        
+        new_item = data
+        new_item['_id'] = str(result.inserted_id)
+        
+        return jsonify(new_item), 201
+    except Exception as e:
+        print(f"Error adding inventory item: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/update-inventory/<item_id>', methods=['PUT'])
+def update_inventory(item_id):
+    try:
+        inventory_collection = db['inventory']
+        data = request.json
+        
+        if '_id' in data:
+            del data['_id']
+        
+        result = inventory_collection.update_one(
+            {"_id": ObjectId(item_id)},
+            {"$set": data}
+        )
+        
+        if result.matched_count == 0:
+            return jsonify({"error": "Item not found"}), 404
+            
+        updated_item = inventory_collection.find_one({"_id": ObjectId(item_id)})
+        updated_item['_id'] = str(updated_item['_id'])
+        
+        return jsonify(updated_item), 200
+    except Exception as e:
+        print(f"Error updating inventory item: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/delete-inventory/<item_id>', methods=['DELETE'])
+def delete_inventory(item_id):
+    try:
+        inventory_collection = db['inventory']
+        result = inventory_collection.delete_one({"_id": ObjectId(item_id)})
+        
+        if result.deleted_count == 0:
+            return jsonify({"error": "Item not found"}), 404
+        
+        return jsonify({"message": "Item deleted successfully"}), 200
+    except Exception as e:
+        print(f"Error deleting inventory item: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True)
