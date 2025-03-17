@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { X } from 'lucide-react';
 
@@ -29,15 +29,9 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
     });
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (isOpen && productId) {
-            fetchProductDetails();
-        }
-    }, [isOpen, productId]);
-
-    const fetchProductDetails = async () => {
+    const fetchProductDetails = useCallback(async () => {
         if (!productId) return;
-        
+
         try {
             setLoading(true);
             const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/get-inventory/${productId}`);
@@ -47,7 +41,13 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
         } finally {
             setLoading(false);
         }
-    };
+    }, [productId]);
+
+    useEffect(() => {
+        if (isOpen && productId) {
+            fetchProductDetails();
+        }
+    }, [isOpen, productId, fetchProductDetails]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -62,7 +62,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!productId) return;
-        
+
         try {
             await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/update-inventory/${productId}`, formData);
             onProductUpdated(productId, formData);

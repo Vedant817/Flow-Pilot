@@ -1,20 +1,24 @@
-// components/OrderTrends.js
 "use client";
-import { useEffect, useRef } from 'react';
-import { Chart, registerables } from 'chart.js';
+import { Chart, registerables, ChartData, ChartOptions } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
 Chart.register(...registerables);
 
-export default function OrderTrends({ data }) {
-  const chartRef = useRef(null);
+interface OrderTrendsProps {
+  data: {
+    dates: string[];
+    counts: number[];
+  };
+}
+
+export default function OrderTrends({ data }: OrderTrendsProps) {
   
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  const chartData = {
+  const chartData: ChartData<'line'> = {
     labels: data.dates.map(date => formatDate(date)),
     datasets: [
       {
@@ -30,7 +34,7 @@ export default function OrderTrends({ data }) {
     ]
   };
 
-  const options = {
+  const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: true,
     scales: {

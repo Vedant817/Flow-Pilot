@@ -1,12 +1,15 @@
-// components/BestWorstProducts.js
 "use client";
-import { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import { ProductSalesData } from '@/lib/types/analytics';
 
 Chart.register(...registerables);
 
-export default function BestWorstProducts({ data }) {
+interface BestWorstProductsProps {
+  data: ProductSalesData;
+}
+
+export default function BestWorstProducts({ data }: BestWorstProductsProps) {
   const bestSellingData = {
     labels: data.bestSelling.map(item => item.name),
     datasets: [
@@ -34,7 +37,7 @@ export default function BestWorstProducts({ data }) {
   };
 
   const options = {
-    indexAxis: 'y',
+    indexAxis: 'y' as const,
     responsive: true,
     maintainAspectRatio: true,
     scales: {
