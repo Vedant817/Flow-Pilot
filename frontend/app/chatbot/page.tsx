@@ -2,10 +2,11 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from "remark-gfm";
-import { Send, Bot, Loader2, Clock } from 'lucide-react';
+import { Send, Bot, Loader2, Clock, Mic, MicOff, Volume2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 interface Message {
   id: string;
@@ -15,7 +16,7 @@ interface Message {
   createdAt: number;
 }
 
-const ChatMessage = memo(({ message }: { message: Message }) => (
+const ChatMessage = memo(({ message, onSpeakMessage }: { message: Message, onSpeakMessage: (text: string) => void }) => (
   <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
     <div className={`p-3 rounded-lg inline-block ${message.type === 'user'
       ? 'bg-[#00E676] text-black'
@@ -24,7 +25,18 @@ const ChatMessage = memo(({ message }: { message: Message }) => (
       <div className="whitespace-pre-wrap break-words max-w-[400px] w-full prose prose-invert prose-sm">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown>
       </div>
-      <p className="text-xs opacity-50 mt-1 text-right">{message.timestamp}</p>
+      <div className="flex justify-between items-center mt-1">
+        <p className="text-xs opacity-50">{message.timestamp}</p>
+        {message.type === 'assistant' && (
+          <button 
+            onClick={() => onSpeakMessage(message.text)}
+            className="text-xs opacity-50 hover:opacity-100"
+            aria-label="Speak message"
+          >
+            <Volume2 size={14} />
+          </button>
+        )}
+      </div>
     </div>
   </div>
 ));
@@ -59,14 +71,23 @@ export default function AISidebar() {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [isListening, setIsListening] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
+
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition
+  } = useSpeechRecognition();
 
   function getDefaultWelcomeMessage(): Message[] {
     return [{
       id: 'welcome-msg',
-      text: 'Hello! How can I assist you today? 😊',
+      text: 'Hello! How can I assist you today? 😊 You can type or use the microphone to speak to me.',
       type: 'assistant',
       timestamp: new Date().toLocaleTimeString(),
       createdAt: Date.now()
@@ -117,18 +138,68 @@ export default function AISidebar() {
       if (abortController) {
         abortController.abort();
       }
+      if (synth) {
+        synth.cancel();
+      }
     };
   }, [abortController]);
 
-  const handleSendMessage = useCallback(async () => {
-    if (!inputMessage.trim() || isTyping) return;
+  // Update input with transcript when speech recognition is active
+  useEffect(() => {
+    if (transcript) {
+      setInputMessage(transcript);
+    }
+  }, [transcript]);
+
+  const speakMessage = useCallback((text: string) => {
+    if (synth) {
+      // Cancel any ongoing speech
+      synth.cancel();
+      
+      // Clean text of markdown and other non-speech elements
+      const cleanText = text.replace(/\*\*|__|\*|_|`|#|>|\[.*\]\(.*\)/g, '');
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      synth.speak(utterance);
+    }
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (listening) {
+      SpeechRecognition.stopListening();
+      setIsListening(false);
+      // If there's text in the transcript, send it
+      if (transcript) {
+        setTimeout(() => {
+          handleSendMessage(transcript);
+        }, 500);
+      }
+    } else {
+      resetTranscript();
+      SpeechRecognition.startListening({ continuous: true });
+      setIsListening(true);
+      toast.info('Listening... Speak now', {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: "dark",
+      });
+    }
+  }, [listening, transcript]);
+
+  const handleSendMessage = useCallback(async (message = inputMessage) => {
+    if (!message.trim() || isTyping) return;
 
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const currentTime = Date.now();
-
     const newUserMessage: Message = {
       id: messageId,
-      text: inputMessage.trim(),
+      text: message.trim(),
       type: 'user',
       timestamp: new Date(currentTime).toLocaleTimeString(),
       createdAt: currentTime
@@ -136,6 +207,7 @@ export default function AISidebar() {
 
     setMessages((prev) => [...prev, newUserMessage]);
     setInputMessage('');
+    resetTranscript();
     setIsTyping(true);
 
     // Create a new AbortController for this request
@@ -143,7 +215,7 @@ export default function AISidebar() {
     setAbortController(controller);
 
     try {
-      const response = await fetch(`http://localhost:5000/chatbot?query=${encodeURIComponent(inputMessage.trim())}`, {
+      const response = await fetch(`http://localhost:5000/chatbot?query=${encodeURIComponent(message.trim())}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
@@ -166,6 +238,9 @@ export default function AISidebar() {
       };
 
       setMessages((prev) => [...prev, newBotMessage]);
+      
+      // Automatically speak the response
+      speakMessage(newBotMessage.text);
     } catch (error) {
       // Only add error message if the request wasn't aborted
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
@@ -191,7 +266,7 @@ export default function AISidebar() {
         inputRef.current.focus();
       }
     }
-  }, [inputMessage, isTyping]);
+  }, [inputMessage, isTyping, resetTranscript, speakMessage]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -206,6 +281,7 @@ export default function AISidebar() {
 
   const handleConfirmClear = useCallback(() => {
     setIsConfirmOpen(false);
+    setMessages(getDefaultWelcomeMessage());
 
     toast.success('Chat history cleared successfully!', {
       position: "top-right",
@@ -236,7 +312,7 @@ export default function AISidebar() {
           <div className="ml-3">
             <h2 className="text-white font-medium">AI Assistant</h2>
             <p className="text-gray-400 text-sm">
-              {isTyping ? 'Typing...' : 'Online'}
+              {isTyping ? 'Typing...' : listening ? 'Listening...' : 'Online'}
             </p>
           </div>
         </div>
@@ -260,7 +336,7 @@ export default function AISidebar() {
       >
         <div className="space-y-4">
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage key={message.id} message={message} onSpeakMessage={speakMessage} />
           ))}
           {isTyping && <TypingIndicator />}
         </div>
@@ -274,14 +350,27 @@ export default function AISidebar() {
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="Type your message..."
+            placeholder={listening ? "Listening..." : "Type your message..."}
             className="w-full bg-[#1A1A1A] text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E676]"
-            disabled={isTyping}
+            disabled={isTyping || listening}
           />
+          {browserSupportsSpeechRecognition && (
+            <button
+              onClick={toggleListening}
+              className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
+                listening 
+                  ? 'bg-red-600 hover:bg-red-700 text-white' 
+                  : 'bg-[#1A1A1A] text-[#00E676] hover:bg-[#252525]'
+              }`}
+              aria-label={listening ? "Stop listening" : "Start listening"}
+            >
+              {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
+          )}
           <button
-            onClick={handleSendMessage}
+            onClick={() => handleSendMessage()}
             className="bg-[#00E676] text-black p-2 rounded-lg hover:bg-[#00ff84] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            disabled={!inputMessage.trim() || isTyping}
+            disabled={(!inputMessage.trim() && !transcript) || isTyping}
             aria-label="Send message"
           >
             {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
