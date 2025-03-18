@@ -1,26 +1,33 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { AlertTriangle, AlertCircle, Search } from "lucide-react";
 
+interface ErrorItem {
+  id: number;
+  message: string;
+  type: string;
+  severity: string;
+  timestamp: string;
+}
+
 export default function ErrorsPage() {
-  const [errors, setErrors] = useState([]);
+  const [errors, setErrors] = useState<ErrorItem[]>([]);
   const [filterType, setFilterType] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const API_ENDPOINT = process.env.NEXT_PUBLIC_API_URL; // Replace with the actual API endpoint
+  const API_ENDPOINT = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     async function fetchErrors() {
       try {
-        const response = await fetch(`${API_ENDPOINT}/api/errors`); // Replace with the actual API endpoint
+        const response = await fetch(`${API_ENDPOINT}/errors`); 
         const data = await response.json();
         if (data.errors) {
           setErrors(
-            data.errors.map((error, index) => ({
-              id: index + 1, // Assigning an ID dynamically
+            data.errors.map((error: { errorMessage: string; type: string; severity: string; timestamp: string }, index: number) => ({
+              id: index + 1,
               message: error.errorMessage,
               type: error.type,
-              severity: error.severity.toLowerCase(), // Ensure lowercase for consistency
+              severity: error.severity.toLowerCase(),
               timestamp: error.timestamp,
             }))
           );
@@ -33,18 +40,16 @@ export default function ErrorsPage() {
     fetchErrors();
   }, []);
 
-  // Filter errors
   const filteredErrors = errors.filter((error) => {
     if (filterType !== "All" && error.type !== filterType) return false;
     if (searchQuery && !error.message.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
-  // Count by type
   const systemErrors = filteredErrors.filter((e) => e.type === "System").length;
   const customerErrors = filteredErrors.filter((e) => e.type === "Customer").length;
 
-  const getSeverityClass = (severity) => {
+  const getSeverityClass = (severity: string) => {
     switch (severity) {
       case "low":
         return "bg-blue-900 text-blue-300";
@@ -59,7 +64,7 @@ export default function ErrorsPage() {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
   };
@@ -68,7 +73,6 @@ export default function ErrorsPage() {
     <div className="p-6 bg-black text-white min-h-screen w-full">
       <h1 className="text-3xl font-bold mb-6">System Errors</h1>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gray-900 p-6 rounded-lg">
           <h2 className="text-xl mb-2">Total Errors</h2>
@@ -93,7 +97,6 @@ export default function ErrorsPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
       <div className="mb-6">
         <div className="relative">
           <input
@@ -107,7 +110,6 @@ export default function ErrorsPage() {
         </div>
       </div>
 
-      {/* Filter Buttons */}
       <div className="flex mb-6">
         {["All", "System", "Customer"].map((type) => (
           <button
@@ -122,7 +124,6 @@ export default function ErrorsPage() {
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-gray-900 rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-800">
           <thead>
