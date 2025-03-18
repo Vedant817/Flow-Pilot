@@ -1,4 +1,4 @@
-import PyMuPDF as fitz
+import fitz
 import easyocr
 import pandas as pd
 import json
