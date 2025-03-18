@@ -3,9 +3,9 @@ from ai21.models.chat import UserMessage
 import json
 from config.dbConfig import db
 from datetime import datetime, timedelta
-from send_email import send_acknowledgment, send_order_update_confirmation, send_order_issue_email
 import os
 from dotenv import load_dotenv
+from email_config.send_emails import send_acknowledgment, send_order_update_confirmation, send_order_issue_email
 from config.gemini_config import gemini_model
 import re
 from pymongo import DESCENDING

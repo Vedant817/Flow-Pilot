@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request # type: ignore
 import threading
 from file_monitor import start_monitoring
 from config.dbConfig import db
-from feedback_handle import fetch_feedback, store_feedback
+from feedback.feedback_handle import fetch_feedback, store_feedback
 from chatbot import ask_bot
 from flask_cors import CORS
 from bson.objectid import ObjectId
@@ -10,7 +10,7 @@ from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
 from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
-from send_email import send_invoice
+from email.send_email import send_invoice
 import json
 from datetime import datetime, timedelta
 class JSONEncoder(json.JSONEncoder):
