@@ -75,7 +75,7 @@ export default function LandingPage() {
                 Automated Order Processing System
               </h1>
               <p className="text-xl text-gray-400 mb-8 max-w-lg">
-                Track, manage, and optimize your electronics inventory with our
+                Track, manage, and optimize your orders with our
                 powerful dashboard. Get real-time insights and never run out of
                 stock again.
               </p>
@@ -636,11 +636,11 @@ export default function LandingPage() {
       <section className="py-16 bg-gradient-to-r from-black to-gray-900">
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Transform Your Inventory Management?
+            Ready to Transform Your Order Processing?
           </h2>
           <p className="text-gray-400 max-w-2xl mx-auto mb-8">
-            Join 500+ electronics retailers already saving time and money with
-            Kasukabe Electronics.
+            Join 500+ retailers already saving time and money with
+            Automated Order Processing System.
           </p>
           <button
             onClick={() => navigateTo("/sign-up")}

@@ -10,7 +10,7 @@ from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
 from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
-from send_email import send_invoice
+# from send_email import send_invoice
 import json
 from datetime import datetime, timedelta
 class JSONEncoder(json.JSONEncoder):
@@ -347,6 +347,12 @@ def delete_inventory(item_id):
     except Exception as e:
         print(f"Error deleting inventory item: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/create-payment-link/<order_id>", methods=["GET"])
+def create_payment_link(order_id):
+    payment_link = create_payment_link(order_id)
+    return jsonify({"payment_link": payment_link})
+
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True)
