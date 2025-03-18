@@ -209,7 +209,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         )
         
         print("Order added with pending inventory status.")
-        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?")
+        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
         return order_id
 
     formatted_entry = {
@@ -277,7 +277,7 @@ def process_order_details(email, date, time, order_details):
             print("Incomplete customer details for new customer.")
             send_order_issue_email(email, [
                 "We could not find your details in our system, and the provided details are incomplete. "
-                "Please provide your name, email, phone, and address to create an account and process your order."
+                "Please provide your name, email, phone, and address to process your order."
             ])
             return
     else:
