@@ -10,7 +10,7 @@ from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
 from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
-# from send_email import send_invoice
+from send_email import send_invoice
 import json
 from datetime import datetime, timedelta
 class JSONEncoder(json.JSONEncoder):
