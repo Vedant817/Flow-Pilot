@@ -353,6 +353,5 @@ def create_payment_link(order_id):
     payment_link = create_payment_link(order_id)
     return jsonify({"payment_link": payment_link})
 
-
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True)
