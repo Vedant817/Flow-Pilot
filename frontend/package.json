@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ariakit/react": "^0.4.15",
+    "@clerk/nextjs": "^6.12.5",
     "@emotion/react": "^11.14.0",
     "@google-cloud/translate": "^9.0.0",
     "@heroicons/react": "^2.2.0",
