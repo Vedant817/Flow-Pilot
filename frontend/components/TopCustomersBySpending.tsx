@@ -47,7 +47,7 @@ export default function TopCustomersBySpending({ data }: TopCustomersBySpendingP
         ticks: {
           color: 'rgba(255, 255, 255, 0.7)',
           callback: function(value) {
-            return '$' + value.toLocaleString();
+            return 'Rs.' + value.toLocaleString();
           }
         }
       },

@@ -188,14 +188,14 @@ export default function PricingAdjustment() {
                     <Tag className="w-5 h-5 text-[#00E676]" /> {item.Product}
                   </td>
                   <td className="p-4 border border-gray-700 text-gray-400">
-                    ${Number(item["Old Price"]).toFixed(2)}
+                    Rs.{Number(item["Old Price"]).toFixed(2)}
                   </td>
                   <td
                     className={`p-4 border border-gray-700 font-semibold ${
                       priceDiff > 0 ? "text-red-500" : "text-green-500"
                     }`}
                   >
-                    ${Number(item["New Price"]).toFixed(2)}
+                    Rs.{Number(item["New Price"]).toFixed(2)}
                   </td>
                   <td className="p-4 border border-gray-700">
                     <PriceAdjustmentBadge oldPrice={item["Old Price"]} newPrice={item["New Price"]} />

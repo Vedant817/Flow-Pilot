@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, useMemo, memo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, BarChart2, DollarSign, Package, Edit, Trash2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, BarChart2, IndianRupee, Package, Edit, Trash2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import axios from 'axios'
 import AddProductPopup from '@/components/AddProductDialog'
 import EditProductPopup from '@/components/EditProductDialog'
@@ -82,7 +82,7 @@ const InventoryRow = memo(({ item, index, onEdit, onDelete }: InventoryRowProps)
       <td className="px-4 py-3">{index + 1}</td>
       <td className="px-4 py-3">{item.name}</td>
       <td className="px-4 py-3">{item.category}</td>
-      <td className="px-4 py-3">${item.price.toFixed(2)}</td>
+      <td className="px-4 py-3">Rs.{item.price.toFixed(2)}</td>
       <td className="px-4 py-3">
         <span className={`${isLowStock ? 'text-red-500' : 'text-[#00E676]'} font-medium`}>
           {item.quantity}
@@ -316,7 +316,7 @@ export default function InventoryPage() {
           <ActionButton
             label="Price Adjustment"
             onClick={navigateToPriceAdjustment}
-            icon={<DollarSign size={18} />}
+            icon={<IndianRupee size={18} />}
           />
           <ActionButton
             label="DeadStock"
