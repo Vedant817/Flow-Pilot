@@ -114,10 +114,10 @@ export default function FeedbackPage() {
           </div>
         )}
       </div>
-      
+{/*       
       <div className="mt-4 text-sm text-gray-500">
         Showing {filteredFeedback.length} of {feedbackData.length} reviews
-      </div>
+      </div> */}
     </div>
   )
 }
