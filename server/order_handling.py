@@ -138,7 +138,7 @@ def check_inventory(order_details):
         product = order["product"]
         quantity = order["quantity"]
 
-        inventory_item = inventory_collection.find_one({"item": product})
+        inventory_item = inventory_collection.find_one({"name": product})
         if not inventory_item or inventory_item["quantity"] < quantity:
             return False
 
@@ -159,18 +159,33 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         return None
     
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
+    five_mins_ago = order_datetime - timedelta(minutes=5)
 
-    existing_order = order_collection.find_one(
-        {
-            "email": email,
-            "products": corrected_orders,
-            "date": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%Y-%m-%d")},
-            "time": {"$gte": (order_datetime - timedelta(minutes=5)).strftime("%H:%M:%S")}
+    existing_order = order_collection.find_one({
+        "email": email,
+        "$and": [
+            {"date": date},
+            {
+                "$or": [
+                    {"time": {"$gte": five_mins_ago.strftime("%H:%M:%S"), 
+                                "$lte": order_datetime.strftime("%H:%M:%S")}},
+                    {"time": {"$gte": "23:55:00"}} 
+                ]
+            }
+        ],
+        "products": {
+            "$size": len(corrected_orders),
+            "$all": [
+                {"$elemMatch": {
+                    "name": item["product"],
+                    "quantity": item["quantity"]
+                }} for item in corrected_orders
+            ]
         }
-    )
+    })
 
     if existing_order:
-        print("Duplicate entry detected. Order not added.")
+        send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
         return None
 
     can_fulfill = check_inventory(order_details=corrected_orders)
@@ -194,7 +209,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         )
         
         print("Order added with pending inventory status.")
-        send_acknowledgment(formatted_entry, message="Some items are currently out of stock. Your order will take additional time to be completed.")
+        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
         return order_id
 
     formatted_entry = {
@@ -262,7 +277,7 @@ def process_order_details(email, date, time, order_details):
             print("Incomplete customer details for new customer.")
             send_order_issue_email(email, [
                 "We could not find your details in our system, and the provided details are incomplete. "
-                "Please provide your name, email, phone, and address to create an account and process your order."
+                "Please provide your name, email, phone, and address to process your order."
             ])
             return
     else:

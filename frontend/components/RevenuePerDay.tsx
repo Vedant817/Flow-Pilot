@@ -53,7 +53,7 @@ export default function RevenuePerDay({ data }: RevenuePerDayProps) {
         ticks: {
           color: "rgba(255, 255, 255, 0.7)",
           callback: function (value) {
-            return `$${value?.toLocaleString()}`;
+            return `Rs.${value?.toLocaleString()}`;
           },
         },
       },

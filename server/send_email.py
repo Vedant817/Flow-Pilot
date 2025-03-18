@@ -45,7 +45,7 @@ def send_email(subject, body, recipient_email,attachment_path=None):
     except Exception as e:
         print(f"Error sending email: {e}")
 
-def send_acknowledgment(order, message=""):
+def send_acknowledgment(order, message="", customer_subject=""):
     order_email = order["email"]
     match = re.search(r'<([^<>]+)>', order_email)
     recipient_email = match.group(1) if match else order_email
@@ -55,29 +55,31 @@ def send_acknowledgment(order, message=""):
     order_id = str(order["_id"])
     tracking_url = f"http://localhost:3000/track-order/{order_id}"
     
-    subject = "Order Confirmation - Thank You!"
+    subject = customer_subject if customer_subject else "Order Confirmation - Thank You!"
+    
+    tracking_info = f"Your order is confirmed, you can track your order status at any time using this link:\n{tracking_url}" if not message else ""
     
     body = f"""Dear {order['name']},
 
-    Thank you for your order! We have received your request and it is currently pending fulfillment.
-    
-    Order Details:
-    {product_list}
-    
-    Order Date: {order['date']} at {order['time']}
-    
-    You can track your order status at any time using this link:
-    {tracking_url}
-    
-    {message if message else ""}
-    
-    We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
-    
-    Thank you for shopping with us!
-    
-    Best regards,
-    The Sales Team
-    """
+            Thank you for your order! We have received your request.
+            
+            Order Details:
+            {product_list}
+
+            Order Date: {order['date']} at {order['time']}
+
+            {tracking_info}
+
+            {message if message else ""}
+
+            {'' if customer_subject else "We will process your order as soon as possible."}
+            If you have any questions or need to make changes, please reply to this email or contact our customer support.
+
+            Thank you for shopping with us!
+
+            Best regards,  
+            The Sales Team
+        """
     
     send_email(subject=subject, body=body, recipient_email=recipient_email)
     print(f"Order acknowledgment sent to {recipient_email}")
@@ -150,3 +152,6 @@ def send_order_issue_email(email, errors):
         body=body,
         recipient_email=email
     )
+
+def send_invoice(order):
+    pass
