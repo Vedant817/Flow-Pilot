@@ -58,7 +58,7 @@ const PriceAdjustmentBadge = ({ oldPrice, newPrice }: PriceAdjustmentBadgeProps)
   return (
     <span
       className={`px-3 py-1 rounded-lg text-sm font-medium ${
-        isIncrease ? "bg-red-600 text-white" : "bg-green-600 text-white"
+        isIncrease ? "bg-green-600 text-white" : "bg-red-600 text-white"
       }`}
     >
       {isIncrease ? `+${priceDiff.toFixed(2)}` : `${priceDiff.toFixed(2)}`}
@@ -192,7 +192,7 @@ export default function PricingAdjustment() {
                   </td>
                   <td
                     className={`p-4 border border-gray-700 font-semibold ${
-                      priceDiff > 0 ? "text-red-500" : "text-green-500"
+                      priceDiff > 0 ? "text-green-500" : "text-red-500"
                     }`}
                   >
                     ${Number(item["New Price"]).toFixed(2)}

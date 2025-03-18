@@ -1,11 +1,45 @@
 from zerobouncesdk import ZeroBounce, ZBException
-from dotenv import load_dotenv
 import os
+from config.dbConfig2 import connect_db
+from datetime import datetime
+from flask import jsonify
+from werkzeug.exceptions import HTTPException
 
-load_dotenv()
 
 API_KEY = os.getenv("ZERO_BOUNCE_KEY")
 zero_bounce = ZeroBounce(API_KEY)
+
+from dotenv import load_dotenv
+from config.dbConfig2 import connect_db
+
+load_dotenv()
+db = connect_db()
+error_collection = db["errors"]
+
+
+
+def handle_exception(e):
+    if isinstance(e, HTTPException):
+        error_data = {
+            "errorMessage": e.description,
+            "type": "Customer",
+            "severity": "Low" if e.code == 400 else "Medium",
+            "timestamp": datetime.utcnow()
+        }
+        error_collection.insert_one(error_data)
+        return jsonify({"error": e.description}), e.code
+
+    # General system errors
+    error_data = {
+        "errorMessage": str(e),
+        "type": "Customer",
+        "severity": "Critical",  # Assume critical severity for unhandled system errors
+        "timestamp": datetime.utcnow()
+    }
+
+    error_collection.insert_one(error_data)
+    return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
 
 def suspicious_email_check(email):
     try:
@@ -23,4 +57,4 @@ def suspicious_email_check(email):
 
     except ZBException as e:
         print("ZeroBounce validate error: " + str(e))
-        return False, "Exception"
+        return handle_exception(e)
