@@ -6,15 +6,17 @@ from email import encoders
 import os
 from dotenv import load_dotenv
 import re
+from payment.stripe_payment import create_payment_link
+from payment.generate_invoice import generate_invoice
+from config.dbConfig import db
+from bson import ObjectId
 
 load_dotenv()
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+FEEDBACK_FORM_LINK  = os.getenv("FORM_LINK")
 
 def send_email(subject, body, recipient_email,attachment_path=None):
-    """
-    Sends an email with an optional attachment.
-    """
     msg = MIMEMultipart()
     msg["From"] = SENDER_EMAIL
     msg["To"] = recipient_email
@@ -156,5 +158,72 @@ def send_order_issue_email(email, errors):
         recipient_email=email
     )
 
-def send_invoice(order):
-    pass
+def send_invoice(order_id):
+    try:
+        if not order_id:
+            print("Error: Order ID is required to send invoice")
+            return
+        
+        orders_collection = db["orders"]
+        order = orders_collection.find_one({"_id": ObjectId(order_id)})
+        
+        if not order:
+            print(f"Error: Order with ID {order_id} not found")
+            return
+        
+        invoice_path = generate_invoice(order)
+        
+        customer_email = order["email"]
+        match = re.search(r'<([^<>]+)>', customer_email)
+        recipient_email = match.group(1) if match else customer_email
+        
+        payment_link = create_payment_link(order_id)
+        
+        subject = f"Invoice for Your Order #{order_id}"
+        
+        product_list = "\n".join([f"- {item['name']}: {item['quantity']} units at ${item.get('price', 0):.2f} each" 
+                                for item in order['products']])
+        
+        total_amount = sum(item.get('price', 0) * item.get('quantity', 0) for item in order['products'])
+        
+        body = f"""Dear {order.get('name', 'Valued Customer')},
+
+Thank you for your order! We're pleased to inform you that your order has been fulfilled and is ready for processing.
+
+Order Details:
+Order ID: {order_id}
+Order Date: {order.get('date', '')} at {order.get('time', '')}
+
+Items:
+{product_list}
+
+Total Amount: ${total_amount:.2f}
+
+To complete your purchase, please use the payment link below:
+{payment_link}
+
+We value your feedback! Once you receive your order, please share your experience:
+{FEEDBACK_FORM_LINK}
+
+If you have any questions or need assistance, please don't hesitate to contact our customer support.
+
+Thank you for shopping with us!
+
+Best regards,
+The Sales Team
+"""
+        
+        send_email(
+            subject=subject,
+            body=body,
+            recipient_email=recipient_email,
+            attachment_path=invoice_path
+        )
+        
+        print(f"Invoice sent successfully to {recipient_email}")
+        
+        if os.path.exists(invoice_path):
+            os.remove(invoice_path)
+            
+    except Exception as e:
+        print(f"Error sending invoice: {e}")
