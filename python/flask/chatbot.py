@@ -30,7 +30,7 @@ chat_history_collection = db["chat_history"]
 
 # Google Cloud Configuration
 PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"D:\Deloitte\Prototype\python\services\fresh-airfoil-445517-q1-0df53973cc7e.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"D:\Deloitte\Prototype\python\services\fresh-airfoil-445517-q1-cb9fe49ae8b1.json"
 aiplatform.init(project=PROJECT_ID, location="us-central1")
 embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
