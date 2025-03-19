@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kasukabe Electronics",
+  title: "Automated Order Processing System",
   description: "A seamless way to automate your orders using emails",
 };
 

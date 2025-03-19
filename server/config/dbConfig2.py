@@ -6,8 +6,8 @@ load_dotenv()
 
 MONGO_URI = os.getenv('MONGO_URI')
 
-DATABASE_NAME = "store_db"
-collections = ["orders", "inventory", "customers", "chat_history", "feedback", "errors"]
+DATABASE_NAME = "test_store_db"
+collections = ["orders", "inventory", "customers","feedback","chat_history"]
 
 def connect_db():
     """Establishes a connection to the MongoDB database and returns the database instance."""

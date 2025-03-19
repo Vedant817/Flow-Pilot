@@ -164,7 +164,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             <div>
               <p className="text-[#00E676] text-4xl font-bold mb-2">500+</p>
-              <p className="text-gray-400">Electronics Retailers Trust Us</p>
+              <p className="text-gray-400">Retailers Trust Us</p>
             </div>
             <div>
               <p className="text-[#00E676] text-4xl font-bold mb-2">99.9%</p>
@@ -186,7 +186,7 @@ export default function LandingPage() {
               Powerful Features
             </h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Our inventory management system is packed with features designed
+              Our Automated Order Processing System is packed with features designed
               to help electronics retailers optimize their operations.
             </p>
           </div>
