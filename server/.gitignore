@@ -8,3 +8,5 @@ __pycache__
 /attachments
 /chroma_langchain_db
 fresh-airfoil-445517-q1-4e804f7d94e2.json
+credentials.json
+credential.json
