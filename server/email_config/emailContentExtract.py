@@ -4,7 +4,7 @@ import json
 import os
 from dotenv import load_dotenv
 from datetime import datetime
-from config.dbConfig2 import connect_db
+from config.dbConfig import connect_db
 from werkzeug.exceptions import HTTPException
 from flask import jsonify
 

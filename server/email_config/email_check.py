@@ -1,6 +1,6 @@
 from zerobouncesdk import ZeroBounce, ZBException
 import os
-from config.dbConfig2 import connect_db
+from config.dbConfig import connect_db
 from datetime import datetime
 from flask import jsonify
 from werkzeug.exceptions import HTTPException
@@ -10,7 +10,6 @@ API_KEY = os.getenv("ZERO_BOUNCE_KEY")
 zero_bounce = ZeroBounce(API_KEY)
 
 from dotenv import load_dotenv
-from config.dbConfig2 import connect_db
 
 load_dotenv()
 db = connect_db()

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from config.dbConfig2 import connect_db
+from config.dbConfig import connect_db
 from bson import ObjectId
 from datetime import datetime
 import json
