@@ -82,14 +82,16 @@ def send_acknowledgment(order, message="", customer_subject=""):
     send_email(subject=subject, body=body, recipient_email=recipient_email)
     print(f"Order acknowledgment sent to {recipient_email}")
 
-def send_order_update_confirmation(email, latest_order):
+def send_order_update_confirmation(email, latest_order, previous_order):
     match = re.search(r'<([^<>]+)>', email)
     recipient_email = match.group(1) if match else email
     
     order_id = str(latest_order["_id"])
     tracking_url = f"http://localhost:3000/track-order/{order_id}"
     
-    product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in latest_order['products']])
+    previous_product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in previous_order['products']])
+    
+    updated_product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in latest_order['products']])
     
     subject = "Order Update Confirmation"
     
@@ -97,8 +99,11 @@ def send_order_update_confirmation(email, latest_order):
 
         Thank you for updating your order with us. Your changes have been successfully processed.
 
+        Previous Order Details:
+        {previous_product_list}
+
         Updated Order Details:
-        {product_list}
+        {updated_product_list}
 
         Order Date: {latest_order['date']} at {latest_order['time']}
 
