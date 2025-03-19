@@ -1,22 +1,23 @@
 import time
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(_file_), "..", "..")))
 import json
 from datetime import datetime, timedelta
-import google.auth
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2.service_account import Credentials
-from emailContentExtract import extract_email_details
+from email_config.emailContentExtract import extract_email_details
 from order_handling import process_order_details, process_order_change
-from email_check import suspicious_email_check
-from email_classification import classify_email
-from feedback_handle import process_complaint
+from email_config.email_check import suspicious_email_check
+from email_config.email_classification import classify_email
+from feedback.feedback_handle import process_complaint
 from file_processing import process_attachment
+import re
 
-# Google Sheets configuration
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1RQCpLaxaP32BWE_cCKBWm0FWD3AvWJO8xVBaGgPQb_g"  # Replace with your Google Sheet ID
-RANGE_NAME = "Sheet1!A1:Z1000"  # Adjust the range as needed
+SPREADSHEET_ID = "1RQCpLaxaP32BWE_cCKBWm0FWD3AvWJO8xVBaGgPQb_g"
+RANGE_NAME = "Sheet1!A1:Z1000"
 
 previous_content = []
 
@@ -74,13 +75,8 @@ def compare_changes(new_content):
     changes = []
     base_timestamp = datetime.now()
     
-    # Create a set of tuples from previous content for faster comparison
-    prev_content_tuples = set()
-    for row in previous_content:
-        if isinstance(row, dict):
-            # Convert to a frozenset of items for hashability
-            row_items = frozenset(row.items())
-            prev_content_tuples.add(row_items)
+    # Create a list of tuples from previous content for comparison (matching old file approach)
+    prev_content_tuples = [tuple(row.items()) for row in previous_content if isinstance(row, dict)]
     
     print(f"Comparing {len(new_content)} current rows with {len(previous_content)} previous rows")
     
@@ -88,10 +84,10 @@ def compare_changes(new_content):
         if not isinstance(row, dict):
             continue
             
-        # Convert to a frozenset of items for comparison
-        row_items = frozenset(row.items())
+        # Convert to tuple of items for comparison (matching old file approach)
+        row_tuple = tuple(row.items())
         
-        if row_items not in prev_content_tuples:
+        if row_tuple not in prev_content_tuples:
             row_with_timestamp = row.copy()
             current_time = base_timestamp + timedelta(seconds=index)
             row_with_timestamp['Date'] = current_time.strftime("%Y-%m-%d")
@@ -130,12 +126,53 @@ def process_changes(changes):
                 for key, value in change.items():
                     print(f"  {key}: {value}")
                 
-                email = change.get("Email")
-                body = change.get("Body")
+                # Format check and extraction
+                email = None
+                body = None
                 date = change.get('Date')
                 time = change.get('Time')
-                attachment_path = change.get('Attachment')
-
+                attachment_path = None
+                subject = None
+                
+                # Check if EmailID field contains the email in the format: "Name" <email@domain.com>
+                if change.get("EmailID"):
+                    email_field = change.get("EmailID")
+                    email_match = re.search(r'<([^>]+)>', email_field)
+                    if email_match:
+                        email = email_match.group(1)
+                    else:
+                        email = email_field  # Use as is if not in expected format
+                else:
+                    email = change.get("Email")  # Fallback to Email field
+                
+                # Extract body from the Body field
+                if change.get("Body"):
+                    body = change.get("Body")
+                
+                # Extract subject if available
+                if change.get("Subject"):
+                    subject = change.get("Subject")
+                
+                # Extract attachment path
+                if change.get("AttachmentPath"):
+                    attachment_path = change.get("AttachmentPath")
+                else:
+                    attachment_path = change.get("Attachment")
+                
+                # Ensure we have the minimum required data
+                if not email or not body:
+                    print(f"❌ Missing required email data. Email: {email}, Body: {body}")
+                    continue
+                
+                print(f"\nProcessing with formatted data:")
+                print(f"  Email: {email}")
+                print(f"  Subject: {subject}")
+                print(f"  Body: {body}")
+                print(f"  Date: {date}")
+                print(f"  Time: {time}")
+                print(f"  Attachment: {attachment_path}")
+                
+                # Continue with email validation and processing
                 print(f"\nValidating email: {email}")
                 email_status = suspicious_email_check(email)
                 is_valid, status = email_status
@@ -193,11 +230,11 @@ def process_changes(changes):
                 else:
                     print('\n❌ Email validation failed:')
                     if status == "Suspicious":
-                        print("⚠️ Warning: This email is flagged as suspicious.")
+                        print("⚠ Warning: This email is flagged as suspicious.")
                     elif status == "Exception":
                         print("❗ Error: There was an issue validating the email.")
                     else:
-                        print("ℹ️ Email is invalid or not recognized.")
+                        print("ℹ Email is invalid or not recognized.")
                 
                 print("\n----- Processing Complete -----")
             
@@ -209,100 +246,6 @@ def process_changes(changes):
             os.remove(changes_file)
             print(f"Removed temporary file: {changes_file}")
 
-def log_to_sheet(message, status="INFO"):
-    """Logs messages to a dedicated log worksheet in the same spreadsheet."""
-    try:
-        creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
-        service = build("sheets", "v4", credentials=creds)
-        
-        # First check if the log sheet exists
-        sheet_metadata = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
-        sheets = sheet_metadata.get('sheets', '')
-        log_sheet_exists = False
-        log_sheet_id = None
-        
-        for sheet in sheets:
-            if sheet.get("properties", {}).get("title") == "ProcessingLogs":
-                log_sheet_exists = True
-                log_sheet_id = sheet.get("properties", {}).get("sheetId")
-                break
-        
-        # Create log sheet if it doesn't exist
-        if not log_sheet_exists:
-            request = {
-                "addSheet": {
-                    "properties": {
-                        "title": "ProcessingLogs",
-                        "gridProperties": {
-                            "rowCount": 1000,
-                            "columnCount": 4
-                        }
-                    }
-                }
-            }
-            
-            result = service.spreadsheets().batchUpdate(
-                spreadsheetId=SPREADSHEET_ID,
-                body={"requests": [request]}
-            ).execute()
-            
-            # Add headers
-            header_values = [["Timestamp", "Status", "Message", "Details"]]
-            service.spreadsheets().values().update(
-                spreadsheetId=SPREADSHEET_ID,
-                range="ProcessingLogs!A1:D1",
-                valueInputOption="RAW",
-                body={"values": header_values}
-            ).execute()
-            
-            # Format headers
-            format_request = {
-                "repeatCell": {
-                    "range": {
-                        "sheetId": result.get("replies")[0].get("addSheet").get("properties").get("sheetId"),
-                        "startRowIndex": 0,
-                        "endRowIndex": 1,
-                        "startColumnIndex": 0,
-                        "endColumnIndex": 4
-                    },
-                    "cell": {
-                        "userEnteredFormat": {
-                            "textFormat": {
-                                "bold": True
-                            }
-                        }
-                    },
-                    "fields": "userEnteredFormat.textFormat.bold"
-                }
-            }
-            
-            service.spreadsheets().batchUpdate(
-                spreadsheetId=SPREADSHEET_ID,
-                body={"requests": [format_request]}
-            ).execute()
-            
-            print(f"Created new log worksheet: ProcessingLogs")
-        
-        # Add log entry
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = [[timestamp, status, message, ""]]
-        
-        # Append the log entry
-        service.spreadsheets().values().append(
-            spreadsheetId=SPREADSHEET_ID,
-            range="ProcessingLogs!A1",
-            valueInputOption="RAW",
-            insertDataOption="INSERT_ROWS",
-            body={"values": log_entry}
-        ).execute()
-        
-        print(f"Log entry added: [{status}] {message}")
-        
-    except HttpError as error:
-        print(f"HTTP error logging to sheet: {error}")
-    except Exception as e:
-        print(f"Error logging to sheet: {e}")
-
 def start_monitoring():
     """Monitors the Google Sheet for changes."""
     print(f"\n{'='*60}")
@@ -310,8 +253,6 @@ def start_monitoring():
     print(f"Spreadsheet ID: {SPREADSHEET_ID}")
     print(f"Range: {RANGE_NAME}")
     print(f"{'='*60}\n")
-    
-    log_to_sheet("Monitoring started", "INFO")
     
     # Initialize with current content
     global previous_content
@@ -339,28 +280,22 @@ def start_monitoring():
             # Process any changes
             if changes:
                 print(f"\nDetected {len(changes)} new/updated entries")
-                log_to_sheet(f"Detected {len(changes)} new/updated entries", "UPDATE")
                 process_changes(changes)
             else:
                 print("\nNo changes detected in this cycle")
             
             # Wait before checking again
-            wait_time = 20# seconds
+            wait_time = 10  # seconds
             print(f"\nWaiting {wait_time} seconds before next check...")
             time.sleep(wait_time)
             
     except KeyboardInterrupt:
         print("\n\nMonitoring stopped by user.")
-        log_to_sheet("Monitoring stopped by user", "INFO")
     except Exception as e:
         error_message = f"Error in monitoring: {str(e)}"
         print(f"\n\nERROR: {error_message}")
-        log_to_sheet(error_message, "ERROR")
         # Wait a bit before retrying
         print("Waiting 10 seconds before restarting monitoring...")
         time.sleep(10)
         print("Restarting monitoring...")
         start_monitoring()  # Restart monitoring
-
-if __name__ == "__main__":
-    start_monitoring()
