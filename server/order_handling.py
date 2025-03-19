@@ -3,9 +3,9 @@ from ai21.models.chat import UserMessage
 import json
 from config.dbConfig import db
 from datetime import datetime, timedelta
-from send_email import send_acknowledgment, send_order_update_confirmation, send_order_issue_email
 import os
 from dotenv import load_dotenv
+from email_config.send_emails import send_acknowledgment, send_order_update_confirmation, send_order_issue_email
 from config.gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
@@ -209,7 +209,7 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         )
         
         print("Order added with pending inventory status.")
-        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?")
+        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
         return order_id
 
     formatted_entry = {
@@ -277,7 +277,7 @@ def process_order_details(email, date, time, order_details):
             print("Incomplete customer details for new customer.")
             send_order_issue_email(email, [
                 "We could not find your details in our system, and the provided details are incomplete. "
-                "Please provide your name, email, phone, and address to create an account and process your order."
+                "Please provide your name, email, phone, and address to process your order."
             ])
             return
     else:
@@ -313,6 +313,7 @@ def process_order_details(email, date, time, order_details):
 def process_order_change(email, date, time, order_details):
     print('Processing order change...')
     try:
+        
         latest_order = order_collection.find_one({"email": email}, sort=[("date", DESCENDING), ("time", DESCENDING)])
         if not latest_order:
             process_order_details(email, date, time, order_details)
@@ -322,6 +323,13 @@ def process_order_change(email, date, time, order_details):
             process_order_details(email, date, time, order_details)
             return
         
+        previous_order = {
+            "_id": latest_order["_id"],
+            "products": latest_order["products"].copy(),
+            "date": latest_order["date"],
+            "time": latest_order["time"]
+        }
+        
         updated_products = get_ai_order_updates(latest_order, order_details)
         
         order_collection.update_one(
@@ -330,7 +338,7 @@ def process_order_change(email, date, time, order_details):
         )
         
         updated_order = order_collection.find_one({"_id": latest_order["_id"]})
-        send_order_update_confirmation(email, updated_order)
+        send_order_update_confirmation(email, latest_order=updated_order, previous_order=previous_order)
     
     except Exception as e:
         print(f"Error updating order: {e}")

@@ -3,19 +3,19 @@ from ai21.models.chat import UserMessage
 import json
 import os
 from dotenv import load_dotenv
+from datetime import datetime
+from config.dbConfig import db
+from werkzeug.exceptions import HTTPException
+from flask import jsonify
 
 load_dotenv()
+error_collection = db["errors"]
 
 API_KEY = os.getenv("AI21KEY")
 
 client = AI21Client(api_key=API_KEY)
 
 def extract_email_details(email_text):
-    """
-    Extracts structured order and customer details from an email.
-    Returns a dictionary with order details and customer information.
-    If details are missing, returns null for those fields.
-    """
     messages = [
         UserMessage(
             content=f"""
@@ -66,4 +66,4 @@ def extract_email_details(email_text):
             return {"customer": None, "orders": None}
     except Exception as e:
         print(f"Error extracting email details: {e}")
-        return {"customer": None, "orders": None}
+        return {"customer": None, "orders": None},

@@ -15,17 +15,13 @@ interface Product {
 };
 
 export type OrderDetails = {
-    orderLink?: string;
-    Order_Link?: string;
-    name?: string;
-    Customer_Name?: string;
-    status?: string;
-    Status?: string;
-    date?: string;
-    Date?: string;
-    time?: string;
-    Time?: string;
-    email?: string;
-    Email?: string;
-    Products?: Product[];
+    _id: string;
+    name: string;
+    phone: string;
+    email: string;
+    date: string;
+    time: string;
+    products: Product[];
+    status: string;
+    orderLink: string;
 };

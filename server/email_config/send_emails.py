@@ -5,18 +5,18 @@ from email.mime.base import MIMEBase
 from email import encoders
 import os
 from dotenv import load_dotenv
-import json
-from generate_invoice import generate_invoice
 import re
+from payment.stripe_payment import create_payment_link
+from payment.generate_invoice import generate_invoice
+from config.dbConfig import db
+from bson import ObjectId
 
 load_dotenv()
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+FEEDBACK_FORM_LINK  = os.getenv("FORM_LINK")
 
 def send_email(subject, body, recipient_email,attachment_path=None):
-    """
-    Sends an email with an optional attachment.
-    """
     msg = MIMEMultipart()
     msg["From"] = SENDER_EMAIL
     msg["To"] = recipient_email
@@ -45,7 +45,7 @@ def send_email(subject, body, recipient_email,attachment_path=None):
     except Exception as e:
         print(f"Error sending email: {e}")
 
-def send_acknowledgment(order, message=""):
+def send_acknowledgment(order, message="", customer_subject=""):
     order_email = order["email"]
     match = re.search(r'<([^<>]+)>', order_email)
     recipient_email = match.group(1) if match else order_email
@@ -55,13 +55,13 @@ def send_acknowledgment(order, message=""):
     order_id = str(order["_id"])
     tracking_url = f"http://localhost:3000/track-order/{order_id}"
     
-    subject = "Order Confirmation - Thank You!"
+    subject = customer_subject if customer_subject else "Order Confirmation - Thank You!"
     
-    tracking_info = f"You can track your order status at any time using this link:\n{tracking_url}" if not message else ""
+    tracking_info = f"Your order is confirmed, you can track your order status at any time using this link:\n{tracking_url}" if not message else ""
     
     body = f"""Dear {order['name']},
 
-            Thank you for your order! We have received your request, and it is currently pending fulfillment.
+            Thank you for your order! We have received your request.
             
             Order Details:
             {product_list}
@@ -72,7 +72,8 @@ def send_acknowledgment(order, message=""):
 
             {message if message else ""}
 
-            We will process your order as soon as possible. If you have any questions or need to make changes, please reply to this email or contact our customer support.
+            {'' if customer_subject else "We will process your order as soon as possible."}
+            If you have any questions or need to make changes, please reply to this email or contact our customer support.
 
             Thank you for shopping with us!
 
@@ -83,14 +84,16 @@ def send_acknowledgment(order, message=""):
     send_email(subject=subject, body=body, recipient_email=recipient_email)
     print(f"Order acknowledgment sent to {recipient_email}")
 
-def send_order_update_confirmation(email, latest_order):
+def send_order_update_confirmation(email, latest_order, previous_order):
     match = re.search(r'<([^<>]+)>', email)
     recipient_email = match.group(1) if match else email
     
     order_id = str(latest_order["_id"])
     tracking_url = f"http://localhost:3000/track-order/{order_id}"
     
-    product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in latest_order['products']])
+    previous_product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in previous_order['products']])
+    
+    updated_product_list = "\n".join([f"• {item['name']}: {item['quantity']} units" for item in latest_order['products']])
     
     subject = "Order Update Confirmation"
     
@@ -98,8 +101,11 @@ def send_order_update_confirmation(email, latest_order):
 
         Thank you for updating your order with us. Your changes have been successfully processed.
 
+        Previous Order Details:
+        {previous_product_list}
+
         Updated Order Details:
-        {product_list}
+        {updated_product_list}
 
         Order Date: {latest_order['date']} at {latest_order['time']}
 
@@ -152,5 +158,68 @@ def send_order_issue_email(email, errors):
         recipient_email=email
     )
 
-def send_invoice(order):
-    pass
+def send_invoice(order_id):
+    try:
+        if not order_id:
+            print("Error: Order ID is required to send invoice")
+            return
+        
+        orders_collection = db["orders"]
+        order = orders_collection.find_one({"_id": ObjectId(order_id)})
+        
+        if not order:
+            print(f"Error: Order with ID {order_id} not found")
+            return
+        
+        invoice_path = generate_invoice(order)
+        
+        customer_email = order["email"]
+        match = re.search(r'<([^<>]+)>', customer_email)
+        recipient_email = match.group(1) if match else customer_email
+        
+        payment_link = create_payment_link(order_id)
+        
+        subject = f"Invoice for Your Order #{order_id}"
+        
+        product_list = "\n".join([f"- {item['name']}: {item['quantity']} units" 
+                                for item in order['products']])
+        
+        body = f"""Dear {order.get('name', 'Valued Customer')},
+
+Thank you for your order! We're pleased to inform you that your order has been fulfilled and is ready for processing.
+
+Order Details:
+Order ID: {order_id}
+Order Date: {order.get('date', '')} at {order.get('time', '')}
+
+Items:
+{product_list}
+
+To complete your purchase, please use the payment link below:
+{payment_link}
+
+We value your feedback! Once you receive your order, please share your experience:
+{FEEDBACK_FORM_LINK}
+
+If you have any questions or need assistance, please don't hesitate to contact our customer support.
+
+Thank you for shopping with us!
+
+Best regards,
+The Sales Team
+"""
+        
+        send_email(
+            subject=subject,
+            body=body,
+            recipient_email=recipient_email,
+            attachment_path=invoice_path
+        )
+        
+        print(f"Invoice sent successfully to {recipient_email}")
+        
+        if os.path.exists(invoice_path):
+            os.remove(invoice_path)
+            
+    except Exception as e:
+        print(f"Error sending invoice: {e}")

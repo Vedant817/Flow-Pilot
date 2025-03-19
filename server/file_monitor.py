@@ -5,14 +5,14 @@ from watchdog.events import FileSystemEventHandler
 import os
 import json
 from datetime import datetime, timedelta
-from emailContentExtract import extract_email_details
 from order_handling import process_order_details, process_order_change
-from email_check import suspicious_email_check
-from email_classification import classify_email
-from feedback_handle import process_complaint
+from email_config.emailContentExtract import extract_email_details
+from email_config.email_check import suspicious_email_check
+from email_config.email_classification import classify_email
+from feedback.feedback_handle import process_complaint
 from file_processing import process_attachment
 
-excel_file_path = os.path.abspath(r'server\Sample.xlsx')
+excel_file_path = os.path.abspath(r'C:\Users\vedan\Downloads\EmailAutomation\server\Sample.xlsx')
 directory_to_watch = os.path.dirname(excel_file_path)
 
 previous_content = []

@@ -14,19 +14,30 @@ API_KEY = os.getenv("FORMBRICKS_API_KEY")
 
 def classify_review(review):
     prompt = f"""
-    Categorize the following review as 'good', 'bad', or 'neutral':
-    ---
-    {review}
-    ---
-    Return only one word: 'good', 'bad', or 'neutral'.
+    You are a sentiment analysis expert. Carefully analyze the following customer review and classify it strictly into one of three categories:
+    
+    - "good": If the review expresses **clear satisfaction, appreciation, or positive feedback**.
+    - "bad": If the review expresses **clear dissatisfaction, complaints, frustration, or negative feedback**.
+    - "neutral": If the review is **unclear, mixed, generic, or does not strongly indicate positive or negative sentiment**.
+
+    **Rules:**
+    - Return **only one word**: "good", "bad", or "neutral".
+    - Do **not** provide explanations or extra text.
+
+    **Review:**  
+    "{review}"
     """
+
     try:
         response = gemini_model.generate_content(prompt)
         classification = response.text.strip().lower()
+
         if classification in ["good", "bad", "neutral"]:
             return classification
+
         return "neutral"
-    except Exception:
+    except Exception as e:
+        print(f"Error in classify_review: {e}")
         return "neutral"
 
 def extract_review(body):

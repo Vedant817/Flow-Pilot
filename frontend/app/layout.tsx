@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import dynamic from "next/dynamic";
-const Sidebar = dynamic(() => import("@/components/Sidebar"));
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { ClerkProvider } from '@clerk/nextjs'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Email Automation",
+  title: "Automated Order Processing System",
   description: "A seamless way to automate your orders using emails",
 };
 
@@ -31,15 +30,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex bg-[#0A0A0A]`}
-      >
-        <Sidebar />
-        {children}
-        <Analytics />
-        <SpeedInsights />
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0A0A0A] text-white h-screen overflow-hidden`}
+        >
+          <div className="h-full flex">
+            {children}
+          </div>
+          <Analytics />
+          <SpeedInsights />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
