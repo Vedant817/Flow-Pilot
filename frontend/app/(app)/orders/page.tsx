@@ -6,7 +6,6 @@ import { OrderDetails } from '@/lib/constants/types';
 
 interface Product {
     name: string;
-    product?: string;
     quantity: number;
 };
 
@@ -41,44 +40,35 @@ const OrderRow = memo(({ order, index, onStatusChange }: OrderRowProps) => {
         const newStatus = e.target.value;
 
         axios.put(`${process.env.NEXT_PUBLIC_API_URL}/update-status`, {
-            orderId: order.orderLink || order.Order_Link || '',
+            orderId: order._id,
             status: newStatus
         })
             .then(response => {
                 console.log(response);
-                onStatusChange(order.orderLink || order.Order_Link || '', newStatus);
+                onStatusChange(order._id, newStatus);
             })
             .catch(error => {
                 console.error('Error updating order status:', error);
             })
     }, [order, onStatusChange]);
 
-    const orderLink = order.orderLink || order.Order_Link || '';
-    const name = order.name || order.Customer_Name || '';
-    const status = order.status || order.Status || 'pending fulfillment';
-    const date = order.date || order.Date || '';
-    const time = order.time || order.Time || '';
-
     const productsDisplay = () => {
-        const products = order.Products || order.Products || [];
-        if (products.length === 0) return 'No products';
+        if (!order.products || order.products.length === 0) return 'No products';
 
-        return products.slice(0, 2).map((p: Product) => {
-            const productName = p.name || p.product || '';
-            const quantity = p.quantity || 0;
-            return `${productName} (${quantity})`;
-        }).join(', ') + (products.length > 2 ? ` +${products.length - 2} more` : '');
+        return order.products.slice(0, 2).map((p: Product) => {
+            return `${p.name} (${p.quantity})`;
+        }).join(', ') + (order.products.length > 2 ? ` +${order.products.length - 2} more` : '');
     };
 
     return (
         <tr className="border-b border-[#333] hover:bg-[#1A1A1A] transition-colors">
             <td className="px-4 py-3">{index + 1}</td>
-            <td className="px-4 py-3">{orderLink || `Order-${index + 1}`}</td>
-            <td className="px-4 py-3">{name}</td>
+            <td className="px-4 py-3">{order._id}</td>
+            <td className="px-4 py-3">{order.name}</td>
             <td className="px-4 py-3">
                 <select
                     className="bg-[#1A1A1A] border border-[#333] rounded px-2 py-1 focus:border-[#00E676] focus:outline-none"
-                    value={status}
+                    value={order.status}
                     onChange={handleStatusChange}
                 >
                     <option value="pending fulfillment">Pending Fulfillment</option>
@@ -86,13 +76,12 @@ const OrderRow = memo(({ order, index, onStatusChange }: OrderRowProps) => {
                     <option value="fulfilled">Fulfilled</option>
                 </select>
             </td>
-            <td className="px-4 py-3">{date} {time}</td>
+            <td className="px-4 py-3">{order.date} {order.time}</td>
             <td className="px-4 py-3">{productsDisplay()}</td>
         </tr>
     );
 });
 OrderRow.displayName = 'OrderRow';
-
 const ActionButton = memo(({ icon, label, onClick }: ActionButtonProps) => (
     <button
         onClick={onClick}
@@ -139,7 +128,7 @@ export default function OrdersPage() {
     const handleStatusChange = useCallback((orderId: string, newStatus: string) => {
         setOrders(prevOrders =>
             prevOrders.map(order =>
-                (order.orderLink === orderId || order.Order_Link === orderId)
+                order._id === orderId
                     ? { ...order, status: newStatus }
                     : order
             )
@@ -151,15 +140,12 @@ export default function OrdersPage() {
 
         const lowerCaseFilter = filterText.toLowerCase();
         return orders.filter(order => {
-            const orderLink = (order.orderLink || order.Order_Link || '').toLowerCase();
-            const name = (order.name || order.Customer_Name || '').toLowerCase();
-            const status = (order.status || order.Status || '').toLowerCase();
-            const email = (order.email || order.Email || '').toLowerCase();
+            const orderIdMatch = order._id.toLowerCase().includes(lowerCaseFilter);
+            const nameMatch = order.name.toLowerCase().includes(lowerCaseFilter);
+            const statusMatch = order.status.toLowerCase().includes(lowerCaseFilter);
+            const emailMatch = order.email.toLowerCase().includes(lowerCaseFilter);
 
-            return orderLink.includes(lowerCaseFilter) ||
-                name.includes(lowerCaseFilter) ||
-                status.includes(lowerCaseFilter) ||
-                email.includes(lowerCaseFilter);
+            return orderIdMatch || nameMatch || statusMatch || emailMatch;
         });
     }, [orders, filterText]);
 
@@ -208,7 +194,7 @@ export default function OrdersPage() {
                                     {currentOrders.length > 0 ? (
                                         currentOrders.map((order, index) => (
                                             <OrderRow
-                                                key={index}
+                                                key={order._id}
                                                 order={order}
                                                 index={indexOfFirstOrder + index}
                                                 onStatusChange={handleStatusChange}
@@ -224,7 +210,6 @@ export default function OrdersPage() {
                                 </tbody>
                             </table>
                         </div>
-
                     )}
                 </div>
 
@@ -256,8 +241,7 @@ export default function OrdersPage() {
                             return (
                                 <button
                                     key={pageNum}
-                                    className={`px-3 py-1 rounded ${currentPage === pageNum ? 'bg-[#00E676] text-black' : 'bg-[#1A1A1A] hover:bg-[#252525]'
-                                        }`}
+                                    className={`px-3 py-1 rounded ${currentPage === pageNum ? 'bg-[#00E676] text-black' : 'bg-[#1A1A1A] hover:bg-[#252525]'}`}
                                     onClick={() => paginate(pageNum)}
                                 >
                                     {pageNum}
