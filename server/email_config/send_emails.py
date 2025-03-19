@@ -5,8 +5,6 @@ from email.mime.base import MIMEBase
 from email import encoders
 import os
 from dotenv import load_dotenv
-import json
-from generate_invoice import generate_invoice
 import re
 
 load_dotenv()

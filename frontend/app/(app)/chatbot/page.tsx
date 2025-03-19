@@ -28,7 +28,7 @@ const ChatMessage = memo(({ message, onSpeakMessage }: { message: Message, onSpe
       <div className="flex justify-between items-center mt-1">
         <p className="text-xs opacity-50">{message.timestamp}</p>
         {message.type === 'assistant' && (
-          <button 
+          <button
             onClick={() => onSpeakMessage(message.text)}
             className="text-xs opacity-50 hover:opacity-100"
             aria-label="Speak message"
@@ -54,7 +54,7 @@ export default function AISidebar() {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
       const savedMessages = localStorage.getItem('chatMessages');
-      
+
       if (savedMessages) {
         try {
           const parsedMessages = JSON.parse(savedMessages) as Message[];
@@ -112,7 +112,7 @@ export default function AISidebar() {
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
       setMessages(prevMessages => filterRecentMessages(prevMessages));
-    }, 60 * 60 * 1000); // Check every hour
+    }, 60 * 60 * 1000);
 
     return () => clearInterval(cleanupInterval);
   }, [filterRecentMessages]);
@@ -144,7 +144,6 @@ export default function AISidebar() {
     };
   }, [abortController]);
 
-  // Update input with transcript when speech recognition is active
   useEffect(() => {
     if (transcript) {
       setInputMessage(transcript);
@@ -153,12 +152,10 @@ export default function AISidebar() {
 
   const speakMessage = useCallback((text: string) => {
     if (synth) {
-      // Cancel any ongoing speech
       synth.cancel();
-      
-      // Clean text of markdown and other non-speech elements
+
       const cleanText = text.replace(/\*\*|__|\*|_|`|#|>|\[.*\]\(.*\)/g, '');
-      
+
       const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.rate = 1;
       utterance.pitch = 1;
@@ -170,7 +167,6 @@ export default function AISidebar() {
     if (listening) {
       SpeechRecognition.stopListening();
       setIsListening(false);
-      // If there's text in the transcript, send it
       if (transcript) {
         setTimeout(() => {
           handleSendMessage(transcript);
@@ -210,19 +206,15 @@ export default function AISidebar() {
     resetTranscript();
     setIsTyping(true);
 
-    // Create a new AbortController for this request
     const controller = new AbortController();
     setAbortController(controller);
 
     try {
-      const response = await fetch(`http://localhost:5000/chatbot?query=${encodeURIComponent(message.trim())}`, {
+      const response = await fetch(`http://localhost:5000/chatbot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        // Add cache control to prevent caching
-        cache: 'no-store',
+        body: JSON.stringify({ query: message.trim() })
       });
-
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -231,18 +223,16 @@ export default function AISidebar() {
       const responseTime = Date.now();
       const newBotMessage: Message = {
         id: `response-${messageId}`,
-        text: data.response.response || "I'm sorry, I couldn't process that.",
+        text: data.response || "I'm sorry, I couldn't process that.",
         type: 'assistant',
         timestamp: new Date(responseTime).toLocaleTimeString(),
         createdAt: responseTime
       };
 
       setMessages((prev) => [...prev, newBotMessage]);
-      
-      // Automatically speak the response
+
       speakMessage(newBotMessage.text);
     } catch (error) {
-      // Only add error message if the request wasn't aborted
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
         console.error('Error fetching chatbot response:', error);
         const errorTime = Date.now();
@@ -357,11 +347,10 @@ export default function AISidebar() {
           {browserSupportsSpeechRecognition && (
             <button
               onClick={toggleListening}
-              className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
-                listening 
-                  ? 'bg-red-600 hover:bg-red-700 text-white' 
+              className={`p-2 rounded-lg transition-colors flex items-center justify-center ${listening
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
                   : 'bg-[#1A1A1A] text-[#00E676] hover:bg-[#252525]'
-              }`}
+                }`}
               aria-label={listening ? "Stop listening" : "Start listening"}
             >
               {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -370,7 +359,7 @@ export default function AISidebar() {
           <button
             onClick={() => handleSendMessage()}
             className="bg-[#00E676] text-black p-2 rounded-lg hover:bg-[#00ff84] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            disabled={(!inputMessage.trim() && !transcript) || isTyping}
+            disabled={(!inputMessage.trim() && !transcript) || isTyping || isListening}
             aria-label="Send message"
           >
             {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
