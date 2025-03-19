@@ -313,6 +313,7 @@ def process_order_details(email, date, time, order_details):
 def process_order_change(email, date, time, order_details):
     print('Processing order change...')
     try:
+        
         latest_order = order_collection.find_one({"email": email}, sort=[("date", DESCENDING), ("time", DESCENDING)])
         if not latest_order:
             process_order_details(email, date, time, order_details)
@@ -322,6 +323,13 @@ def process_order_change(email, date, time, order_details):
             process_order_details(email, date, time, order_details)
             return
         
+        previous_order = {
+            "_id": latest_order["_id"],
+            "products": latest_order["products"].copy(),
+            "date": latest_order["date"],
+            "time": latest_order["time"]
+        }
+        
         updated_products = get_ai_order_updates(latest_order, order_details)
         
         order_collection.update_one(
@@ -330,7 +338,7 @@ def process_order_change(email, date, time, order_details):
         )
         
         updated_order = order_collection.find_one({"_id": latest_order["_id"]})
-        send_order_update_confirmation(email, updated_order)
+        send_order_update_confirmation(email, latest_order=updated_order, previous_order=previous_order)
     
     except Exception as e:
         print(f"Error updating order: {e}")

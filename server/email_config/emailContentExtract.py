@@ -4,48 +4,18 @@ import json
 import os
 from dotenv import load_dotenv
 from datetime import datetime
-from config.dbConfig import connect_db
+from config.dbConfig import db
 from werkzeug.exceptions import HTTPException
 from flask import jsonify
 
 load_dotenv()
-db = connect_db()
 error_collection = db["errors"]
-
-
-
-def handle_exception(e):
-    if isinstance(e, HTTPException):
-        error_data = {
-            "errorMessage": e.description,
-            "type": "Customer",
-            "severity": "Low" if e.code == 400 else "Medium",
-            "timestamp": datetime.utcnow()
-        }
-        error_collection.insert_one(error_data)
-        return jsonify({"error": e.description}), e.code
-
-    # General system errors
-    error_data = {
-        "errorMessage": str(e),
-        "type": "Customer",
-        "severity": "Critical",  # Assume critical severity for unhandled system errors
-        "timestamp": datetime.utcnow()
-    }
-
-    error_collection.insert_one(error_data)
-    return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
 API_KEY = os.getenv("AI21KEY")
 
 client = AI21Client(api_key=API_KEY)
 
 def extract_email_details(email_text):
-    """
-    Extracts structured order and customer details from an email.
-    Returns a dictionary with order details and customer information.
-    If details are missing, returns null for those fields.
-    """
     messages = [
         UserMessage(
             content=f"""
@@ -96,4 +66,4 @@ def extract_email_details(email_text):
             return {"customer": None, "orders": None}
     except Exception as e:
         print(f"Error extracting email details: {e}")
-        return {"customer": None, "orders": None}, #handle_exception(e)
+        return {"customer": None, "orders": None},
