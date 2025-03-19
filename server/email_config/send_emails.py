@@ -181,10 +181,8 @@ def send_invoice(order_id):
         
         subject = f"Invoice for Your Order #{order_id}"
         
-        product_list = "\n".join([f"- {item['name']}: {item['quantity']} units at ${item.get('price', 0):.2f} each" 
+        product_list = "\n".join([f"- {item['name']}: {item['quantity']} units" 
                                 for item in order['products']])
-        
-        total_amount = sum(item.get('price', 0) * item.get('quantity', 0) for item in order['products'])
         
         body = f"""Dear {order.get('name', 'Valued Customer')},
 
@@ -196,8 +194,6 @@ Order Date: {order.get('date', '')} at {order.get('time', '')}
 
 Items:
 {product_list}
-
-Total Amount: ${total_amount:.2f}
 
 To complete your purchase, please use the payment link below:
 {payment_link}

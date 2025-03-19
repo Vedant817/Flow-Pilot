@@ -1,70 +1,64 @@
-import stripe
+from config.dbConfig import db
+import stripe # type: ignore
 import os
-from flask import Flask, jsonify, request
 from dotenv import load_dotenv
-from config.dbConfig2 import connect_db
 
-# Load environment variables
 load_dotenv()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-app = Flask(__name__)
-
-# Connect to MongoDB
-db = connect_db()
-inventory_collection = db["inventory"]
-orders_collection = db["orders"]
-
-
-@app.route("/create-payment-session/<order_id>", methods=["GET"])
-def create_payment_session(order_id):
-    """Find the order, get product prices from inventory, and generate a Stripe Checkout Session."""
-    order = orders_collection.find_one({"orderLink": order_id})
-
-    if not order:
-        return jsonify({"error": "Order not found"}), 404
-
-    line_items = []
-
-    for product in order["products"]:
-        product_name = product["name"]
-        quantity = product["quantity"]
-
-        # Fetch product details from inventory database
-        product_info = inventory_collection.find_one({"name": product_name})
-
-        if not product_info:
-            return jsonify({"error": f"Product {product_name} not found in inventory"}), 400
-
-        # Use price from inventory (Stripe requires amount in cents)
-        price_in_cents = int(product_info["price"] * 100)
-
-        line_items.append({
-            "price_data": {  # ✅ Using dynamic price_data inside `checkout.Session.create`
-                "currency": "usd",
-                "product_data": {
-                    "name": product_name,
-                },
-                "unit_amount": price_in_cents,
-            },
-            "quantity": quantity,
-        })
-
+def create_payment_link(order_id):
     try:
-        # Create Stripe Checkout Session (instead of Payment Link)
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
+        orders_collection = db["orders"]
+        order = orders_collection.find_one({"orderLink": order_id})
+        
+        if not order:
+            order = orders_collection.find_one({"_id": order_id})
+            
+        if not order:
+            print(f"Error: Order with ID {order_id} not found")
+            return "Payment link unavailable"
+        
+        line_items = []
+        
+        for product in order["products"]:
+            product_name = product["name"]
+            quantity = product["quantity"]
+            
+            price = product.get("price", 0)
+            if not price:
+                inventory_collection = db["inventory"]
+                product_info = inventory_collection.find_one({"name": product_name})
+                if product_info:
+                    price = product_info.get("price", 0)
+            
+            if price <= 0:
+                print(f"Error: Product {product_name} has no price")
+                return "Payment link unavailable"
+                
+            price_in_cents = int(price * 100)
+            
+            price = stripe.Price.create(
+                unit_amount=price_in_cents,
+                currency="usd",
+                product_data={"name": product_name}
+            )
+            
+            line_items.append({
+                "price": price.id,
+                "quantity": quantity
+            })
+        
+        if not line_items:
+            print("Error: No products with valid prices found")
+            return "Payment link unavailable"
+        
+        payment_link = stripe.PaymentLink.create(
             line_items=line_items,
-            mode="payment",
-            success_url="https://yourwebsite.com/success",
-            cancel_url="https://yourwebsite.com/cancel",
+            metadata={"order_id": str(order_id)}
         )
-
-        return jsonify({"checkout_url": session.url})
-
-    except stripe.error.StripeError as e:
-        return jsonify({"error": str(e)}), 500
-
-
-if __name__ == "__main__":
-    app.run(debug=True,port=5001)
+        
+        return payment_link.url
+        
+    except Exception as e:
+        print(f"Error creating payment link: {e}")
+        return "Payment link unavailable"

@@ -7,7 +7,7 @@ from config.dbConfig import db
 from feedback.feedback_handle import fetch_feedback, store_feedback
 from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
 from flask_cors import CORS
-from bson.objectid import ObjectId
+from bson import ObjectId
 from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
 from analytics.urgentRestock import get_urgent_restocking
@@ -338,7 +338,11 @@ def get_customer_analytics():
 def get_orders():
     try:
         orders_collection = db['orders']
-        orders = list(orders_collection.find({}, {'_id': 0}))
+        orders = list(orders_collection.find({}).sort([('date', -1), ('time', -1)]))  # Sort in descending order of date and time
+        
+        for order in orders:
+            order['_id'] = str(order['_id'])
+            
         return jsonify(orders), 200
     except Exception as e:
         print(f"Error retrieving orders: {str(e)}")
@@ -358,21 +362,36 @@ def handle_status_update():
         if not order_id or not new_status:
             return jsonify({"error": "Order ID and status are required"}), 400
 
+        try:
+            order_id = ObjectId(order_id)
+        except Exception as e:
+            return jsonify({"error": f"Invalid ObjectId format: {e}"}), 400
+
         orders_collection = db['orders']
+        existing_order = orders_collection.find_one({"_id": order_id})
+
+        if not existing_order:
+            return jsonify({"error": "Order not found"}), 404
+
         result = orders_collection.update_one(
-            {"orderLink": order_id},
+            {"_id": order_id},
             {"$set": {"status": new_status}}
         )
 
         if result.modified_count == 0:
-            return jsonify({"error": "Order not found or status not changed"}), 404
+            return jsonify({"error": "Status not changed (already set or issue with update)"}), 400
 
-        if new_status == "fulfilled":
-            send_invoice(order_id)
+        if new_status.lower() == "fulfilled":
+            try:
+                send_invoice(order_id=order_id)
+            except Exception as e:
+                print(f"Error sending invoice: {e}")
+                return jsonify({"error": f"Failed to send invoice: {str(e)}"}), 500
 
         return jsonify({"success": True, "message": "Order status updated successfully"}), 200
 
     except Exception as e:
+        print(f"General error: {e}")
         handle_exception(e)
         return jsonify({'error': str(e)}), 500
 
