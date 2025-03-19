@@ -34,8 +34,6 @@ error_collection = db["errors"]
 CORS(app, resources={
     r"/*": {
         "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 
