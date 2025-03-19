@@ -11,6 +11,7 @@ feedback_collection = db["feedback"]
 
 SURVEY_ID = os.getenv("FORMBRICKS_SURVEY_ID")
 API_KEY = os.getenv("FORMBRICKS_API_KEY")
+
 def classify_review(review):
     prompt = f"""
     You are a sentiment analysis expert. Carefully analyze the following customer review and classify it strictly into one of three categories:
@@ -31,16 +32,13 @@ def classify_review(review):
         response = gemini_model.generate_content(prompt)
         classification = response.text.strip().lower()
 
-        # Ensure only valid classifications are returned
         if classification in ["good", "bad", "neutral"]:
             return classification
 
-        return "neutral"  # Fallback for unexpected responses
+        return "neutral"
     except Exception as e:
         print(f"Error in classify_review: {e}")
         return "neutral"
-
-
 
 def extract_review(body):
     prompt = f"""
