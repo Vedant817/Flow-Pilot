@@ -11,6 +11,8 @@ import pandas as pd
 from config.gemini_config import gemini_model
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from config.dbConfig import db
+import hashlib
+import pickle
 
 load_dotenv()
 inventory_collection = db["inventory"]
@@ -22,7 +24,7 @@ chat_history_collection = db["chat_history"]
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\vedan\Downloads\EmailAutomation\server\fresh-airfoil-445517-q1-4e804f7d94e2.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"D:\Deloitte\Prototype\server\services\fresh-airfoil-445517-q1-4e804f7d94e2.json"
 aiplatform.init(project=PROJECT_ID, location="us-central1")
 embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
@@ -53,6 +55,19 @@ def get_chat_history(session_id, limit=10):
 
 def process_pdf(pdf_path):
     print("\n📌 Processing PDF:", pdf_path)
+    
+    mod_time = os.path.getmtime(pdf_path)
+    cache_key = f"{pdf_path}_{mod_time}"
+    cache_file = f"pdf_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.pkl"
+    
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'rb') as f:
+                docs = pickle.load(f)
+                print("✅ Loaded PDF from cache.")
+                return docs
+        except Exception as e:
+            print(f"Cache loading failed: {e}")
 
     try:
         loader = PyPDFLoader(pdf_path)
@@ -74,7 +89,7 @@ def process_pdf(pdf_path):
                 "page": doc.metadata.get("page", 0),
                 "section": extract_section_title(doc.page_content),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "priority": "high",  # Prioritize manual content
+                "priority": "medium",  # Prioritize manual content
                 "content_type": "documentation"
             }
             docs.append(Document(
@@ -82,6 +97,10 @@ def process_pdf(pdf_path):
                 metadata=metadata
             ))
 
+        with open(cache_file, 'wb') as f:
+            pickle.dump(docs, f)
+        
+        print(f"✅ Added {len(docs)} new documents to vector store.")
         return docs
 
     except Exception as e:
@@ -108,7 +127,7 @@ def build_records_from_collection(data, collection_name):
                 continue
                 
             records.append({
-                "id": f"{collection_name}_{idx}_chunk_{chunk_idx}",
+                "id": f"{collection_name}{idx}_chunk{chunk_idx}",
                 "text": chunk,
                 "source": collection_name,
                 "record_type": collection_name,
@@ -137,7 +156,7 @@ def upsert_documents(new_docs):
             vector_store.add_documents(new_filtered_docs)
             print(f"✅ Added {len(new_filtered_docs)} new documents to vector store.")
         else:
-            print("⚠️ No new documents to add.")
+            print("⚠ No new documents to add.")
 
     except Exception as e:
         print("❌ Error during upsert:", e)
@@ -173,7 +192,7 @@ def refresh_data_and_update_vector_store():
 
     docs = build_documents(all_records)
 
-    pdf_docs = process_pdf(r"C:\Users\vedan\Downloads\EmailAutomation\server\attachments\User Mannual.pdf")
+    pdf_docs = process_pdf(r"C:\Users\kumar\Downloads\User Mannual.pdf")
     docs.extend(pdf_docs)
 
     upsert_documents(docs)
@@ -271,29 +290,29 @@ def ask_bot(query, session_id=None):
     
     prompt = f"""
 You are an AI assistant with expertise in:
-- **Order Management**
-- **Inventory Tracking**
-- **Product Analytics**
-- **User Manual Navigation**
+- *Order Management*
+- *Inventory Tracking*
+- *Product Analytics*
+- *User Manual Navigation*
 
-Use the **provided context and chat history** to answer the query accurately.
+Use the *provided context and chat history* to answer the query accurately.
 
-**Chat History:**
+*Chat History:*
 {history_text}
 
-**Context:**
+*Context:*
 {context}
 
-**Query:**
+*Query:*
 {query}
 
-**Instructions:**
-1. If the context contains relevant **order, inventory, analytics, or PDF** information, answer directly.
-2. If missing details, **explain what additional info is needed**.
-3. **Do not ask the user to check the documentation—assume you are the documentation.**
+*Instructions:*
+1. If the context contains relevant *order, inventory, analytics, or PDF* information, answer directly.
+2. If missing details, *explain what additional info is needed*.
+3. *Do not ask the user to check the documentation—assume you are the documentation.*
 4. Reference previous conversations when relevant.
 
-**Answer:**
+*Answer:*
 """
     
     response = gemini_model.generate_content(prompt)

@@ -6,7 +6,6 @@ import os
 from new_file_monitor import start_monitoring
 from config.dbConfig import db
 from feedback.feedback_handle import fetch_feedback, store_feedback
-from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
 from flask_cors import CORS
 from bson import ObjectId
 from analytics.deadstock import identify_deadstocks
@@ -18,8 +17,7 @@ import json
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
+from error_handle import handle_exception
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID'
@@ -66,75 +64,6 @@ def get_feedback():
         feedback_data = fetch_feedback()
         response = store_feedback(feedback_data)
         return jsonify(response), 200
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-
-
-#? Chatbot Endpoints
-@app.route('/chatbot', methods=['POST'])
-def chat():
-    try:
-        data = request.get_json()
-        if not data or 'query' not in data:
-            return jsonify({"error": "Query parameter is required"}), 400
-
-        query = data['query']
-        
-        session_id = session.get('session_id')
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            session['session_id'] = session_id
-        print('Query:', query)
-        print('Session ID:', session_id)
-        response_data = ask_bot(query, session_id)
-        response_text = response_data.get('response', '')
-        
-        if response_text:
-            store_chat_history(session_id, query, response_text)
-        print('Response:', response_text)
-        return jsonify({"response": response_text, "session_id": session_id})
-    except Exception as e:
-        app.logger.error(f"Error in chatbot endpoint: {str(e)}")
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/chat-history', methods=['GET'])
-def get_session_chat_history():
-    try:
-        session_id = session.get('session_id')
-        if not session_id:
-            return jsonify({"error": "No active session"}), 400
-            
-        limit = int(request.args.get("limit", 10))
-        
-        history = get_chat_history(session_id, limit)
-        
-        return jsonify({"history": history, "session_id": session_id})
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/end-session', methods=['POST'])
-def end_session():
-    try:
-        session_id = session.get('session_id')
-        if not session_id:
-            return jsonify({"error": "No active session"}), 400
-        
-        session.pop('session_id', None)
-        
-        return jsonify({"message": "Session ended"})
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/refresh-data', methods=['POST'])
-def refresh_data():
-    try:
-        refresh_data_and_update_vector_store()
-        return jsonify({"message": "Data refreshed and vector store updated."})
     except Exception as e:
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
@@ -198,27 +127,6 @@ def urgent_restocking():
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    if isinstance(e, HTTPException):
-        error_data = {
-            "errorMessage": e.description,
-            "type": "Customer",
-            "severity": "Low" if e.code == 400 else "Medium",
-            "timestamp": datetime.utcnow()
-        }
-        error_collection.insert_one(error_data)
-        return jsonify({"error": e.description}), e.code
-
-    error_data = {
-        "errorMessage": str(e),
-        "type": "System",
-        "severity": "Critical",
-        "timestamp": datetime.utcnow()
-    }
-
-    error_collection.insert_one(error_data)
-    return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
 @app.route('/product-analytics', methods=['GET'])
 def get_product_analytics():
@@ -515,11 +423,5 @@ def get_errors():
     except Exception as e:
         return handle_exception(e)
 
-def scheduled_refresh():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(refresh_data_and_update_vector_store, 'interval', hours=1)
-    scheduler.start()
-
 if __name__ == '__main__':
-    scheduled_refresh()
     app.run(host = '0.0.0.0', debug=True)

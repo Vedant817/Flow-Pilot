@@ -1,19 +1,49 @@
-"use client";
-import { useRouter } from "next/navigation";
-import {
-  BarChart2,
-  PieChart,
-  ArrowRight,
-  Play,
-  Database,
-} from "lucide-react";
+"use client"
+import { useRouter } from "next/navigation"
+import { BarChart2, PieChart, ArrowRight, Play, Database } from "lucide-react"
+import { useState, useEffect } from "react"
 
 export default function LandingPage() {
-  const router = useRouter();
+  const router = useRouter()
 
   const navigateTo = (path: string) => {
-    router.push(path);
-  };
+    router.push(path)
+  }
+
+  const [isVisible, setIsVisible] = useState({
+    features: false,
+    dashboard: false,
+    testimonials: false,
+    pricing: false,
+    faq: false,
+  })
+
+  useEffect(() => {
+    const handleScroll = () => {
+      console.log(isVisible)
+      const sections = ["features", "dashboard", "testimonials", "pricing", "faq"]
+
+      sections.forEach((section) => {
+        const element = document.getElementById(section)
+        if (element) {
+          const rect = element.getBoundingClientRect()
+          const isInView = rect.top <= window.innerHeight * 0.75 && rect.bottom >= 0
+
+          setIsVisible((prev) => ({
+            ...prev,
+            [section]: isInView,
+          }))
+        }
+      })
+    }
+
+    window.addEventListener("scroll", handleScroll)
+    handleScroll() // Check on initial load
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -46,10 +76,7 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigateTo("/sign-in")}
-            className="text-white hover:text-[#00E676]"
-          >
+          <button onClick={() => navigateTo("/sign-in")} className="text-white hover:text-[#00E676]">
             Sign In
           </button>
           <button
@@ -71,13 +98,10 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 py-16 md:py-24 relative z-10">
           <div className="flex flex-col md:flex-row items-center">
             <div className="md:w-1/2 mb-12 md:mb-0">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                Automated Order Processing System
-              </h1>
+              <h1 className="text-4xl md:text-5xl font-bold mb-6">Automated Order Processing System</h1>
               <p className="text-xl text-gray-400 mb-8 max-w-lg">
-                Track, manage, and optimize your orders with our
-                powerful dashboard. Get real-time insights and never run out of
-                stock again.
+                Track, manage, and optimize your orders with our powerful dashboard. Get real-time insights and never
+                run out of stock again.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                 <button
@@ -97,9 +121,7 @@ export default function LandingPage() {
                 <div className="rounded-md shadow-lg overflow-hidden">
                   <div className="bg-[#111827] p-4">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-white text-lg font-bold">
-                        Inventory Dashboard
-                      </h3>
+                      <h3 className="text-white text-lg font-bold">Inventory Dashboard</h3>
                       <div className="flex space-x-2">
                         <span className="w-3 h-3 bg-red-500 rounded-full"></span>
                         <span className="w-3 h-3 bg-yellow-500 rounded-full"></span>
@@ -117,9 +139,7 @@ export default function LandingPage() {
                       </div>
                       <div className="bg-black p-3 rounded-md">
                         <p className="text-gray-400 text-xs">Total Value</p>
-                        <p className="text-[#00E676] text-xl font-bold">
-                          $109,095
-                        </p>
+                        <p className="text-[#00E676] text-xl font-bold">$109,095</p>
                       </div>
                       <div className="bg-black p-3 rounded-md">
                         <p className="text-gray-400 text-xs">Categories</p>
@@ -182,12 +202,10 @@ export default function LandingPage() {
       <section id="features" className="py-16 md:py-24">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Powerful Features
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Features</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Our Automated Order Processing System is packed with features designed
-              to help electronics retailers optimize their operations.
+              Our Automated Order Processing System is packed with features designed to help electronics retailers
+              optimize their operations.
             </p>
           </div>
 
@@ -232,12 +250,9 @@ export default function LandingPage() {
       <section className="py-16 bg-gradient-to-b from-black to-gray-900">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Powerful Dashboard
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Dashboard</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Everything you need to manage your inventory efficiently in one
-              place.
+              Everything you need to manage your inventory efficiently in one place.
             </p>
           </div>
 
@@ -265,35 +280,21 @@ export default function LandingPage() {
               <button className="bg-[#00E676] text-black px-4 py-2 rounded-md flex items-center">
                 <span className="mr-1">+</span> Add Product
               </button>
-              <button className="bg-gray-800 text-white px-4 py-2 rounded-md">
-                Forecasting
-              </button>
-              <button className="bg-gray-800 text-white px-4 py-2 rounded-md">
-                Price Adjustment
-              </button>
+              <button className="bg-gray-800 text-white px-4 py-2 rounded-md">Forecasting</button>
+              <button className="bg-gray-800 text-white px-4 py-2 rounded-md">Price Adjustment</button>
             </div>
 
             <div className="overflow-x-auto">
               <table className="min-w-full bg-black rounded-lg">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="py-3 px-4 text-left text-gray-400">
-                      Product ID
-                    </th>
+                    <th className="py-3 px-4 text-left text-gray-400">Product ID</th>
                     <th className="py-3 px-4 text-left text-gray-400">Name</th>
-                    <th className="py-3 px-4 text-left text-gray-400">
-                      Category
-                    </th>
+                    <th className="py-3 px-4 text-left text-gray-400">Category</th>
                     <th className="py-3 px-4 text-left text-gray-400">Price</th>
-                    <th className="py-3 px-4 text-left text-gray-400">
-                      Quantity
-                    </th>
-                    <th className="py-3 px-4 text-left text-gray-400">
-                      Supplier
-                    </th>
-                    <th className="py-3 px-4 text-left text-gray-400">
-                      Actions
-                    </th>
+                    <th className="py-3 px-4 text-left text-gray-400">Quantity</th>
+                    <th className="py-3 px-4 text-left text-gray-400">Supplier</th>
+                    <th className="py-3 px-4 text-left text-gray-400">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -356,126 +357,147 @@ export default function LandingPage() {
 
       {/* Testimonials */}
       <section id="testimonials" className="py-16 bg-black">
-  <div className="container mx-auto px-6">
-    <div className="text-center mb-16">
-      <h2 className="text-3xl md:text-4xl font-bold mb-4">
-        What Our Customers Say
-      </h2>
-      <p className="text-gray-400 max-w-2xl mx-auto">
-        Don&apos;t just take our word for it. Here&apos;s what electronics retailers
-        have to say about our automated order processing system.
-      </p>
-    </div>
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Customers Say</h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Don&apos;t just take our word for it. Here&apos;s what electronics retailers have to say about our
+              automated order processing system.
+            </p>
+          </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-        <div className="flex text-[#00E676] mb-4">★★★★★</div>
-        <p className="text-gray-300 mb-6">
-          &quot;The automated order processing system has transformed our operations.
-          We&apos;ve reduced stockouts by 75% and improved cash flow
-          significantly.&quot;
-        </p>
-        <div className="flex items-center">
-          {/* <Image
-            src="https://randomuser.me/api/portraits/men/32.jpg" 
-            alt="Alex Johnson" 
-            className="w-10 h-10 rounded-full object-cover"
-            width={40}
-            height={40}
-          /> */}
-          <div className="ml-3">
-            <p className="font-medium">Alex Johnson</p>
-            <p className="text-gray-500 text-sm">TechWorld Electronics</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
+              <div className="flex text-[#00E676] mb-4">★★★★★</div>
+              <p className="text-gray-300 mb-6">
+                &quot;The automated order processing system has transformed our operations. We&apos;ve reduced stockouts
+                by 75% and improved cash flow significantly.&quot;
+              </p>
+              <div className="flex items-center">
+                {/* <Image
+                  src="https://randomuser.me/api/portraits/men/32.jpg" 
+                  alt="Alex Johnson" 
+                  className="w-10 h-10 rounded-full object-cover"
+                  width={40}
+                  height={40}
+                /> */}
+                <div className="ml-3">
+                  <p className="font-medium">Alex Johnson</p>
+                  <p className="text-gray-500 text-sm">TechWorld Electronics</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
+              <div className="flex text-[#00E676] mb-4">★★★★★</div>
+              <p className="text-gray-300 mb-6">
+                &quot;The analytics features alone are worth the investment. We can now predict trends and stock
+                accordingly. Game changer!&quot;
+              </p>
+              <div className="flex items-center">
+                {/* <Image 
+                  src="https://randomuser.me/api/portraits/women/44.jpg" 
+                  alt="Sarah Williams" 
+                  className="w-10 h-10 rounded-full object-cover"
+                  height={40}
+                  width={40}
+                /> */}
+                <div className="ml-3">
+                  <p className="font-medium">Sarah Williams</p>
+                  <p className="text-gray-500 text-sm">Gadget Galaxy</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
+              <div className="flex text-[#00E676] mb-4">★★★★★</div>
+              <p className="text-gray-300 mb-6">
+                &quot;Implementation was smooth and the customer support is exceptional. Our inventory accuracy has
+                improved from 85% to 99%.&quot;
+              </p>
+              <div className="flex items-center">
+                {/* <Image 
+                  src="https://randomuser.me/api/portraits/men/75.jpg" 
+                  alt="Michael Chen" 
+                  className="w-10 h-10 rounded-full object-cover"
+                  height={40}
+                  width={40}
+                /> */}
+                <div className="ml-3">
+                  <p className="font-medium">Michael Chen</p>
+                  <p className="text-gray-500 text-sm">ElectroMart</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-        <div className="flex text-[#00E676] mb-4">★★★★★</div>
-        <p className="text-gray-300 mb-6">
-          &quot;The analytics features alone are worth the investment. We can
-          now predict trends and stock accordingly. Game changer!&quot;
-        </p>
-        <div className="flex items-center">
-          {/* <Image 
-            src="https://randomuser.me/api/portraits/women/44.jpg" 
-            alt="Sarah Williams" 
-            className="w-10 h-10 rounded-full object-cover"
-            height={40}
-            width={40}
-          /> */}
-          <div className="ml-3">
-            <p className="font-medium">Sarah Williams</p>
-            <p className="text-gray-500 text-sm">Gadget Galaxy</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-        <div className="flex text-[#00E676] mb-4">★★★★★</div>
-        <p className="text-gray-300 mb-6">
-          &quot;Implementation was smooth and the customer support is
-          exceptional. Our inventory accuracy has improved from 85% to
-          99%.&quot;
-        </p>
-        <div className="flex items-center">
-          {/* <Image 
-            src="https://randomuser.me/api/portraits/men/75.jpg" 
-            alt="Michael Chen" 
-            className="w-10 h-10 rounded-full object-cover"
-            height={40}
-            width={40}
-          /> */}
-          <div className="ml-3">
-            <p className="font-medium">Michael Chen</p>
-            <p className="text-gray-500 text-sm">ElectroMart</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
+      </section>
 
       {/* Pricing Section */}
       <section id="pricing" className="py-16 md:py-24 bg-gray-900">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Simple, Transparent Pricing
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple, Transparent Pricing</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Choose the plan that fits your business needs. All plans include
-              our core features.
+              Choose the plan that fits your manufacturing needs. All plans include our core features.
             </p>
 
             <div className="flex justify-center mt-6">
               <div className="bg-black p-1 rounded-full inline-flex">
-                <button className="px-4 py-2 rounded-full bg-[#00E676] text-black">
-                  Monthly
-                </button>
-                <button className="px-4 py-2 rounded-full text-gray-400">
-                  Annual (Save 20%)
-                </button>
+                <button className="px-4 py-2 rounded-full bg-[#00E676] text-black">Monthly</button>
+                <button className="px-4 py-2 rounded-full text-gray-400">Annual (Save 20%)</button>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Free Plan */}
+            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:border-[#00E676]">
               <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Basic</h3>
-                <p className="text-4xl font-bold mb-6">
-                  $49<span className="text-gray-500 text-lg">/mo</span>
+                <h3 className="text-xl font-bold mb-4">Free Plan</h3>
+                <p className="text-4xl font-bold mb-2">
+                  $0<span className="text-gray-500 text-lg">/mo</span>
                 </p>
-                <p className="text-gray-400 mb-6">
-                  Perfect for small electronics retailers
-                </p>
+                <p className="text-[#00E676] mb-6">Up to 1k Requests</p>
 
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Up to 1,000 products</span>
+                    <span>Up to 1,000 requests per month</span>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-[#00E676] mr-2">✓</span>
+                    <span>Basic dashboard</span>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-[#00E676] mr-2">✓</span>
+                    <span>Community support</span>
+                  </li>
+                  <li className="flex items-center text-gray-500">
+                    <span className="text-gray-500 mr-2">✗</span>
+                    <span>API access</span>
+                  </li>
+                </ul>
+
+                <button className="w-full border border-[#00E676] text-[#00E676] py-2 rounded-md hover:bg-[#00E676] hover:text-black transition-colors">
+                  Sign Up Free
+                </button>
+              </div>
+            </div>
+
+            {/* Small Scale Manufacturers */}
+            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:border-[#00E676]">
+              <div className="p-6">
+                <h3 className="text-xl font-bold mb-4">Small Scale Manufacturers</h3>
+                <p className="text-4xl font-bold mb-2">
+                  $125<span className="text-gray-500 text-lg">/mo</span>
+                </p>
+                <p className="text-[#00E676] mb-6">Under 10k Requests</p>
+
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-center">
+                    <span className="text-[#00E676] mr-2">✓</span>
+                    <span>Up to 10,000 requests per month</span>
                   </li>
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
@@ -485,6 +507,10 @@ export default function LandingPage() {
                     <span className="text-[#00E676] mr-2">✓</span>
                     <span>Email support</span>
                   </li>
+                  <li className="flex items-center">
+                    <span className="text-[#00E676] mr-2">✓</span>
+                    <span>API access</span>
+                  </li>
                 </ul>
 
                 <button className="w-full border border-[#00E676] text-[#00E676] py-2 rounded-md hover:bg-[#00E676] hover:text-black transition-colors">
@@ -493,23 +519,22 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="bg-black rounded-lg border border-[#00E676] overflow-hidden relative">
+            {/* Medium Scale Manufacturers */}
+            <div className="bg-black rounded-lg border border-[#00E676] overflow-hidden relative transform transition-all duration-300 hover:scale-105">
               <div className="absolute top-0 right-0 bg-[#00E676] text-black text-xs font-bold px-3 py-1">
                 MOST POPULAR
               </div>
               <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Pro</h3>
-                <p className="text-4xl font-bold mb-6">
-                  $99<span className="text-gray-500 text-lg">/mo</span>
+                <h3 className="text-xl font-bold mb-4">Medium Scale Manufacturers</h3>
+                <p className="text-4xl font-bold mb-2">
+                  $1,500<span className="text-gray-500 text-lg">/mo</span>
                 </p>
-                <p className="text-gray-400 mb-6">
-                  Ideal for growing electronics businesses
-                </p>
+                <p className="text-[#00E676] mb-6">Around 100k Requests</p>
 
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Up to 10,000 products</span>
+                    <span>Up to 100,000 requests per month</span>
                   </li>
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
@@ -521,7 +546,11 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
-                    <span>API access</span>
+                    <span>Advanced integrations</span>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-[#00E676] mr-2">✓</span>
+                    <span>Dedicated account manager</span>
                   </li>
                 </ul>
 
@@ -531,20 +560,17 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden">
+            {/* Large Scale Manufacturers */}
+            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:border-[#00E676]">
               <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Enterprise</h3>
-                <p className="text-4xl font-bold mb-6">
-                  $249<span className="text-gray-500 text-lg">/mo</span>
-                </p>
-                <p className="text-gray-400 mb-6">
-                  For large electronics retailers
-                </p>
+                <h3 className="text-xl font-bold mb-4">Large Scale Manufacturers</h3>
+                <p className="text-4xl font-bold mb-2">Custom</p>
+                <p className="text-[#00E676] mb-6">100k+ Requests</p>
 
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Unlimited products</span>
+                    <span>Unlimited requests</span>
                   </li>
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
@@ -556,7 +582,11 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-center">
                     <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Advanced integrations</span>
+                    <span>Enterprise-grade integrations</span>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-[#00E676] mr-2">✓</span>
+                    <span>Custom implementation</span>
                   </li>
                 </ul>
 
@@ -566,6 +596,75 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+
+          {/* Request Calculator */}
+          <div className="mt-16 bg-black p-6 rounded-lg border border-gray-800 max-w-2xl mx-auto">
+            <h3 className="text-xl font-bold mb-4 text-center">Request Calculator</h3>
+            <p className="text-gray-400 mb-6 text-center">
+              Estimate your monthly requests and find the right plan for you
+            </p>
+
+            <div className="mb-6">
+              <label className="block text-gray-400 mb-2">Monthly Requests</label>
+              <input
+                type="range"
+                min="500"
+                max="150000"
+                step="500"
+                defaultValue="1000"
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                id="requestSlider"
+                onChange={(e) => {
+                  const value = Number.parseInt(e.target.value) || 0; // Default to 0 if parsing fails
+                  const requestValueElement = document.getElementById("requestValue");
+                  if (requestValueElement) {
+                    requestValueElement.textContent = value.toLocaleString();
+                  }
+
+                  let planName = "";
+                  let price = "";
+
+                  if (value <= 1000) {
+                    planName = "Free Plan"
+                    price = "$0/month"
+                  } else if (value < 10000) {
+                    planName = "Small Scale"
+                    price = "$125/month"
+                  } else if (value < 100000) {
+                    planName = "Medium Scale"
+                    price = "$1,500/month"
+                  } else {
+                    planName = "Large Scale"
+                    price = "Custom Pricing"
+                  const recommendedPlanElement = document.getElementById("recommendedPlan");
+                  const planPriceElement = document.getElementById("planPrice");
+
+                  if (recommendedPlanElement && planPriceElement) {
+                    recommendedPlanElement.textContent = planName;
+                    planPriceElement.textContent = price;
+                  }
+                }}}
+              />
+                  </div>
+            <div className="text-center mb-6">
+              <p className="text-gray-400">
+                Estimated monthly requests:{" "}
+                <span id="requestValue" className="text-white font-bold">
+                  10,000
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-gray-900 p-4 rounded-lg text-center">
+              <p className="text-gray-400 mb-2">Recommended Plan</p>
+              <p className="text-2xl font-bold mb-1">
+                <span id="recommendedPlan">Small Scale</span>
+              </p>
+              <p className="text-[#00E676] text-xl font-bold">
+                <span id="planPrice">$125/month</span>
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -573,61 +672,37 @@ export default function LandingPage() {
       <section id="faq" className="py-16 bg-black">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Frequently Asked Questions
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Find answers to common questions about our inventory management
-              system.
+              Find answers to common questions about our inventory management system.
             </p>
           </div>
 
           <div className="max-w-3xl mx-auto">
-            <div className="mb-6 border border-gray-800 rounded-lg overflow-hidden">
-              <div className="bg-gray-900 p-4 flex justify-between items-center cursor-pointer">
-                <h3 className="font-medium">
-                  How secure is my inventory data?
-                </h3>
-                <span className="text-[#00E676]">+</span>
-              </div>
-              <div className="p-4 bg-black">
-                <p className="text-gray-400">
-                  Your data is encrypted both in transit and at rest. We use
-                  industry-standard security protocols and regularly perform
-                  security audits to ensure your information is protected.
-                </p>
-              </div>
-            </div>
+            <FaqItem
+              question="How secure is my inventory data?"
+              answer="Your data is encrypted both in transit and at rest. We use industry-standard security protocols and regularly perform security audits to ensure your information is protected."
+            />
 
-            <div className="mb-6 border border-gray-800 rounded-lg overflow-hidden">
-              <div className="bg-gray-900 p-4 flex justify-between items-center cursor-pointer">
-                <h3 className="font-medium">
-                  Can I integrate with my existing POS system?
-                </h3>
-                <span className="text-[#00E676]">+</span>
-              </div>
-              <div className="p-4 bg-black">
-                <p className="text-gray-400">
-                  Yes, our system offers API integration with most popular POS
-                  systems. Our Pro and Enterprise plans include dedicated
-                  support for custom integrations.
-                </p>
-              </div>
-            </div>
+            <FaqItem
+              question="Can I integrate with my existing POS system?"
+              answer="Yes, our system offers API integration with most popular POS systems. Our Pro and Enterprise plans include dedicated support for custom integrations."
+            />
 
-            <div className="mb-6 border border-gray-800 rounded-lg overflow-hidden">
-              <div className="bg-gray-900 p-4 flex justify-between items-center cursor-pointer">
-                <h3 className="font-medium">Do you offer mobile access?</h3>
-                <span className="text-[#00E676]">+</span>
-              </div>
-              <div className="p-4 bg-black">
-                <p className="text-gray-400">
-                  Yes, our platform is fully responsive and works on all
-                  devices. We also offer dedicated mobile apps for iOS and
-                  Android for on-the-go inventory management.
-                </p>
-              </div>
-            </div>
+            <FaqItem
+              question="Do you offer mobile access?"
+              answer="Yes, our platform is fully responsive and works on all devices. We also offer dedicated mobile apps for iOS and Android for on-the-go inventory management."
+            />
+
+            <FaqItem
+              question="How does the request-based pricing work?"
+              answer="Our pricing is based on the number of API requests your system makes to our platform each month. This includes inventory checks, updates, and any other interactions with our API."
+            />
+
+            <FaqItem
+              question="Can I upgrade or downgrade my plan?"
+              answer="Yes, you can change your plan at any time. If you upgrade mid-month, we'll prorate the difference. If you downgrade, the new rate will apply at the start of your next billing cycle."
+            />
           </div>
         </div>
       </section>
@@ -635,12 +710,9 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-16 bg-gradient-to-r from-black to-gray-900">
         <div className="container mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Transform Your Order Processing?
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Transform Your Order Processing?</h2>
           <p className="text-gray-400 max-w-2xl mx-auto mb-8">
-            Join 500+ retailers already saving time and money with
-            Automated Order Processing System.
+            Join 500+ retailers already saving time and money with Automated Order Processing System.
           </p>
           <button
             onClick={() => navigateTo("/sign-up")}
@@ -648,42 +720,60 @@ export default function LandingPage() {
           >
             Start Free Trial
           </button>
-          <p className="text-gray-500 mt-4">
-            No credit card required. 14-day free trial.
-          </p>
+          <p className="text-gray-500 mt-4">No credit card required. 14-day free trial.</p>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="bg-black py-12 border-t border-gray-800">
-  <div className="container mx-auto px-6">
-    <div className="flex flex-col items-center justify-center">
-      <div className="flex space-x-6 mb-6">
-        <a href="#features" className="text-gray-400 hover:text-white">
-          Features
-        </a>
-        <a href="#pricing" className="text-gray-400 hover:text-white">
-          Pricing
-        </a>
-        <a
-          href="#testimonials"
-          className="text-gray-400 hover:text-white"
-        >
-          Testimonials
-        </a>
-        <a href="#faq" className="text-gray-400 hover:text-white">
-          FAQ
-        </a>
-      </div>
-      <div className="text-center">
-        <p className="text-gray-500 text-sm">
-          © 2025 Automated Order Processing System. All rights reserved.
-        </p>
-      </div>
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col items-center justify-center">
+            <div className="flex space-x-6 mb-6">
+              <a href="#features" className="text-gray-400 hover:text-white">
+                Features
+              </a>
+              <a href="#pricing" className="text-gray-400 hover:text-white">
+                Pricing
+              </a>
+              <a href="#testimonials" className="text-gray-400 hover:text-white">
+                Testimonials
+              </a>
+              <a href="#faq" className="text-gray-400 hover:text-white">
+                FAQ
+              </a>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-500 text-sm">© 2025 Automated Order Processing System. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
-  </div>
-</footer>
+  )
+interface FaqItemProps {
+  question: string;
+  answer: string;
+}
 
+function FaqItem({ question, answer }: FaqItemProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mb-6 border border-gray-800 rounded-lg overflow-hidden">
+      <div
+        className="bg-gray-900 p-4 flex justify-between items-center cursor-pointer"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <h3 className="font-medium">{question}</h3>
+        <span className="text-[#00E676]">{isOpen ? "−" : "+"}</span>
+      </div>
+      <div className={`overflow-hidden transition-all duration-300 ${isOpen ? "max-h-40" : "max-h-0"}`}>
+        <div className="p-4 bg-black">
+          <p className="text-gray-400">{answer}</p>
+        </div>
+      </div>
     </div>
-  );
+  )
+}
+
 }

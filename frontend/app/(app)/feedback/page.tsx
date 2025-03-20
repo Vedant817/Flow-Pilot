@@ -11,7 +11,7 @@ interface Feedback {
 }
 
 interface ApiResponse {
-  feedbacks: Feedback[];
+  feedbacks: Feedback[];  
 }
 
 export default function FeedbackPage() {
