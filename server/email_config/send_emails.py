@@ -10,40 +10,101 @@ from payment.stripe_payment import create_payment_link
 from payment.generate_invoice import generate_invoice
 from config.dbConfig import db
 from bson import ObjectId
+import ssl,time,socket
 
 load_dotenv()
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 FEEDBACK_FORM_LINK  = os.getenv("FORM_LINK")
 
-def send_email(subject, body, recipient_email,attachment_path=None):
+def send_email(subject, body, recipient_email, attachment_path=None, max_retries=3):
+    # Create message
     msg = MIMEMultipart()
     msg["From"] = SENDER_EMAIL
     msg["To"] = recipient_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
-    if attachment_path:
-        with open(attachment_path, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-        
-        encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition",
-            f"attachment; filename={attachment_path}",
-        )
-        msg.attach(part)
+    # Add attachment if provided
+    if attachment_path and os.path.exists(attachment_path):
+        try:
+            with open(attachment_path, "rb") as attachment:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(attachment.read())
+            
+            encoders.encode_base64(part)
+            filename = os.path.basename(attachment_path)
+            part.add_header("Content-Disposition", f"attachment; filename={filename}")
+            msg.attach(part)
+        except Exception as e:
+            print(f"Error attaching file: {e}")
+    
+    # Attempt to send email with retries
+    for attempt in range(max_retries):
+        try:
+            # Method 1: SMTP_SSL (preferred for Gmail)
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=30) as server:
+                server.login(SENDER_EMAIL, SENDER_PASSWORD)
+                server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
+                print(f"Email sent successfully using SMTP_SSL!")
+                return True
+        except (smtplib.SMTPServerDisconnected, socket.timeout, ConnectionRefusedError) as e:
+            print(f"Attempt {attempt+1} failed with SMTP_SSL: {e}")
+            time.sleep(2)  # Wait before trying alternative method
+            
+            try:
+                # Method 2: SMTP with explicit TLS
+                with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+                    server.set_debuglevel(1)  # Enable debug output
+                    server.ehlo()
+                    server.starttls(context=context)
+                    server.ehlo()
+                    server.login(SENDER_EMAIL, SENDER_PASSWORD)
+                    server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
+                    print(f"Email sent successfully using SMTP with STARTTLS!")
+                    return True
+            except Exception as inner_e:
+                print(f"Attempt {attempt+1} failed with SMTP+TLS: {inner_e}")
+                
+                if attempt == max_retries - 1:
+                    print(f"All {max_retries} attempts failed. Could not send email.")
+                else:
+                    print(f"Retrying in 5 seconds...")
+                    time.sleep(5)
+    
+    return False
 
+
+def test_smtp_connection():
+    print("Testing SMTP connection...")
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
-        server.quit()
-        print("Email sent successfully!")
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=10) as server:
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            print("SMTP_SSL connection successful!")
+            return True
     except Exception as e:
-        print(f"Error sending email: {e}")
+        print(f"SMTP_SSL test failed: {e}")
+        
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            print("SMTP+TLS connection successful!")
+            return True
+    except Exception as e:
+        print(f"SMTP+TLS test failed: {e}")
+        
+    return False
+
+# Run this before attempting to send emails
+if not test_smtp_connection():
+    print("Unable to establish SMTP connection. Please check your credentials and network.")
+
+
 
 def send_acknowledgment(order, message="", customer_subject=""):
     order_email = order["email"]

@@ -2,7 +2,6 @@ import os
 import sys
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
 from langchain.schema import Document
 from google.cloud import aiplatform
@@ -11,8 +10,6 @@ import pandas as pd
 from config.gemini_config import gemini_model
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from config.dbConfig import db
-import hashlib
-import pickle
 
 load_dotenv()
 inventory_collection = db["inventory"]
@@ -52,69 +49,6 @@ def get_chat_history(session_id, limit=10):
     ).sort("timestamp", -1).limit(limit))
     
     return history
-
-def process_pdf(pdf_path):
-    print("\n📌 Processing PDF:", pdf_path)
-    
-    mod_time = os.path.getmtime(pdf_path)
-    cache_key = f"{pdf_path}_{mod_time}"
-    cache_file = f"pdf_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.pkl"
-    
-    if os.path.exists(cache_file):
-        try:
-            with open(cache_file, 'rb') as f:
-                docs = pickle.load(f)
-                print("✅ Loaded PDF from cache.")
-                return docs
-        except Exception as e:
-            print(f"Cache loading failed: {e}")
-
-    try:
-        loader = PyPDFLoader(pdf_path)
-        documents = loader.load()
-
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=300,
-            chunk_overlap=150,
-            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],
-            keep_separator=True
-        )
-        pdf_texts = text_splitter.split_documents(documents)
-
-        docs = []
-        for i, doc in enumerate(pdf_texts):
-            metadata = {
-                "id": f"pdf_chunk_{i}",
-                "source": "User Manual",
-                "page": doc.metadata.get("page", 0),
-                "section": extract_section_title(doc.page_content),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "priority": "medium",  # Prioritize manual content
-                "content_type": "documentation"
-            }
-            docs.append(Document(
-                page_content=doc.page_content,
-                metadata=metadata
-            ))
-
-        with open(cache_file, 'wb') as f:
-            pickle.dump(docs, f)
-        
-        print(f"✅ Added {len(docs)} new documents to vector store.")
-        return docs
-
-    except Exception as e:
-        print("❌ Error processing PDF:", e)
-        return []
-
-def extract_section_title(text):
-    """Extract potential section titles from text chunks"""
-    lines = text.split('\n')
-    for line in lines[:3]:
-        if (len(line.strip()) < 50 and (line.strip().endswith(':') or 
-            line.strip().isupper() or line.strip().istitle())):
-            return line.strip()
-    return "General Content"
 
 def build_records_from_collection(data, collection_name):
     records = []
@@ -157,7 +91,6 @@ def upsert_documents(new_docs):
             print(f"✅ Added {len(new_filtered_docs)} new documents to vector store.")
         else:
             print("⚠ No new documents to add.")
-
     except Exception as e:
         print("❌ Error during upsert:", e)
 
@@ -169,7 +102,7 @@ def build_documents(records):
             "source": rec["source"],
             "record_type": rec.get("record_type", "general"),
             "timestamp": rec["timestamp"],
-            "priority": "high" if rec["source"] in ["pdf", "app_docs", "technical_docs"] else "normal"
+            "priority": "high" if rec["source"] in ["app_docs", "technical_docs"] else "normal"
         }
         docs.append(Document(
             page_content=rec["text"],
@@ -191,10 +124,6 @@ def refresh_data_and_update_vector_store():
     )
 
     docs = build_documents(all_records)
-
-    pdf_docs = process_pdf(r"C:\Users\kumar\Downloads\User Mannual.pdf")
-    docs.extend(pdf_docs)
-
     upsert_documents(docs)
     
     return vector_store
@@ -213,26 +142,14 @@ def calculate_metadata_relevance(metadata, query):
     score = 0
     
     if "source" in metadata:
-        if metadata["source"].lower() == "user manual" and ("manual" in query_lower or 
-                                                            "guide" in query_lower or 
-                                                            "help" in query_lower or
-                                                            "how to" in query_lower):
-            score += 0.5
-        elif metadata["source"].lower() == "inventory" and ("inventory" in query_lower or 
-                                                            "stock" in query_lower or 
-                                                            "product" in query_lower):
+        if metadata["source"].lower() == "inventory" and ("inventory" in query_lower or 
+                                                          "stock" in query_lower or 
+                                                          "product" in query_lower):
             score += 0.5
         elif metadata["source"].lower() == "orders" and ("order" in query_lower or 
                                                         "purchase" in query_lower or 
                                                         "buy" in query_lower):
             score += 0.5
-    
-    if "section" in metadata and metadata["section"]:
-        section_words = extract_keywords(metadata["section"])
-        query_words = extract_keywords(query)
-        common_words = set(section_words).intersection(set(query_words))
-        if common_words:
-            score += 0.3
     
     return score
 
@@ -293,7 +210,6 @@ You are an AI assistant with expertise in:
 - *Order Management*
 - *Inventory Tracking*
 - *Product Analytics*
-- *User Manual Navigation*
 
 Use the *provided context and chat history* to answer the query accurately.
 
@@ -307,10 +223,9 @@ Use the *provided context and chat history* to answer the query accurately.
 {query}
 
 *Instructions:*
-1. If the context contains relevant *order, inventory, analytics, or PDF* information, answer directly.
+1. If the context contains relevant *order, inventory, or analytics* information, answer directly.
 2. If missing details, *explain what additional info is needed*.
-3. *Do not ask the user to check the documentation—assume you are the documentation.*
-4. Reference previous conversations when relevant.
+3. Reference previous conversations when relevant.
 
 *Answer:*
 """

@@ -15,7 +15,6 @@ from werkzeug.exceptions import HTTPException
 from email_config.send_emails import send_invoice
 import json
 from datetime import datetime, timedelta
-from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 from error_handle import handle_exception
 

@@ -1,4 +1,3 @@
-# ordder file
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
@@ -10,7 +9,7 @@ from email_config.send_emails import send_acknowledgment, send_order_update_conf
 from config.gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
-from error_handle import handle_exception
+from error_handle import handle_order_error
 
 load_dotenv()
 API_KEY = os.getenv("AI21KEY")
@@ -56,7 +55,6 @@ def correct_product_names(order_details, inventory_items):
                 corrected_orders.append(order)
 
     except Exception as e:
-        handle_exception(e)
         print(f"Error correcting product names: {e}")
         corrected_orders = order_details
 
@@ -68,15 +66,15 @@ def validate_order_details_ai(order_details):
     You are an AI assistant validating order details.
     Your task is to check if the order contains incomplete, incorrect, or unclear details.
 
-    **Validation Criteria:**
+    *Validation Criteria:*
     - Ensure that each item has a product name and quantity.
     - The price is not required.
     - If any required detail is missing or unclear, list it as an error.
 
-    **Order Details:**
+    *Order Details:*
     {json.dumps(order_details, indent=2)}
 
-    **Expected JSON Output (Strict Format, No Explanation):**
+    *Expected JSON Output (Strict Format, No Explanation):*
     {{
         "valid": true/false,
         "errors": ["Missing quantity for product X"]
@@ -87,7 +85,7 @@ def validate_order_details_ai(order_details):
         response = gemini_model.generate_content(prompt)
         ai_response = response.text.strip()
 
-        clean_response = re.sub(r"```json|```", "", ai_response).strip()
+        clean_response = re.sub(r"json|", "", ai_response).strip()
 
         try:
             validation_result = json.loads(clean_response)
@@ -105,10 +103,10 @@ def extract_order_details_ai(email_text):
             You are an AI assistant extracting order details from an email.
             Extract and return only in JSON format:
 
-            **Email:**
+            *Email:*
             "{email_text}"
 
-            **Expected JSON Output:**
+            *Expected JSON Output:*
             {{
                 "orders": [
                     {{"product": "Product Name", "quantity": Number}}
@@ -133,7 +131,6 @@ def extract_order_details_ai(email_text):
             print("Error: No choices found in API response.")
             return []
     except Exception as e:
-        handle_exception(e)
         print(f"Error extracting order details: {e}")
         return []
 
@@ -152,137 +149,103 @@ def get_customer_from_db(email):
     return customers_collection.find_one({"email": email})
 
 def add_orders_to_collection(email, date, time, customer_details, order_details):
-    try:
-        inventory_items = fetch_inventory_items()
-        corrected_orders = correct_product_names(order_details, inventory_items)
-        unknown_products = [
-            order["product"] for order in corrected_orders if order["product"] not in inventory_items
-        ]
+    inventory_items = fetch_inventory_items()
+    corrected_orders = correct_product_names(order_details, inventory_items)
+    unknown_products = [
+        order["product"] for order in corrected_orders if order["product"] not in inventory_items
+    ]
 
-        if unknown_products:
-            print('Unknown products found. Order not added.')
-            return None
-        
-        try:
-            order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
-            five_mins_ago = order_datetime - timedelta(minutes=5)
-        except ValueError as e:
-            handle_exception(e)
-            print(f"Error parsing date and time: {e}")
-            return None
-
-        try:
-            existing_order = order_collection.find_one({
-                "email": email,
-                "$and": [
-                    {"date": date},
-                    {
-                        "$or": [
-                            {"time": {"$gte": five_mins_ago.strftime("%H:%M:%S"), 
-                                        "$lte": order_datetime.strftime("%H:%M:%S")}},
-                            {"time": {"$gte": "23:55:00"}} 
-                        ]
-                    }
-                ],
-                "products": {
-                    "$size": len(corrected_orders),
-                    "$all": [
-                        {"$elemMatch": {
-                            "name": item["product"],
-                            "quantity": item["quantity"]
-                        }} for item in corrected_orders
-                    ]
-                }
-            })
-
-            if existing_order:
-                send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
-                return None
-        except Exception as e:
-            print(f"Error checking for duplicate order: {e}")
-            handle_exception(e)
-            return None
-
-        try:
-            can_fulfill = check_inventory(order_details=corrected_orders)
-            if not can_fulfill:
-                formatted_entry = {
-                    "name": customer_details['name'],
-                    "phone": customer_details['phone'],
-                    "email": email,
-                    "date": date,
-                    "time": time,
-                    "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
-                    "status": "pending inventory",
-                    "orderLink": ""
-                }
-                
-                result = order_collection.insert_one(formatted_entry)
-                order_id = str(result.inserted_id)
-                
-                order_collection.update_one(
-                    {"_id": result.inserted_id},
-                    {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
-                )
-                
-                print("Order added with pending inventory status.")
-                send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
-                return order_id
-        except Exception as e:
-            print(f"Error checking inventory or adding pending order: {e}")
-            handle_exception(e)
-            return None
-
-        try:
-            formatted_entry = {
-                "name": customer_details['name'],
-                "phone": customer_details['phone'],
-                "email": email,
-                "date": date,
-                "time": time,
-                "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
-                "status": "pending fulfillment",
-                "orderLink": ""
-            }
-            
-            result = order_collection.insert_one(formatted_entry)
-            order_id = str(result.inserted_id)
-            
-            order_collection.update_one(
-                {"_id": result.inserted_id},
-                {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
-            )
-            
-            for item in corrected_orders:
-                inventory_collection.update_one(
-                    {"item": item["product"]},
-                    {"$inc": {"quantity": -item["quantity"]}}
-                )
-            
-            print('Order added and inventory updated.')
-            send_acknowledgment(formatted_entry)
-            return order_id
-        except Exception as e:
-            print(f"Error adding order or updating inventory: {e}")
-            handle_exception(e)
-            # If we've gotten this far but failed, try to rollback any inventory changes
-            try:
-                if 'result' in locals() and result and result.inserted_id:
-                    order_collection.delete_one({"_id": result.inserted_id})
-                    print("Rolled back order insertion due to error.")
-            except Exception as rollback_error:
-                print(f"Error during rollback: {rollback_error}")
-                handle_exception(e)
-            return None
-            
-    except Exception as e:
-        print(f"Unexpected error in add_orders_to_collection: {e}")
-        handle_exception(e)
+    if unknown_products:
+        error_msg = "Unknown products found in order. Order not added."
+        print(error_msg)
+        handle_order_error(email, error_msg)
         return None
+    
+    order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
+    twenty_four_hours_ago = order_datetime - timedelta(hours=24)
+    yesterday_date = twenty_four_hours_ago.strftime("%Y-%m-%d")
+    yesterday_time = twenty_four_hours_ago.strftime("%H:%M:%S")
+
+    existing_order = order_collection.find_one({
+    "email": email,
+    "$or": [
+        {"date": date, "time": {"$gte": yesterday_time, "$lte": time}} if date == yesterday_date else {"date": date},
+        {"date": yesterday_date, "time": {"$gte": yesterday_time}} if date != yesterday_date else {}
+    ],
+    "products": {
+        "$size": len(corrected_orders),
+        "$all": [
+            {"$elemMatch": {
+                "name": item["product"],
+                "quantity": item["quantity"]
+            }} for item in corrected_orders
+        ]}
+    })
+
+    if existing_order:
+        error_msg = "Duplicate order detected within the last 24 hours."
+        print(error_msg)
+        handle_order_error(email, error_msg, existing_order["_id"])
+        send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
+        return None
+
+    can_fulfill = check_inventory(order_details=corrected_orders)
+    if not can_fulfill:
+        formatted_entry = {
+            "name": customer_details['name'],
+            "phone": customer_details['phone'],
+            "email": email,
+            "date": date,
+            "time": time,
+            "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
+            "status": "pending inventory",
+            "orderLink": ""
+        }
+        result = order_collection.insert_one(formatted_entry)
+        order_id = str(result.inserted_id)
+        
+        order_collection.update_one(
+            {"_id": result.inserted_id},
+            {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
+        )
+        
+        print("Order added with pending inventory status.")
+        error_msg = "Some items are out of stock, causing a delay."
+        handle_order_error(email, error_msg, order_id)
+        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
+        return order_id
+
+    formatted_entry = {
+        "name": customer_details['name'],
+        "phone": customer_details['phone'],
+        "email": email,
+        "date": date,
+        "time": time,
+        "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
+        "status": "pending fulfillment",
+        "orderLink": ""
+    }
+    
+    result = order_collection.insert_one(formatted_entry)
+    order_id = str(result.inserted_id)
+    
+    order_collection.update_one(
+        {"_id": result.inserted_id},
+        {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
+    )
+    
+    for item in corrected_orders:
+        inventory_collection.update_one(
+            {"item": item["product"]},
+            {"$inc": {"quantity": -item["quantity"]}}
+        )
+    
+    print('Order added and inventory updated.')
+    send_acknowledgment(formatted_entry)
+    return order_id
 
 def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
-    print('Customer Details: ', customer_details)
     orders = order_details.get("orders", None)
 
     if not orders:
@@ -292,8 +255,8 @@ def process_order_details(email, date, time, order_details):
 
     is_valid, errors = validate_order_details_ai(orders)
     if not is_valid:
-        print("Order details are invalid. Sending issue email.")
-        send_order_issue_email(email, errors)
+        # print("Order details are invalid. Sending issue email.")
+        # send_order_issue_email(email, errors)
         return
 
     existing_customer = get_customer_from_db(email)
@@ -332,7 +295,6 @@ def process_order_details(email, date, time, order_details):
     order_id = add_orders_to_collection(email, date, time, customer_details, orders)
     
     if order_id:
-        # Update to include more order details in past_orders
         order_summary = {
             "order_id": order_id,
             "date": date,
@@ -352,43 +314,55 @@ def process_order_details(email, date, time, order_details):
 def process_order_change(email, date, time, order_details):
     print('Processing order change...')
     try:
-        
-        latest_order = order_collection.find_one({"email": email}, sort=[("date", DESCENDING), ("time", DESCENDING)])
+        latest_order = order_collection.find_one(
+            {"email": email},
+            sort=[("date", DESCENDING), ("time", DESCENDING)]
+        )
+
         if not latest_order:
+            print("No existing order found. Creating a new order.")
             process_order_details(email, date, time, order_details)
             return
 
         if latest_order.get("status") not in ["pending fulfillment", "partially fulfilled"]:
             process_order_details(email, date, time, order_details)
             return
-        
+
         previous_order = {
             "_id": latest_order["_id"],
             "products": latest_order["products"].copy(),
             "date": latest_order["date"],
             "time": latest_order["time"]
         }
-        
+
         updated_products = get_ai_order_updates(latest_order, order_details)
-        
-        order_collection.update_one(
+
+        if not isinstance(updated_products, list):
+            print("AI order update failed. Using fallback method.")
+            updated_products = merge_orders_fallback(latest_order, order_details)
+
+        if updated_products is None:
+            print("No valid updates detected, skipping order update.")
+            return
+
+        result = order_collection.update_one(
             {"_id": latest_order["_id"]},
-            {"$set": {"products": updated_products}}
+            {"$set": {"products": updated_products, "date": date, "time": time}}  # Update timestamp
         )
-        
+
+        if result.modified_count == 0:
+            print("Order update failed, no changes were made.")
+        else:
+            print(f"Order {latest_order['_id']} updated successfully.")
+
         updated_order = order_collection.find_one({"_id": latest_order["_id"]})
         send_order_update_confirmation(email, latest_order=updated_order, previous_order=previous_order)
-    
+
     except Exception as e:
-        handle_exception(e)
         print(f"Error updating order: {e}")
         send_order_issue_email(email, ["An error occurred while updating your order."])
 
 def get_ai_order_updates(previous_order, new_order_details):
-    """
-    Use AI to intelligently merge the previous order with the new order details.
-    Handles cases of adding new items, modifying quantities, and removing items.
-    """
     try:
         previous_products = previous_order.get("products", [])
         previous_products_formatted = json.dumps(previous_products, indent=2)
@@ -431,7 +405,6 @@ def get_ai_order_updates(previous_order, new_order_details):
             
     except Exception as e:
         print(f"Error in AI order update: {e}")
-        handle_exception(e)
         return merge_orders_fallback(previous_order, new_order_details)
 
 def merge_orders_fallback(previous_order, new_order_details):
