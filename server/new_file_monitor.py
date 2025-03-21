@@ -206,7 +206,7 @@ def start_monitoring():
             else:
                 print("\nNo changes detected in this cycle")
             
-            wait_time = 10 
+            wait_time = 20 
             print(f"\nWaiting {wait_time} seconds before next check...")
             time.sleep(wait_time)
             

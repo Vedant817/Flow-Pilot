@@ -1,14 +1,11 @@
 # chatbot_app.py
 from flask import Flask, jsonify, request, session
-import threading
 import uuid
 import os
 from flask_cors import CORS
 from dotenv import load_dotenv
 from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
 from error_handle import handle_exception
-from apscheduler.schedulers.background import BackgroundScheduler
-import json
 
 load_dotenv()
 app = Flask(__name__)
@@ -95,11 +92,7 @@ def refresh_data():
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
-def scheduled_refresh():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(refresh_data_and_update_vector_store, 'interval', hours=1)
-    scheduler.start()
-
 if __name__ == '__main__':
-    scheduled_refresh()
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    # Initialize the database and vector store on startup
+    # refresh_data_and_update_vector_store()
+    app.run(host='0.0.0.0', port=5002, debug=True)

@@ -417,7 +417,7 @@ def create_payment_link(order_id):
 @app.route('/errors', methods=['GET'])
 def get_errors():
     try:
-        errors = list(error_collection.find({}, {'_id': 0}))
+        errors = list(error_collection.find({}, {'_id': 0}).sort("timestamp", -1))
         return {"errors": errors}
     except Exception as e:
         return handle_exception(e)
