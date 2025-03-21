@@ -1,4 +1,6 @@
 import os
+from flask import Flask, jsonify, request, session # type: ignore
+from flask_cors import CORS
 import sys
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -8,11 +10,28 @@ from langchain.schema import Document
 from google.cloud import aiplatform
 from langchain_google_vertexai import VertexAIEmbeddings
 import pandas as pd
+from bson.objectid import ObjectId
+import json
 from config.gemini_config import gemini_model
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from config.dbConfig import db
-import hashlib
-import pickle
+from werkzeug.exceptions import HTTPException
+from apscheduler.schedulers.background import BackgroundScheduler
+import uuid
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
+
+
+load_dotenv()
+app = Flask(__name__)
+app.json_encoder = JSONEncoder
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+CORS(app)
 
 load_dotenv()
 inventory_collection = db["inventory"]
@@ -20,6 +39,7 @@ feedback_collection = db["feedback"]
 orders_collection = db["orders"]
 customers_collection = db["customers"]
 chat_history_collection = db["chat_history"]
+error_collection = db["errors"]
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -55,19 +75,6 @@ def get_chat_history(session_id, limit=10):
 
 def process_pdf(pdf_path):
     print("\n📌 Processing PDF:", pdf_path)
-    
-    mod_time = os.path.getmtime(pdf_path)
-    cache_key = f"{pdf_path}_{mod_time}"
-    cache_file = f"pdf_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.pkl"
-    
-    if os.path.exists(cache_file):
-        try:
-            with open(cache_file, 'rb') as f:
-                docs = pickle.load(f)
-                print("✅ Loaded PDF from cache.")
-                return docs
-        except Exception as e:
-            print(f"Cache loading failed: {e}")
 
     try:
         loader = PyPDFLoader(pdf_path)
@@ -97,10 +104,6 @@ def process_pdf(pdf_path):
                 metadata=metadata
             ))
 
-        with open(cache_file, 'wb') as f:
-            pickle.dump(docs, f)
-        
-        print(f"✅ Added {len(docs)} new documents to vector store.")
         return docs
 
     except Exception as e:
@@ -127,7 +130,7 @@ def build_records_from_collection(data, collection_name):
                 continue
                 
             records.append({
-                "id": f"{collection_name}_{idx}_chunk_{chunk_idx}",
+                "id": f"{collection_name}{idx}_chunk{chunk_idx}",
                 "text": chunk,
                 "source": collection_name,
                 "record_type": collection_name,
@@ -156,7 +159,7 @@ def upsert_documents(new_docs):
             vector_store.add_documents(new_filtered_docs)
             print(f"✅ Added {len(new_filtered_docs)} new documents to vector store.")
         else:
-            print("⚠️ No new documents to add.")
+            print("⚠ No new documents to add.")
 
     except Exception as e:
         print("❌ Error during upsert:", e)
@@ -290,29 +293,29 @@ def ask_bot(query, session_id=None):
     
     prompt = f"""
 You are an AI assistant with expertise in:
-- **Order Management**
-- **Inventory Tracking**
-- **Product Analytics**
-- **User Manual Navigation**
+- *Order Management*
+- *Inventory Tracking*
+- *Product Analytics*
+- *User Manual Navigation*
 
-Use the **provided context and chat history** to answer the query accurately.
+Use the *provided context and chat history* to answer the query accurately.
 
-**Chat History:**
+*Chat History:*
 {history_text}
 
-**Context:**
+*Context:*
 {context}
 
-**Query:**
+*Query:*
 {query}
 
-**Instructions:**
-1. If the context contains relevant **order, inventory, analytics, or PDF** information, answer directly.
-2. If missing details, **explain what additional info is needed**.
-3. **Do not ask the user to check the documentation—assume you are the documentation.**
+*Instructions:*
+1. If the context contains relevant *order, inventory, analytics, or PDF* information, answer directly.
+2. If missing details, *explain what additional info is needed*.
+3. *Do not ask the user to check the documentation—assume you are the documentation.*
 4. Reference previous conversations when relevant.
 
-**Answer:**
+*Answer:*
 """
     
     response = gemini_model.generate_content(prompt)
@@ -322,5 +325,104 @@ Use the **provided context and chat history** to answer the query accurately.
         return {"response": response_text}
     else:
         return {"error": "Invalid response format from Google Vertex AI"}
+    
+@app.errorhandler(Exception)
+def handle_exception(e):
+    if isinstance(e, HTTPException):
+        error_data = {
+            "errorMessage": e.description,
+            "type": "Customer",
+            "severity": "Low" if e.code == 400 else "Medium",
+            "timestamp": datetime.utcnow()
+        }
+        error_collection.insert_one(error_data)
+        return jsonify({"error": e.description}), e.code
+
+    error_data = {
+        "errorMessage": str(e),
+        "type": "System",
+        "severity": "Critical",
+        "timestamp": datetime.utcnow()
+    }
+
+    error_collection.insert_one(error_data)
+    return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
+    
+@app.route('/chatbot', methods=['POST'])
+def chat():
+    try:
+        data = request.get_json()
+        if not data or 'query' not in data:
+            return jsonify({"error": "Query parameter is required"}), 400
+
+        query = data['query']
+        
+        session_id = session.get('session_id')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            session['session_id'] = session_id
+        print('Query:', query)
+        print('Session ID:', session_id)
+        response_data = ask_bot(query, session_id)
+        response_text = response_data.get('response', '')
+        
+        if response_text:
+            store_chat_history(session_id, query, response_text)
+        print('Response:', response_text)
+        return jsonify({"response": response_text, "session_id": session_id})
+    except Exception as e:
+        app.logger.error(f"Error in chatbot endpoint: {str(e)}")
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/chat-history', methods=['GET'])
+def get_session_chat_history():
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({"error": "No active session"}), 400
+            
+        limit = int(request.args.get("limit", 10))
+        
+        history = get_chat_history(session_id, limit)
+        
+        return jsonify({"history": history, "session_id": session_id})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/end-session', methods=['POST'])
+def end_session():
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({"error": "No active session"}), 400
+        
+        session.pop('session_id', None)
+        
+        return jsonify({"message": "Session ended"})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/refresh-data', methods=['POST'])
+def refresh_data():
+    try:
+        refresh_data_and_update_vector_store()
+        return jsonify({"message": "Data refreshed and vector store updated."})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+    
+def scheduled_refresh():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(refresh_data_and_update_vector_store, 'interval', hours=1)
+    scheduler.start()
+
 
 refresh_data_and_update_vector_store()
+
+if __name__ == '__main__':
+    scheduled_refresh()
+    app.run(host = '0.0.0.0', debug=True,port=5001)

@@ -18,8 +18,6 @@ import json
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID'
@@ -32,7 +30,7 @@ class JSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 load_dotenv()
-app = Flask(_name_)
+app = Flask(__name__)
 app.json_encoder = JSONEncoder
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
@@ -520,6 +518,6 @@ def scheduled_refresh():
     scheduler.add_job(refresh_data_and_update_vector_store, 'interval', hours=1)
     scheduler.start()
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     scheduled_refresh()
     app.run(host = '0.0.0.0', debug=True)

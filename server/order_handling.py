@@ -159,32 +159,28 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         return None
     
     order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
-    five_mins_ago = order_datetime - timedelta(minutes=5)
+    twenty_four_hours_ago = order_datetime - timedelta(hours=24)
+    yesterday_date = twenty_four_hours_ago.strftime("%Y-%m-%d")
+    yesterday_time = twenty_four_hours_ago.strftime("%H:%M:%S")
 
     existing_order = order_collection.find_one({
-        "email": email,
-        "$and": [
-            {"date": date},
-            {
-                "$or": [
-                    {"time": {"$gte": five_mins_ago.strftime("%H:%M:%S"), 
-                                "$lte": order_datetime.strftime("%H:%M:%S")}},
-                    {"time": {"$gte": "23:55:00"}} 
-                ]
-            }
-        ],
-        "products": {
-            "$size": len(corrected_orders),
-            "$all": [
-                {"$elemMatch": {
-                    "name": item["product"],
-                    "quantity": item["quantity"]
-                }} for item in corrected_orders
-            ]
-        }
+    "email": email,
+    "$or": [
+        {"date": date, "time": {"$gte": yesterday_time, "$lte": time}} if date == yesterday_date else {"date": date},
+        {"date": yesterday_date, "time": {"$gte": yesterday_time}} if date != yesterday_date else {}
+    ],
+    "products": {
+        "$size": len(corrected_orders),
+        "$all": [
+            {"$elemMatch": {
+                "name": item["product"],
+                "quantity": item["quantity"]
+            }} for item in corrected_orders
+        ]}
     })
 
     if existing_order:
+        print("Duplicate order detected. Order not added.")
         send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
         return None
 

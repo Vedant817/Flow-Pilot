@@ -1,4 +1,4 @@
-import fitz
+import pymupdf as fitz
 import easyocr
 import pandas as pd
 import json

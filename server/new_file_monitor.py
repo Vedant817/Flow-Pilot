@@ -1,7 +1,7 @@
 import time
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(_file_), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import json
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
