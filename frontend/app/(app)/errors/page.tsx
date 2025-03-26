@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { AlertTriangle, AlertCircle, Search } from "lucide-react";
+import { AlertTriangle, Search, Server, User } from "lucide-react";
 
 interface ErrorItem {
   id: number;
@@ -14,12 +14,11 @@ export default function ErrorsPage() {
   const [errors, setErrors] = useState<ErrorItem[]>([]);
   const [filterType, setFilterType] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const API_ENDPOINT = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     async function fetchErrors() {
       try {
-        const response = await fetch(`${API_ENDPOINT}/errors`); 
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/errors`); 
         const data = await response.json();
         if (data.errors) {
           setErrors(
@@ -64,6 +63,14 @@ export default function ErrorsPage() {
     }
   };
 
+  const getTypeIcon = (type: string) => {
+    if (type === "System") {
+      return <Server size={12} className="mr-1" />;
+    } else {
+      return <User size={12} className="mr-1" />;
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
@@ -84,14 +91,14 @@ export default function ErrorsPage() {
         <div className="bg-gray-900 p-6 rounded-lg">
           <h2 className="text-xl mb-2">System Errors</h2>
           <div className="flex items-center">
-            <AlertCircle size={24} className="text-purple-500 mr-2" />
+            <Server size={24} className="text-purple-500 mr-2" />
             <span className="text-4xl font-bold">{systemErrors}</span>
           </div>
         </div>
         <div className="bg-gray-900 p-6 rounded-lg">
           <h2 className="text-xl mb-2">Customer Errors</h2>
           <div className="flex items-center">
-            <AlertTriangle size={24} className="text-amber-500 mr-2" />
+            <User size={24} className="text-amber-500 mr-2" />
             <span className="text-4xl font-bold">{customerErrors}</span>
           </div>
         </div>
@@ -147,7 +154,7 @@ export default function ErrorsPage() {
                         error.type === "System" ? "bg-purple-900 text-purple-300" : "bg-amber-900 text-amber-300"
                       }`}
                     >
-                      {error.type === "System" ? <AlertCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
+                      {getTypeIcon(error.type)}
                       {error.type}
                     </span>
                   </td>

@@ -1,7 +1,0 @@
-ai21
-fpdf
-pymongo
-python-dotenv
-openpyxl
-watchdog
-smtplib

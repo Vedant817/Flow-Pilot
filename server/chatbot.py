@@ -2,7 +2,6 @@ import os
 import sys
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
 from langchain.schema import Document
 from google.cloud import aiplatform
@@ -22,7 +21,7 @@ chat_history_collection = db["chat_history"]
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\vedan\Downloads\EmailAutomation\server\fresh-airfoil-445517-q1-4e804f7d94e2.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"D:\Deloitte\Prototype\server\services\fresh-airfoil-445517-q1-4e804f7d94e2.json"
 aiplatform.init(project=PROJECT_ID, location="us-central1")
 embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
@@ -51,52 +50,6 @@ def get_chat_history(session_id, limit=10):
     
     return history
 
-def process_pdf(pdf_path):
-    print("\n📌 Processing PDF:", pdf_path)
-
-    try:
-        loader = PyPDFLoader(pdf_path)
-        documents = loader.load()
-
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=300,
-            chunk_overlap=150,
-            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],
-            keep_separator=True
-        )
-        pdf_texts = text_splitter.split_documents(documents)
-
-        docs = []
-        for i, doc in enumerate(pdf_texts):
-            metadata = {
-                "id": f"pdf_chunk_{i}",
-                "source": "User Manual",
-                "page": doc.metadata.get("page", 0),
-                "section": extract_section_title(doc.page_content),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "priority": "high",  # Prioritize manual content
-                "content_type": "documentation"
-            }
-            docs.append(Document(
-                page_content=doc.page_content,
-                metadata=metadata
-            ))
-
-        return docs
-
-    except Exception as e:
-        print("❌ Error processing PDF:", e)
-        return []
-
-def extract_section_title(text):
-    """Extract potential section titles from text chunks"""
-    lines = text.split('\n')
-    for line in lines[:3]:
-        if (len(line.strip()) < 50 and (line.strip().endswith(':') or 
-            line.strip().isupper() or line.strip().istitle())):
-            return line.strip()
-    return "General Content"
-
 def build_records_from_collection(data, collection_name):
     records = []
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
@@ -108,7 +61,7 @@ def build_records_from_collection(data, collection_name):
                 continue
                 
             records.append({
-                "id": f"{collection_name}_{idx}_chunk_{chunk_idx}",
+                "id": f"{collection_name}{idx}_chunk{chunk_idx}",
                 "text": chunk,
                 "source": collection_name,
                 "record_type": collection_name,
@@ -137,8 +90,7 @@ def upsert_documents(new_docs):
             vector_store.add_documents(new_filtered_docs)
             print(f"✅ Added {len(new_filtered_docs)} new documents to vector store.")
         else:
-            print("⚠️ No new documents to add.")
-
+            print("⚠ No new documents to add.")
     except Exception as e:
         print("❌ Error during upsert:", e)
 
@@ -150,7 +102,7 @@ def build_documents(records):
             "source": rec["source"],
             "record_type": rec.get("record_type", "general"),
             "timestamp": rec["timestamp"],
-            "priority": "high" if rec["source"] in ["pdf", "app_docs", "technical_docs"] else "normal"
+            "priority": "high" if rec["source"] in ["app_docs", "technical_docs"] else "normal"
         }
         docs.append(Document(
             page_content=rec["text"],
@@ -172,10 +124,6 @@ def refresh_data_and_update_vector_store():
     )
 
     docs = build_documents(all_records)
-
-    pdf_docs = process_pdf(r"C:\Users\vedan\Downloads\EmailAutomation\server\attachments\User Mannual.pdf")
-    docs.extend(pdf_docs)
-
     upsert_documents(docs)
     
     return vector_store
@@ -194,26 +142,14 @@ def calculate_metadata_relevance(metadata, query):
     score = 0
     
     if "source" in metadata:
-        if metadata["source"].lower() == "user manual" and ("manual" in query_lower or 
-                                                            "guide" in query_lower or 
-                                                            "help" in query_lower or
-                                                            "how to" in query_lower):
-            score += 0.5
-        elif metadata["source"].lower() == "inventory" and ("inventory" in query_lower or 
-                                                            "stock" in query_lower or 
-                                                            "product" in query_lower):
+        if metadata["source"].lower() == "inventory" and ("inventory" in query_lower or 
+                                                          "stock" in query_lower or 
+                                                          "product" in query_lower):
             score += 0.5
         elif metadata["source"].lower() == "orders" and ("order" in query_lower or 
                                                         "purchase" in query_lower or 
                                                         "buy" in query_lower):
             score += 0.5
-    
-    if "section" in metadata and metadata["section"]:
-        section_words = extract_keywords(metadata["section"])
-        query_words = extract_keywords(query)
-        common_words = set(section_words).intersection(set(query_words))
-        if common_words:
-            score += 0.3
     
     return score
 
@@ -271,29 +207,27 @@ def ask_bot(query, session_id=None):
     
     prompt = f"""
 You are an AI assistant with expertise in:
-- **Order Management**
-- **Inventory Tracking**
-- **Product Analytics**
-- **User Manual Navigation**
+- *Order Management*
+- *Inventory Tracking*
+- *Product Analytics*
 
-Use the **provided context and chat history** to answer the query accurately.
+Use the *provided context and chat history* to answer the query accurately.
 
-**Chat History:**
+*Chat History:*
 {history_text}
 
-**Context:**
+*Context:*
 {context}
 
-**Query:**
+*Query:*
 {query}
 
-**Instructions:**
-1. If the context contains relevant **order, inventory, analytics, or PDF** information, answer directly.
-2. If missing details, **explain what additional info is needed**.
-3. **Do not ask the user to check the documentation—assume you are the documentation.**
-4. Reference previous conversations when relevant.
+*Instructions:*
+1. If the context contains relevant *order, inventory, or analytics* information, answer directly.
+2. If missing details, *explain what additional info is needed*.
+3. Reference previous conversations when relevant.
 
-**Answer:**
+*Answer:*
 """
     
     response = gemini_model.generate_content(prompt)
