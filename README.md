@@ -45,3 +45,28 @@ The **Automatic Order Processing System** provides a centralized dashboard for m
 - **Instant Responses & Voice Input**: Query data using text or voice commands.  
 - **Chat History & Clear Chat**: Maintain recent interactions for reference.  
  
+## 🛠️ Installation  
+
+Follow these steps to set up and run the **Automatic Order Processing System** locally:  
+
+### 1️⃣ Clone the Repository  
+```bash
+git clone https://github.com/KumarShresth7/EmailAutomation.git
+cd EmailAutomation
+```
+### 2️⃣ Frontend  
+```bash
+cd frontend
+npm install --force
+npm run dev
+```
+### 3️⃣ Server
+```bash 
+cd ../server
+python -m venv venv
+source venv/bin/activate
+venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+python chatbot.py
+```
