@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request, session # type: ignore
 import threading
 import uuid
 import os
-from new_file_monitor import start_monitoring
+from server.file_monitor import start_monitoring
 from config.dbConfig import db
 from feedback.feedback_handle import fetch_feedback, store_feedback
 from flask_cors import CORS
