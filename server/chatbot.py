@@ -4,7 +4,7 @@ import uuid
 import os
 from flask_cors import CORS
 from dotenv import load_dotenv
-from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
+from chat import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
 from error_handle import handle_exception
 
 load_dotenv()
