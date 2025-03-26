@@ -1,3 +1,4 @@
+# ordder file
 from ai21 import AI21Client
 from ai21.models.chat import UserMessage
 import json
@@ -9,6 +10,7 @@ from email_config.send_emails import send_acknowledgment, send_order_update_conf
 from config.gemini_config import gemini_model
 import re
 from pymongo import DESCENDING
+from error_handle import handle_exception
 
 load_dotenv()
 API_KEY = os.getenv("AI21KEY")
@@ -54,6 +56,7 @@ def correct_product_names(order_details, inventory_items):
                 corrected_orders.append(order)
 
     except Exception as e:
+        handle_exception(e)
         print(f"Error correcting product names: {e}")
         corrected_orders = order_details
 
@@ -130,6 +133,7 @@ def extract_order_details_ai(email_text):
             print("Error: No choices found in API response.")
             return []
     except Exception as e:
+        handle_exception(e)
         print(f"Error extracting order details: {e}")
         return []
 
@@ -148,11 +152,12 @@ def get_customer_from_db(email):
     return customers_collection.find_one({"email": email})
 
 def add_orders_to_collection(email, date, time, customer_details, order_details):
-    inventory_items = fetch_inventory_items()
-    corrected_orders = correct_product_names(order_details, inventory_items)
-    unknown_products = [
-        order["product"] for order in corrected_orders if order["product"] not in inventory_items
-    ]
+    try:
+        inventory_items = fetch_inventory_items()
+        corrected_orders = correct_product_names(order_details, inventory_items)
+        unknown_products = [
+            order["product"] for order in corrected_orders if order["product"] not in inventory_items
+        ]
 
     if unknown_products:
         print('Unknown products found. Order not added.')
@@ -184,58 +189,127 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
         send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
         return None
 
-    can_fulfill = check_inventory(order_details=corrected_orders)
-    if not can_fulfill:
-        formatted_entry = {
-            "name": customer_details['name'],
-            "phone": customer_details['phone'],
-            "email": email,
-            "date": date,
-            "time": time,
-            "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
-            "status": "pending inventory",
-            "orderLink": ""
-        }
-        result = order_collection.insert_one(formatted_entry)
-        order_id = str(result.inserted_id)
-        
-        order_collection.update_one(
-            {"_id": result.inserted_id},
-            {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
-        )
-        
-        print("Order added with pending inventory status.")
-        send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
-        return order_id
+        try:
+            can_fulfill = check_inventory(order_details=corrected_orders)
+            if not can_fulfill:
+                formatted_entry = {
+                    "name": customer_details['name'],
+                    "phone": customer_details['phone'],
+                    "email": email,
+                    "date": date,
+                    "time": time,
+                    "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
+                    "status": "pending inventory",
+                    "orderLink": ""
+                }
+                
+                result = order_collection.insert_one(formatted_entry)
+                order_id = str(result.inserted_id)
+                
+                order_collection.update_one(
+                    {"_id": result.inserted_id},
+                    {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
+                )
+                
+                print("Order added with pending inventory status.")
+                send_acknowledgment(formatted_entry, message="Some items are currently out of stock, which may delay your order. Would you still like to proceed or cancel it?", customer_subject="Query Mail")
+                return order_id
+        except Exception as e:
+            print(f"Error checking inventory or adding pending order: {e}")
+            handle_exception(e)
+            return None
 
-    formatted_entry = {
-        "name": customer_details['name'],
-        "phone": customer_details['phone'],
-        "email": email,
-        "date": date,
-        "time": time,
-        "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
-        "status": "pending fulfillment",
-        "orderLink": ""
-    }
-    
-    result = order_collection.insert_one(formatted_entry)
-    order_id = str(result.inserted_id)
-    
-    order_collection.update_one(
-        {"_id": result.inserted_id},
-        {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
-    )
-    
-    for item in corrected_orders:
-        inventory_collection.update_one(
-            {"item": item["product"]},
-            {"$inc": {"quantity": -item["quantity"]}}
-        )
-    
-    print('Order added and inventory updated.')
-    send_acknowledgment(formatted_entry)
-    return order_id
+        try:
+            formatted_entry = {
+                "name": customer_details['name'],
+                "phone": customer_details['phone'],
+                "email": email,
+                "date": date,
+                "time": time,
+                "products": [{"name": item["product"], "quantity": item["quantity"]} for item in corrected_orders],
+                "status": "pending fulfillment",
+                "orderLink": ""
+            }
+            
+            result = order_collection.insert_one(formatted_entry)
+            order_id = str(result.inserted_id)
+            
+            order_collection.update_one(
+                {"_id": result.inserted_id},
+                {"$set": {"orderLink": f"http://localhost:3000/track-order/{order_id}"}}
+            )
+            
+            for item in corrected_orders:
+                inventory_collection.update_one(
+                    {"item": item["product"]},
+                    {"$inc": {"quantity": -item["quantity"]}}
+                )
+            
+            print('Order added and inventory updated.')
+            send_acknowledgment(formatted_entry)
+            return order_id
+        except Exception as e:
+            print(f"Error adding order or updating inventory: {e}")
+            handle_exception(e)
+            # If we've gotten this far but failed, try to rollback any inventory changes
+            try:
+                if 'result' in locals() and result and result.inserted_id:
+                    order_collection.delete_one({"_id": result.inserted_id})
+                    print("Rolled back order insertion due to error.")
+            except Exception as rollback_error:
+                print(f"Error during rollback: {rollback_error}")
+                handle_exception(e)
+            return None
+            
+    except Exception as e:
+        print(f"Unexpected error in add_orders_to_collection: {e}")
+        handle_exception(e)
+        return None
+
+def validate_customer_details_ai(email, customer_details):
+    """
+    Use AI to validate if all required customer details are present.
+    Returns a tuple of (is_valid, missing_fields, customer_details)
+    """
+    try:
+        # If customer_details is None, create an empty dict to avoid errors
+        if not customer_details:
+            customer_details = {}
+            
+        prompt = f"""
+        You are an AI assistant validating customer details for an order.
+        Your task is to check if all required customer information is present.
+
+        **Validation Criteria:**
+        - Required fields: name, email, phone, address
+        - Each field should have a non-empty value
+        - If any required field is missing or empty, list it as a missing field
+
+        **Customer Details:**
+        {json.dumps(customer_details, indent=2)}
+
+        **Expected JSON Output (Strict Format, No Explanation):**
+        {{
+            "valid": true/false,
+            "missing_fields": ["field1", "field2"]
+        }}
+        """
+
+        response = gemini_model.generate_content(prompt)
+        ai_response = response.text.strip()
+
+        clean_response = re.sub(r"``````", "", ai_response).strip()
+
+        try:
+            validation_result = json.loads(clean_response)
+            return validation_result.get("valid", False), validation_result.get("missing_fields", []), customer_details
+        except json.JSONDecodeError as e:
+            return False, ["Error validating customer details"], customer_details
+
+    except Exception as e:
+        handle_exception(e)
+        print(f"Error validating customer details: {e}")
+        return False, ["System error while validating customer details"], customer_details
 
 def process_order_details(email, date, time, order_details):
     customer_details = order_details.get("customer", None)
@@ -249,42 +323,70 @@ def process_order_details(email, date, time, order_details):
 
     is_valid, errors = validate_order_details_ai(orders)
     if not is_valid:
-        print("Order details are invalid. Sending issue email.")
-        send_order_issue_email(email, errors)
+        # print("Order details are invalid. Sending issue email.")
+        # send_order_issue_email(email, errors)
         return
 
     existing_customer = get_customer_from_db(email)
     customer_id = None
 
+    # Check if customer exists in database
     if not existing_customer:
-        if customer_details and all(k in customer_details for k in ["name", "email", "phone", "address"]):
-            new_customer = {
-                "name": customer_details["name"],
-                "email": customer_details["email"],
-                "phone": customer_details["phone"],
-                "address": customer_details["address"],
-                "past_orders": [],
-                "created_at": datetime.utcnow()
-            }
-            result = customers_collection.insert_one(new_customer)
-            customer_id = result.inserted_id
-            print("New customer created successfully.")
-        else:
-            print("Incomplete customer details for new customer.")
-            send_order_issue_email(email, [
-                "We could not find your details in our system, and the provided details are incomplete. "
-                "Please provide your name, email, phone, and address to process your order."
-            ])
+        # Validate customer details using AI
+        is_valid, missing_fields, customer_details = validate_customer_details_ai(email, customer_details)
+        
+        if not is_valid:
+            # print(f"Incomplete customer details: {missing_fields}")
+            error_message = [
+                f"We could not find your details in our system, and the following information is missing: {', '.join(missing_fields)}. "
+                f"Please provide your complete details (name, email, phone, and address) to process your order."
+            ]
+            send_order_issue_email(email, error_message)
             return
+        
+        # Create new customer if all details are valid
+        new_customer = {
+            "name": customer_details["name"],
+            "email": customer_details["email"],
+            "phone": customer_details["phone"],
+            "address": customer_details["address"],
+            "past_orders": [],
+            "created_at": datetime.utcnow()
+        }
+        result = customers_collection.insert_one(new_customer)
+        customer_id = result.inserted_id
+        print("New customer created successfully.")
     else:
         customer_id = existing_customer["_id"]
-        if not customer_details or not all(k in customer_details for k in ["name", "email", "phone"]):
+        
+        # If customer exists but some details are missing in the current order
+        if not customer_details:
             customer_details = {
                 "name": existing_customer.get("name", ""),
                 "email": existing_customer.get("email", ""),
                 "phone": existing_customer.get("phone", ""),
                 "address": existing_customer.get("address", "")
             }
+        else:
+            # Validate if the provided customer details are complete
+            is_valid, missing_fields, customer_details = validate_customer_details_ai(email, customer_details)
+            
+            if not is_valid:
+                # Fill in missing fields from existing customer record  
+                for field in missing_fields:
+                    if field in existing_customer and existing_customer[field]:
+                        customer_details[field] = existing_customer[field]
+                
+                # Check if any fields are still missing
+                is_valid, still_missing, _ = validate_customer_details_ai(email, customer_details)
+                if not is_valid:
+                    print(f"Still missing customer details: {still_missing}")
+                    error_message = [
+                        f"Your order is missing the following information: name, phone and address. "
+                        f"Please provide these details to complete your order."
+                    ]
+                    send_order_issue_email(email, error_message)
+                    return
 
     order_id = add_orders_to_collection(email, date, time, customer_details, orders)
     
@@ -337,6 +439,7 @@ def process_order_change(email, date, time, order_details):
         send_order_update_confirmation(email, latest_order=updated_order, previous_order=previous_order)
     
     except Exception as e:
+        handle_exception(e)
         print(f"Error updating order: {e}")
         send_order_issue_email(email, ["An error occurred while updating your order."])
 
@@ -387,6 +490,7 @@ def get_ai_order_updates(previous_order, new_order_details):
             
     except Exception as e:
         print(f"Error in AI order update: {e}")
+        handle_exception(e)
         return merge_orders_fallback(previous_order, new_order_details)
 
 def merge_orders_fallback(previous_order, new_order_details):
@@ -404,3 +508,5 @@ def merge_orders_fallback(previous_order, new_order_details):
             existing_products[product_name] = quantity
 
     return [{"name": name, "quantity": qty} for name, qty in existing_products.items()]
+
+# for push

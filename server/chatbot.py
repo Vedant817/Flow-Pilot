@@ -1,6 +1,8 @@
+# chatbot_app.py
+from flask import Flask, jsonify, request, session
+import uuid
 import os
-import sys
-from datetime import datetime, timezone
+from flask_cors import CORS
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
@@ -104,223 +106,50 @@ def process_pdf(pdf_path):
         return docs
 
     except Exception as e:
-        print("❌ Error processing PDF:", e)
-        return []
+        app.logger.error(f"Error in chatbot endpoint: {str(e)}")
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
 
-def extract_section_title(text):
-    """Extract potential section titles from text chunks"""
-    lines = text.split('\n')
-    for line in lines[:3]:
-        if (len(line.strip()) < 50 and (line.strip().endswith(':') or 
-            line.strip().isupper() or line.strip().istitle())):
-            return line.strip()
-    return "General Content"
-
-def build_records_from_collection(data, collection_name):
-    records = []
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-    for idx, record in enumerate(data):
-        text = str(record)
-        chunks = text_splitter.split_text(text)
-        for chunk_idx, chunk in enumerate(chunks):
-            if not chunk or chunk.strip() == "":
-                continue
-                
-            records.append({
-                "id": f"{collection_name}_{idx}_chunk_{chunk_idx}",
-                "text": chunk,
-                "source": collection_name,
-                "record_type": collection_name,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            })
-    return records
-
-vector_store = Chroma(
-    collection_name="customer",
-    embedding_function=embeddings,
-    persist_directory="./chroma_langchain_db",
-)
-
-def upsert_documents(new_docs):
-    if not vector_store:
-        print("❌ Error: Vector store is not initialized.")
-        return
-
+@app.route('/chat-history', methods=['GET'])
+def get_session_chat_history():
     try:
-        existing_docs = vector_store.get()
-        existing_ids = set(existing_docs["ids"]) if existing_docs and "ids" in existing_docs else set()
-
-        new_filtered_docs = [doc for doc in new_docs if doc.metadata["id"] not in existing_ids]
-
-        if new_filtered_docs:
-            vector_store.add_documents(new_filtered_docs)
-            print(f"✅ Added {len(new_filtered_docs)} new documents to vector store.")
-        else:
-            print("⚠️ No new documents to add.")
-
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({"error": "No active session"}), 400
+            
+        limit = int(request.args.get("limit", 10))
+        
+        history = get_chat_history(session_id, limit)
+        
+        return jsonify({"history": history, "session_id": session_id})
     except Exception as e:
-        print("❌ Error during upsert:", e)
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
 
-def build_documents(records):
-    docs = []
-    for rec in records:
-        metadata = {
-            "id": rec["id"],
-            "source": rec["source"],
-            "record_type": rec.get("record_type", "general"),
-            "timestamp": rec["timestamp"],
-            "priority": "high" if rec["source"] in ["pdf", "app_docs", "technical_docs"] else "normal"
-        }
-        docs.append(Document(
-            page_content=rec["text"],
-            metadata=metadata
-        ))
-    return docs
-
-def refresh_data_and_update_vector_store():
-    customers = load_collection_data(customers_collection)
-    inventory = load_collection_data(inventory_collection)
-    orders = load_collection_data(orders_collection)
-    feedback = load_collection_data(feedback_collection)
-
-    all_records = (
-        build_records_from_collection(customers, "customers") +
-        build_records_from_collection(inventory, "inventory") +
-        build_records_from_collection(orders, "orders") +
-        build_records_from_collection(feedback, "feedback")
-    )
-
-    docs = build_documents(all_records)
-
-    pdf_docs = process_pdf(r"C:\Users\vedan\Downloads\EmailAutomation\server\attachments\User Mannual.pdf")
-    docs.extend(pdf_docs)
-
-    upsert_documents(docs)
-    
-    return vector_store
-
-def extract_keywords(text):
-    stop_words = {'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 
-                    'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about', 'like', 'from'}
-    
-    words = text.lower().split()
-    keywords = [word for word in words if word not in stop_words and len(word) > 2]
-    return keywords
-
-def calculate_metadata_relevance(metadata, query):
-    """Calculate how relevant metadata is to query"""
-    query_lower = query.lower()
-    score = 0
-    
-    if "source" in metadata:
-        if metadata["source"].lower() == "user manual" and ("manual" in query_lower or 
-                                                            "guide" in query_lower or 
-                                                            "help" in query_lower or
-                                                            "how to" in query_lower):
-            score += 0.5
-        elif metadata["source"].lower() == "inventory" and ("inventory" in query_lower or 
-                                                            "stock" in query_lower or 
-                                                            "product" in query_lower):
-            score += 0.5
-        elif metadata["source"].lower() == "orders" and ("order" in query_lower or 
-                                                        "purchase" in query_lower or 
-                                                        "buy" in query_lower):
-            score += 0.5
-    
-    if "section" in metadata and metadata["section"]:
-        section_words = extract_keywords(metadata["section"])
-        query_words = extract_keywords(query)
-        common_words = set(section_words).intersection(set(query_words))
-        if common_words:
-            score += 0.3
-    
-    return score
-
-def retrieve_similar_docs(query, k=15):
-    if vector_store is None:
-        return []
-    
+@app.route('/end-session', methods=['POST'])
+def end_session():
     try:
-        results = vector_store.similarity_search_with_score(query, k=k*2)
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({"error": "No active session"}), 400
         
-        keywords = extract_keywords(query)
+        session.pop('session_id', None)
         
-        reranked_results = []
-        for doc, score in results:
-            keyword_score = sum(1 for keyword in keywords if keyword.lower() in doc.page_content.lower())
-            
-            metadata_score = calculate_metadata_relevance(doc.metadata, query)
-            
-            recency_score = 0
-            if "timestamp" in doc.metadata:
-                try:
-                    doc_time = datetime.fromisoformat(doc.metadata["timestamp"])
-                    time_diff = (datetime.now(timezone.utc) - doc_time).days
-                    recency_score = max(0, 1 - (time_diff / 30))
-                except:
-                    pass
-            
-            final_score = (
-                (1 - score) * 0.5 +
-                keyword_score * 0.2 +
-                metadata_score * 0.2 +
-                recency_score * 0.1
-            )
-            
-            reranked_results.append((doc, final_score))
-        
-        sorted_results = sorted(reranked_results, key=lambda x: x[1], reverse=True)
-        return [doc for doc, _ in sorted_results[:k]]
-    
+        return jsonify({"message": "Session ended"})
     except Exception as e:
-        print(f"❌ Error retrieving similar docs: {e}")
-        return []
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
 
-def ask_bot(query, session_id=None):
-    history_text = ""
-    if session_id:
-        chat_history = get_chat_history(session_id)
-        if chat_history:
-            history_text = "Previous conversation:\n"
-            for entry in reversed(chat_history):
-                history_text += f"User: {entry['query']}\nAssistant: {entry['response']}\n\n"
-    
-    relevant_docs = retrieve_similar_docs(query, k=100)
-    context = "\n\n".join([doc.page_content for doc in relevant_docs])
-    
-    prompt = f"""
-You are an AI assistant with expertise in:
-- **Order Management**
-- **Inventory Tracking**
-- **Product Analytics**
-- **User Manual Navigation**
+@app.route('/refresh-data', methods=['POST'])
+def refresh_data():
+    try:
+        refresh_data_and_update_vector_store()
+        return jsonify({"message": "Data refreshed and vector store updated."})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
 
-Use the **provided context and chat history** to answer the query accurately.
-
-**Chat History:**
-{history_text}
-
-**Context:**
-{context}
-
-**Query:**
-{query}
-
-**Instructions:**
-1. If the context contains relevant **order, inventory, analytics, or PDF** information, answer directly.
-2. If missing details, **explain what additional info is needed**.
-3. **Do not ask the user to check the documentation—assume you are the documentation.**
-4. Reference previous conversations when relevant.
-
-**Answer:**
-"""
-    
-    response = gemini_model.generate_content(prompt)
-    response_text = response.text.strip() if hasattr(response, "text") else ""
-    
-    if response and hasattr(response, "text"):
-        return {"response": response_text}
-    else:
-        return {"error": "Invalid response format from Google Vertex AI"}
-
-refresh_data_and_update_vector_store()
+if __name__ == '__main__':
+    # Initialize the database and vector store on startup
+    # refresh_data_and_update_vector_store()
+    app.run(host='0.0.0.0', port=5002, debug=True)
