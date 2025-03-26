@@ -44,9 +44,4 @@ The **Automatic Order Processing System** provides a centralized dashboard for m
 - **AI-Powered Assistance**: Retrieve order, inventory, and analytics information.  
 - **Instant Responses & Voice Input**: Query data using text or voice commands.  
 - **Chat History & Clear Chat**: Maintain recent interactions for reference.  
-
-## 📜 License  
-This project is licensed under [Your License Name] – see the [LICENSE](LICENSE) file for details.  
-
-## 📞 Contact  
-For queries or contributions, feel free to reach out via [Your Contact Information].  
+ 
