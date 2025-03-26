@@ -159,49 +159,35 @@ def add_orders_to_collection(email, date, time, customer_details, order_details)
             order["product"] for order in corrected_orders if order["product"] not in inventory_items
         ]
 
-        if unknown_products:
-            print('Unknown products found. Order not added.')
-            return None
-        
-        try:
-            order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
-            five_mins_ago = order_datetime - timedelta(minutes=5)
-        except ValueError as e:
-            handle_exception(e)
-            print(f"Error parsing date and time: {e}")
-            return None
+    if unknown_products:
+        print('Unknown products found. Order not added.')
+        return None
+    
+    order_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
+    twenty_four_hours_ago = order_datetime - timedelta(hours=24)
+    yesterday_date = twenty_four_hours_ago.strftime("%Y-%m-%d")
+    yesterday_time = twenty_four_hours_ago.strftime("%H:%M:%S")
 
-        try:
-            existing_order = order_collection.find_one({
-                "email": email,
-                "$and": [
-                    {"date": date},
-                    {
-                        "$or": [
-                            {"time": {"$gte": five_mins_ago.strftime("%H:%M:%S"), 
-                                        "$lte": order_datetime.strftime("%H:%M:%S")}},
-                            {"time": {"$gte": "23:55:00"}} 
-                        ]
-                    }
-                ],
-                "products": {
-                    "$size": len(corrected_orders),
-                    "$all": [
-                        {"$elemMatch": {
-                            "name": item["product"],
-                            "quantity": item["quantity"]
-                        }} for item in corrected_orders
-                    ]
-                }
-            })
+    existing_order = order_collection.find_one({
+    "email": email,
+    "$or": [
+        {"date": date, "time": {"$gte": yesterday_time, "$lte": time}} if date == yesterday_date else {"date": date},
+        {"date": yesterday_date, "time": {"$gte": yesterday_time}} if date != yesterday_date else {}
+    ],
+    "products": {
+        "$size": len(corrected_orders),
+        "$all": [
+            {"$elemMatch": {
+                "name": item["product"],
+                "quantity": item["quantity"]
+            }} for item in corrected_orders
+        ]}
+    })
 
-            if existing_order:
-                send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
-                return None
-        except Exception as e:
-            print(f"Error checking for duplicate order: {e}")
-            handle_exception(e)
-            return None
+    if existing_order:
+        print("Duplicate order detected. Order not added.")
+        send_order_issue_email(email, [" A duplicate order was detected within the last few minutes. Please confirm if this was an accidental duplicate order if you intended to reorder it."])
+        return None
 
         try:
             can_fulfill = check_inventory(order_details=corrected_orders)

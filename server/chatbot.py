@@ -4,50 +4,107 @@ import uuid
 import os
 from flask_cors import CORS
 from dotenv import load_dotenv
-from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
-from error_handle import handle_exception
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_chroma import Chroma
+from langchain.schema import Document
+from google.cloud import aiplatform
+from langchain_google_vertexai import VertexAIEmbeddings
+import pandas as pd
+from config.gemini_config import gemini_model
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from config.dbConfig import db
+import hashlib
+import pickle
 
 load_dotenv()
-app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")
+inventory_collection = db["inventory"]
+feedback_collection = db["feedback"]
+orders_collection = db["orders"]
+customers_collection = db["customers"]
+chat_history_collection = db["chat_history"]
 
-CORS(app, resources={
-    r"/*": {
-        "origins": "*"
-    }
-})
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-@app.before_request
-def before_request():
-    if 'session_id' not in session:
-        session['session_id'] = str(uuid.uuid4())
+PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\vedan\Downloads\EmailAutomation\server\fresh-airfoil-445517-q1-4e804f7d94e2.json"
+aiplatform.init(project=PROJECT_ID, location="us-central1")
+embeddings = VertexAIEmbeddings(model="text-embedding-004", project=PROJECT_ID)
 
-@app.route('/')
-def index():
-    return 'Chatbot Service is Running!', 200
-
-@app.route('/chatbot', methods=['POST'])
-def chat():
+def load_collection_data(collection):
     try:
-        data = request.get_json()
-        if not data or 'query' not in data:
-            return jsonify({"error": "Query parameter is required"}), 400
+        return list(collection.find({}, {"_id": 0}))
+    except Exception as e:
+        print(f"Error loading from collection: {e}")
+        return []
 
-        query = data['query']
+def store_chat_history(session_id, query, response):
+    """Store chat interactions in MongoDB using session ID"""
+    chat_history_collection.insert_one({
+        "session_id": session_id,
+        "query": query,
+        "response": response,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+def get_chat_history(session_id, limit=10):
+    """Retrieve chat history for a specific session"""
+    history = list(chat_history_collection.find(
+        {"session_id": session_id}, 
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(limit))
+    
+    return history
+
+def process_pdf(pdf_path):
+    print("\n📌 Processing PDF:", pdf_path)
+    
+    mod_time = os.path.getmtime(pdf_path)
+    cache_key = f"{pdf_path}_{mod_time}"
+    cache_file = f"pdf_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.pkl"
+    
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'rb') as f:
+                docs = pickle.load(f)
+                print("✅ Loaded PDF from cache.")
+                return docs
+        except Exception as e:
+            print(f"Cache loading failed: {e}")
+
+    try:
+        loader = PyPDFLoader(pdf_path)
+        documents = loader.load()
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=300,
+            chunk_overlap=150,
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],
+            keep_separator=True
+        )
+        pdf_texts = text_splitter.split_documents(documents)
+
+        docs = []
+        for i, doc in enumerate(pdf_texts):
+            metadata = {
+                "id": f"pdf_chunk_{i}",
+                "source": "User Manual",
+                "page": doc.metadata.get("page", 0),
+                "section": extract_section_title(doc.page_content),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "priority": "medium",  # Prioritize manual content
+                "content_type": "documentation"
+            }
+            docs.append(Document(
+                page_content=doc.page_content,
+                metadata=metadata
+            ))
+
+        with open(cache_file, 'wb') as f:
+            pickle.dump(docs, f)
         
-        session_id = session.get('session_id')
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            session['session_id'] = session_id
-        print('Query:', query)
-        print('Session ID:', session_id)
-        response_data = ask_bot(query, session_id)
-        response_text = response_data.get('response', '')
-        
-        if response_text:
-            store_chat_history(session_id, query, response_text)
-        print('Response:', response_text)
-        return jsonify({"response": response_text, "session_id": session_id})
+        print(f"✅ Added {len(docs)} new documents to vector store.")
+        return docs
+
     except Exception as e:
         app.logger.error(f"Error in chatbot endpoint: {str(e)}")
         handle_exception(e)

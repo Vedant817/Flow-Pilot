@@ -1,22 +1,27 @@
 # main.py
 from flask import Flask, jsonify, request, session # type: ignore
+# main.py
+from flask import Flask, jsonify, request, session # type: ignore
 import threading
 import uuid
 import os
-from server.file_monitor import start_monitoring
+from new_file_monitor import start_monitoring
 from config.dbConfig import db
 from feedback.feedback_handle import fetch_feedback, store_feedback
+from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
 from flask_cors import CORS
+from bson import ObjectId
 from bson import ObjectId
 from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
 from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
 from email_config.send_emails import send_invoice
+from email_config.send_emails import send_invoice
 import json
 from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
-from error_handle import handle_exception
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID'
@@ -29,8 +34,13 @@ class JSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 load_dotenv()
+load_dotenv()
 app = Flask(__name__)
 app.json_encoder = JSONEncoder
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+error_collection = db["errors"]
+
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 error_collection = db["errors"]
@@ -53,6 +63,11 @@ def before_request():
     if 'session_id' not in session:
         session['session_id'] = str(uuid.uuid4())
 
+@app.before_request
+def before_request():
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+
 @app.route('/')
 def index():
     return 'File Monitoring is Already Running!', 200
@@ -63,6 +78,76 @@ def get_feedback():
         feedback_data = fetch_feedback()
         response = store_feedback(feedback_data)
         return jsonify(response), 200
+    except Exception as e:
+        handle_exception(e)
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+
+
+#? Chatbot Endpoints
+@app.route('/chatbot', methods=['POST'])
+def chat():
+    try:
+        data = request.get_json()
+        if not data or 'query' not in data:
+            return jsonify({"error": "Query parameter is required"}), 400
+
+        query = data['query']
+        
+        session_id = session.get('session_id')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            session['session_id'] = session_id
+        print('Query:', query)
+        print('Session ID:', session_id)
+        response_data = ask_bot(query, session_id)
+        response_text = response_data.get('response', '')
+        
+        if response_text:
+            store_chat_history(session_id, query, response_text)
+        print('Response:', response_text)
+        return jsonify({"response": response_text, "session_id": session_id})
+    except Exception as e:
+        app.logger.error(f"Error in chatbot endpoint: {str(e)}")
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/chat-history', methods=['GET'])
+def get_session_chat_history():
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({"error": "No active session"}), 400
+            
+        limit = int(request.args.get("limit", 10))
+        
+        history = get_chat_history(session_id, limit)
+        
+        return jsonify({"history": history, "session_id": session_id})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/end-session', methods=['POST'])
+def end_session():
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({"error": "No active session"}), 400
+        
+        session.pop('session_id', None)
+        
+        return jsonify({"message": "Session ended"})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/refresh-data', methods=['POST'])
+def refresh_data():
+    try:
+        refresh_data_and_update_vector_store()
+        return jsonify({"message": "Data refreshed and vector store updated."})
     except Exception as e:
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
@@ -96,11 +181,18 @@ def get_order_info(order_id):
 
     except Exception as e:
         handle_exception(e)
+        handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
 #? Analytics Endpoints
 @app.route('/analytics/deadstocks', methods=['GET'])
 def get_deadstocks():
+    try:
+        deadstock_list = identify_deadstocks()
+        return jsonify(deadstock_list)
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
     try:
         deadstock_list = identify_deadstocks()
         return jsonify(deadstock_list)
@@ -116,6 +208,12 @@ def price_summary():
     except Exception as e:
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
+    try:
+        summary = generate_pricing_suggestions()
+        return jsonify({"Pricing Suggestions": summary})
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/analytics/urgent-restocking', methods=['GET'])
 def urgent_restocking():
@@ -125,7 +223,34 @@ def urgent_restocking():
     except Exception as e:
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
+    try:
+        restocking_data = get_urgent_restocking()
+        return jsonify(restocking_data)
+    except Exception as e:
+        handle_exception(e)
+        return jsonify({"error": str(e)}), 500
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    if isinstance(e, HTTPException):
+        error_data = {
+            "errorMessage": e.description,
+            "type": "Customer",
+            "severity": "Low" if e.code == 400 else "Medium",
+            "timestamp": datetime.utcnow()
+        }
+        error_collection.insert_one(error_data)
+        return jsonify({"error": e.description}), e.code
+
+    error_data = {
+        "errorMessage": str(e),
+        "type": "System",
+        "severity": "Critical",
+        "timestamp": datetime.utcnow()
+    }
+
+    error_collection.insert_one(error_data)
+    return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
 @app.route('/product-analytics', methods=['GET'])
 def get_product_analytics():
@@ -188,6 +313,7 @@ def get_product_analytics():
     except Exception as e:
         print(f"Error in product analytics: {str(e)}")
         handle_exception(e)
+        handle_exception(e)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/customer-analytics', methods=['GET'])
@@ -225,6 +351,18 @@ def get_customer_analytics():
             {"$sort": {"total_spent": -1}},
             {"$limit": 10}
         ]
+            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
+            {"$unwind": "$products"},
+            {"$addFields": {
+                "item_total": {"$multiply": ["$products.price", "$products.quantity"]}
+            }},
+            {"$group": {
+                "_id": "$name", 
+                "total_spent": {"$sum": "$item_total"}
+            }},
+            {"$sort": {"total_spent": -1}},
+            {"$limit": 10}
+        ]
 
         top_spenders = list(orders_collection.aggregate(pipeline_spenders))
         
@@ -247,11 +385,24 @@ def get_customer_analytics():
     except Exception as e:
         print(f"Error in customer analytics: {str(e)}")
         handle_exception(e)
+        handle_exception(e)
         return jsonify({'error': str(e)}), 500
 
 #? CRUD Endpoints
 @app.route('/get-orders', methods=['GET'])
 def get_orders():
+    try:
+        orders_collection = db['orders']
+        orders = list(orders_collection.find({}).sort([('date', -1), ('time', -1)]))  # Sort in descending order of date and time
+        
+        for order in orders:
+            order['_id'] = str(order['_id'])
+            
+        return jsonify(orders), 200
+    except Exception as e:
+        print(f"Error retrieving orders: {str(e)}")
+        handle_exception(e)
+        return jsonify({'error': str(e)}), 500
     try:
         orders_collection = db['orders']
         orders = list(orders_collection.find({}).sort([('date', -1), ('time', -1)]))  # Sort in descending order of date and time
@@ -306,6 +457,47 @@ def handle_status_update():
 
         return jsonify({"success": True, "message": "Order status updated successfully"}), 200
 
+    try:
+        data = request.get_json()
+        order_id = data.get('orderId')
+        new_status = data.get('status')
+
+        if not order_id or not new_status:
+            return jsonify({"error": "Order ID and status are required"}), 400
+
+        try:
+            order_id = ObjectId(order_id)
+        except Exception as e:
+            return jsonify({"error": f"Invalid ObjectId format: {e}"}), 400
+
+        orders_collection = db['orders']
+        existing_order = orders_collection.find_one({"_id": order_id})
+
+        if not existing_order:
+            return jsonify({"error": "Order not found"}), 404
+
+        result = orders_collection.update_one(
+            {"_id": order_id},
+            {"$set": {"status": new_status}}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({"error": "Status not changed (already set or issue with update)"}), 400
+
+        if new_status.lower() == "fulfilled":
+            try:
+                send_invoice(order_id=order_id)
+            except Exception as e:
+                print(f"Error sending invoice: {e}")
+                return jsonify({"error": f"Failed to send invoice: {str(e)}"}), 500
+
+        return jsonify({"success": True, "message": "Order status updated successfully"}), 200
+
+    except Exception as e:
+        print(f"General error: {e}")
+        handle_exception(e)
+        return jsonify({'error': str(e)}), 500
+
     except Exception as e:
         print(f"General error: {e}")
         handle_exception(e)
@@ -324,6 +516,7 @@ def get_inventory():
     except Exception as e:
         print(f"Error retrieving inventory: {str(e)}")
         handle_exception(e)
+        handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
 @app.route('/get-inventory/<item_id>', methods=['GET'])
@@ -339,8 +532,10 @@ def get_inventory_item(item_id):
     except Exception as e:
         print(f"Error retrieving item: {str(e)}")
         handle_exception(e)
+        handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
+app.route('/add-inventory', methods=['POST'])
 app.route('/add-inventory', methods=['POST'])
 def add_inventory():
     try:
@@ -360,6 +555,7 @@ def add_inventory():
         return jsonify(new_item), 201
     except Exception as e:
         print(f"Error adding inventory item: {str(e)}")
+        handle_exception(e)
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
@@ -387,6 +583,7 @@ def update_inventory(item_id):
     except Exception as e:
         print(f"Error updating inventory item: {str(e)}")
         handle_exception(e)
+        handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
 @app.route('/delete-inventory/<item_id>', methods=['DELETE'])
@@ -401,6 +598,7 @@ def delete_inventory(item_id):
         return jsonify({"message": "Item deleted successfully"}), 200
     except Exception as e:
         print(f"Error deleting inventory item: {str(e)}")
+        handle_exception(e)
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
@@ -417,10 +615,16 @@ def create_payment_link(order_id):
 @app.route('/errors', methods=['GET'])
 def get_errors():
     try:
-        errors = list(error_collection.find({}, {'_id': 0}).sort("timestamp", -1))
+        errors = list(error_collection.find({}, {'_id': 0}))
         return {"errors": errors}
     except Exception as e:
         return handle_exception(e)
 
+def scheduled_refresh():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(refresh_data_and_update_vector_store, 'interval', hours=1)
+    scheduler.start()
+
 if __name__ == '__main__':
+    scheduled_refresh()
     app.run(host = '0.0.0.0', debug=True)
