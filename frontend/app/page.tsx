@@ -1,7 +1,6 @@
 "use client"
 import { useRouter } from "next/navigation"
-import { BarChart2, PieChart, ArrowRight, Play, Database } from "lucide-react"
-import { useState, useEffect } from "react"
+import { BarChart2, ArrowRight, Database, Shield, Users, CheckCircle, TrendingUp, Globe, Award, Clock, Target, Cpu, Layers, BookOpen, Settings, AlertTriangle, SendToBack } from "lucide-react"
 
 export default function LandingPage() {
   const router = useRouter()
@@ -10,162 +9,164 @@ export default function LandingPage() {
     router.push(path)
   }
 
-  const [isVisible, setIsVisible] = useState({
-    features: false,
-    dashboard: false,
-    testimonials: false,
-    pricing: false,
-    faq: false,
-  })
-
-  useEffect(() => {
-    const handleScroll = () => {
-      console.log(isVisible)
-      const sections = ["features", "dashboard", "testimonials", "pricing", "faq"]
-
-      sections.forEach((section) => {
-        const element = document.getElementById(section)
-        if (element) {
-          const rect = element.getBoundingClientRect()
-          const isInView = rect.top <= window.innerHeight * 0.75 && rect.bottom >= 0
-
-          setIsVisible((prev) => ({
-            ...prev,
-            [section]: isInView,
-          }))
-        }
-      })
-    }
-
-    window.addEventListener("scroll", handleScroll)
-    handleScroll() // Check on initial load
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-    }
-  }, [])
-
   return (
-    <div className="min-h-screen bg-black text-white overflow-x-hidden">
-      {/* Navigation */}
-      {/* Navigation */}
-      <nav className="flex items-center justify-between p-6 border-b border-gray-800 sticky top-0 z-50 bg-black">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-900 overflow-x-hidden">
+      <nav className="flex items-center justify-between px-6 py-2 bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center">
-          <div className="w-10 h-10 rounded-lg bg-[#00E676] flex items-center justify-center text-black font-bold text-sm">
-            AO
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+            <SendToBack />
           </div>
-          <div className="ml-3">
-            <h2 className="text-white font-bold">Automated Order</h2>
-            <p className="text-gray-400 text-sm">Processing System</p>
+          <div className="ml-4">
+            <h2 className="text-slate-900 font-bold text-xl">Omni Order</h2>
           </div>
         </div>
 
         <div className="hidden md:flex items-center space-x-8">
-          <a href="#features" className="text-gray-300 hover:text-white">
-            Features
+          <a href="#problem" className="text-slate-700 hover:text-blue-600 font-medium transition-colors">
+            Challenge
           </a>
-          <a href="#pricing" className="text-gray-300 hover:text-white">
-            Pricing
+          <a href="#solution" className="text-slate-700 hover:text-blue-600 font-medium transition-colors">
+            Solution
           </a>
-          <a href="#testimonials" className="text-gray-300 hover:text-white">
-            Testimonials
+          <a href="#features" className="text-slate-700 hover:text-blue-600 font-medium transition-colors">
+            Platform
           </a>
-          <a href="#faq" className="text-gray-300 hover:text-white">
-            FAQ
+          <a href="#workflow" className="text-slate-700 hover:text-blue-600 font-medium transition-colors">
+            How It Works
           </a>
         </div>
 
         <div className="flex items-center space-x-4">
-          <button onClick={() => navigateTo("/sign-in")} className="text-white hover:text-[#00E676]">
+          <button onClick={() => navigateTo("/sign-in")} className="text-slate-700 hover:text-blue-600 font-medium transition-colors">
             Sign In
           </button>
           <button
             onClick={() => navigateTo("/sign-up")}
-            className="bg-[#00E676] text-black px-4 py-2 rounded-md font-medium hover:bg-opacity-90"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
           >
-            Get Started
+            Start Now
           </button>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative">
-        <div className="absolute inset-0 opacity-10 overflow-hidden">
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[#00E676] rounded-full filter blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#00E676] rounded-full filter blur-3xl"></div>
-        </div>
-
-        <div className="container mx-auto px-6 py-16 md:py-24 relative z-10">
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="md:w-1/2 mb-12 md:mb-0">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">Automated Order Processing System</h1>
-              <p className="text-xl text-gray-400 mb-8 max-w-lg">
-                Track, manage, and optimize your orders with our powerful dashboard. Get real-time insights and never
-                run out of stock again.
+      <section className="relative overflow-hidden">
+        <div className="container mx-auto px-6 py-6 md:py-12 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center">
+            <div className="lg:w-1/2 mb-16 lg:mb-0">
+              <div className="inline-flex items-center bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+                <Award className="w-4 h-4 mr-2" />
+                Trusted by Global Fortune 500 Companies
+              </div>
+              
+              <h1 className="text-5xl md:text-6xl font-bold mb-8 leading-tight">
+                Transform Your 
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+                  Supply Chain Operations
+                </span>
+              </h1>
+              
+              <p className="text-xl text-slate-600 mb-10 max-w-lg leading-relaxed">
+                Eliminate operational bottlenecks with AI-powered order processing. 
+                Reduce manual errors by 95%, cut processing time by 75%, and achieve 
+                real-time visibility across your entire supply chain ecosystem.
               </p>
-              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+              
+              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-12">
                 <button
                   onClick={() => navigateTo("/sign-up")}
-                  className="bg-[#00E676] text-black px-6 py-3 rounded-md font-medium hover:bg-opacity-90 flex items-center justify-center"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center text-lg"
                 >
-                  Get Started <ArrowRight size={18} className="ml-2" />
+                  Start Now <ArrowRight size={20} className="ml-2" />
                 </button>
-                <button className="border border-gray-700 text-white px-6 py-3 rounded-md font-medium hover:bg-gray-900 flex items-center justify-center">
-                  <Play size={18} className="mr-2" /> Watch Demo
-                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-8 text-sm text-slate-500">
+                <div className="flex items-center">
+                  <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                  SOC 2 Type II Certified
+                </div>
+                <div className="flex items-center">
+                  <Shield className="w-5 h-5 text-blue-500 mr-2" />
+                  Enterprise-Grade Security
+                </div>
+                <div className="flex items-center">
+                  <Clock className="w-5 h-5 text-purple-500 mr-2" />
+                  99.99% Uptime SLA
+                </div>
+                <div className="flex items-center">
+                  <Globe className="w-5 h-5 text-indigo-500 mr-2" />
+                  Global Multi-Region Deployment
+                </div>
               </div>
             </div>
 
-            <div className="md:w-1/2">
-              <div className="bg-gray-900 rounded-lg p-4 shadow-2xl border border-gray-800 transform rotate-1 hover:rotate-0 transition-transform duration-300">
-                <div className="rounded-md shadow-lg overflow-hidden">
-                  <div className="bg-[#111827] p-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-white text-lg font-bold">Inventory Dashboard</h3>
+            <div className="lg:w-1/2">
+              <div className="bg-white rounded-2xl p-8 shadow-2xl border border-slate-200/50 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
+                <div className="rounded-xl shadow-lg overflow-hidden">
+                  <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-white text-xl font-bold">Real-Time Operations Dashboard</h3>
                       <div className="flex space-x-2">
-                        <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-                        <span className="w-3 h-3 bg-yellow-500 rounded-full"></span>
-                        <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                        <span className="w-3 h-3 bg-red-400 rounded-full"></span>
+                        <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
+                        <span className="w-3 h-3 bg-green-400 rounded-full"></span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-3 mb-4">
-                      <div className="bg-black p-3 rounded-md">
-                        <p className="text-gray-400 text-xs">Total Products</p>
-                        <p className="text-white text-xl font-bold">5</p>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-xs mb-1">Orders Processed Today</p>
+                        <p className="text-white text-2xl font-bold">847,293</p>
+                        <p className="text-green-400 text-xs flex items-center mt-1">
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                          +23.4% vs yesterday
+                        </p>
                       </div>
-                      <div className="bg-black p-3 rounded-md">
-                        <p className="text-gray-400 text-xs">Low Stock</p>
-                        <p className="text-red-500 text-xl font-bold">1</p>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-xs mb-1">Processing Time Avg</p>
+                        <p className="text-white text-2xl font-bold">2.3s</p>
+                        <p className="text-green-400 text-xs flex items-center mt-1">
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                          -45% improvement
+                        </p>
                       </div>
-                      <div className="bg-black p-3 rounded-md">
-                        <p className="text-gray-400 text-xs">Total Value</p>
-                        <p className="text-[#00E676] text-xl font-bold">$109,095</p>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-xs mb-1">Accuracy Rate</p>
+                        <p className="text-white text-2xl font-bold">99.97%</p>
+                        <p className="text-blue-400 text-xs">Target: 99.5%</p>
                       </div>
-                      <div className="bg-black p-3 rounded-md">
-                        <p className="text-gray-400 text-xs">Categories</p>
-                        <p className="text-white text-xl font-bold">4</p>
+                      <div className="bg-slate-700 p-4 rounded-lg">
+                        <p className="text-slate-400 text-xs mb-1">Cost Savings</p>
+                        <p className="text-white text-2xl font-bold">$2.8M</p>
+                        <p className="text-green-400 text-xs">This quarter</p>
                       </div>
                     </div>
-                    <div className="bg-black rounded-md p-2">
-                      <div className="grid grid-cols-7 gap-2 text-gray-400 text-xs p-2">
-                        <div>ID</div>
-                        <div>Name</div>
-                        <div>Category</div>
-                        <div>Price</div>
-                        <div>Qty</div>
-                        <div>Supplier</div>
-                        <div>Actions</div>
+                    
+                    <div className="bg-slate-700 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <p className="text-slate-300 text-sm font-medium">Active Processing Streams</p>
+                        <span className="text-green-400 text-xs bg-green-400/10 px-2 py-1 rounded">Live</span>
                       </div>
-                      <div className="grid grid-cols-7 gap-2 text-white text-sm p-2 border-t border-gray-800">
-                        <div>PROD001</div>
-                        <div>Premium Laptop</div>
-                        <div>Electronics</div>
-                        <div>$1299.99</div>
-                        <div className="text-green-500">50</div>
-                        <div>TechCorp</div>
-                        <div className="flex space-x-1">
-                          <span className="w-6 h-6 bg-[#00E676] rounded-full flex items-center justify-center text-black">
-                            ✓
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-300">Email Processing Pipeline</span>
+                          <span className="text-green-400 flex items-center">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
+                            Active
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-300">AI Classification Engine</span>
+                          <span className="text-blue-400 flex items-center">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+                            Processing
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-300">ERP Integration Layer</span>
+                          <span className="text-green-400 flex items-center">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
+                            Synced
                           </span>
                         </div>
                       </div>
@@ -178,602 +179,516 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="bg-gray-900 py-12">
+      <section className="bg-gradient-to-r from-blue-600 to-indigo-600 py-16">
         <div className="container mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-white mb-4">Powering Enterprise Operations Globally</h2>
+            <p className="text-blue-100 text-lg">Real impact across industries and geographies</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
             <div>
-              <p className="text-[#00E676] text-4xl font-bold mb-2">500+</p>
-              <p className="text-gray-400">Retailers Trust Us</p>
+              <p className="text-4xl md:text-5xl font-bold mb-2">$50B+</p>
+              <p className="text-blue-100 text-lg">Orders Processed Annually</p>
             </div>
             <div>
-              <p className="text-[#00E676] text-4xl font-bold mb-2">99.9%</p>
-              <p className="text-gray-400">Uptime Guaranteed</p>
+              <p className="text-4xl md:text-5xl font-bold mb-2">2.4s</p>
+              <p className="text-blue-100 text-lg">Average Processing Time</p>
             </div>
             <div>
-              <p className="text-[#00E676] text-4xl font-bold mb-2">$10M+</p>
-              <p className="text-gray-400">Inventory Managed Daily</p>
+              <p className="text-4xl md:text-5xl font-bold mb-2">99.97%</p>
+              <p className="text-blue-100 text-lg">Accuracy Rate</p>
+            </div>
+            <div>
+              <p className="text-4xl md:text-5xl font-bold mb-2">150+</p>
+              <p className="text-blue-100 text-lg">Countries Deployed</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-16 md:py-24">
+      <section id="problem" className="py-16 bg-white">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Features</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Our Automated Order Processing System is packed with features designed to help electronics retailers
-              optimize their operations.
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
+              The Enterprise Order Management Challenge
+            </h2>
+            <p className="text-xl text-slate-600 max-w-4xl mx-auto leading-relaxed">
+              Modern enterprises process millions of orders across multiple channels, systems, and formats. 
+              Traditional manual processes create bottlenecks, errors, and missed opportunities.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-              <div className="w-12 h-12 bg-green-900 rounded-lg flex items-center justify-center mb-4">
-                <BarChart2 className="text-[#00E676]" size={24} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+              <div className="flex items-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-500 mr-3" />
+                <h3 className="text-xl font-bold text-slate-900">Manual Processing Bottlenecks</h3>
               </div>
-              <h3 className="text-xl font-bold mb-2">Real-time Tracking</h3>
-              <p className="text-gray-400">
-                Monitor stock levels and get alerts when inventory runs low.
-                Never miss a sales opportunity again.
+              <p className="text-slate-600 leading-relaxed">
+                Teams spend 60-80% of their time on manual data entry, order verification, 
+                and system updates, leading to delays and human errors.
               </p>
             </div>
 
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-              <div className="w-12 h-12 bg-green-900 rounded-lg flex items-center justify-center mb-4">
-                <Database className="text-[#00E676]" size={24} />
+            <div className="bg-orange-50 border-l-4 border-orange-500 p-6 rounded-lg">
+              <div className="flex items-center mb-4">
+                <Target className="w-8 h-8 text-orange-500 mr-3" />
+                <h3 className="text-xl font-bold text-slate-900">Fragmented Systems</h3>
               </div>
-              <h3 className="text-xl font-bold mb-2">Centralized Management</h3>
-              <p className="text-gray-400">
-                Manage all your electronics inventory from a single dashboard
-                with powerful filtering and search.
+              <p className="text-slate-600 leading-relaxed">
+                Orders arrive through emails, portals, EDI, and APIs, requiring manual 
+                routing and translation between incompatible systems.
               </p>
             </div>
 
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-              <div className="w-12 h-12 bg-green-900 rounded-lg flex items-center justify-center mb-4">
-                <PieChart className="text-[#00E676]" size={24} />
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg">
+              <div className="flex items-center mb-4">
+                <TrendingUp className="w-8 h-8 text-yellow-600 mr-3" />
+                <h3 className="text-xl font-bold text-slate-900">Lack of Real-Time Visibility</h3>
               </div>
-              <h3 className="text-xl font-bold mb-2">Smart Analytics</h3>
-              <p className="text-gray-400">
-                Gain insights with powerful reporting and forecasting tools to
-                make data-driven decisions.
+              <p className="text-slate-600 leading-relaxed">
+                Without unified dashboards, enterprises lose visibility into order status, 
+                performance metrics, and operational bottlenecks.
               </p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Dashboard Preview Section */}
-      <section className="py-16 bg-gradient-to-b from-black to-gray-900">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Dashboard</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Everything you need to manage your inventory efficiently in one place.
-            </p>
-          </div>
-
-          <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 shadow-xl max-w-5xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-black p-4 rounded-lg">
-                <h3 className="text-gray-400 text-sm mb-1">Total Products</h3>
-                <p className="text-white text-2xl font-bold">5</p>
-              </div>
-              <div className="bg-black p-4 rounded-lg">
-                <h3 className="text-gray-400 text-sm mb-1">Low Stock Items</h3>
-                <p className="text-red-500 text-2xl font-bold">1</p>
-              </div>
-              <div className="bg-black p-4 rounded-lg">
-                <h3 className="text-gray-400 text-sm mb-1">Total Value</h3>
-                <p className="text-[#00E676] text-2xl font-bold">$109,095.87</p>
-              </div>
-              <div className="bg-black p-4 rounded-lg">
-                <h3 className="text-gray-400 text-sm mb-1">Categories</h3>
-                <p className="text-white text-2xl font-bold">4</p>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mb-4">
-              <button className="bg-[#00E676] text-black px-4 py-2 rounded-md flex items-center">
-                <span className="mr-1">+</span> Add Product
-              </button>
-              <button className="bg-gray-800 text-white px-4 py-2 rounded-md">Forecasting</button>
-              <button className="bg-gray-800 text-white px-4 py-2 rounded-md">Price Adjustment</button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-black rounded-lg">
-                <thead>
-                  <tr className="border-b border-gray-800">
-                    <th className="py-3 px-4 text-left text-gray-400">Product ID</th>
-                    <th className="py-3 px-4 text-left text-gray-400">Name</th>
-                    <th className="py-3 px-4 text-left text-gray-400">Category</th>
-                    <th className="py-3 px-4 text-left text-gray-400">Price</th>
-                    <th className="py-3 px-4 text-left text-gray-400">Quantity</th>
-                    <th className="py-3 px-4 text-left text-gray-400">Supplier</th>
-                    <th className="py-3 px-4 text-left text-gray-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-800">
-                    <td className="py-3 px-4 text-white">PROD001</td>
-                    <td className="py-3 px-4 text-white">Premium Laptop</td>
-                    <td className="py-3 px-4 text-white">Electronics</td>
-                    <td className="py-3 px-4 text-white">$1299.99</td>
-                    <td className="py-3 px-4 text-green-500">50</td>
-                    <td className="py-3 px-4 text-white">TechCorp</td>
-                    <td className="py-3 px-4">
-                      <div className="flex space-x-2">
-                        <button className="w-8 h-8 bg-[#00E676] rounded-full flex items-center justify-center text-black">
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-gray-800">
-                    <td className="py-3 px-4 text-white">PROD003</td>
-                    <td className="py-3 px-4 text-white">Smart Watch</td>
-                    <td className="py-3 px-4 text-white">Wearables</td>
-                    <td className="py-3 px-4 text-white">$299.99</td>
-                    <td className="py-3 px-4 text-red-500">8</td>
-                    <td className="py-3 px-4 text-white">TechCorp</td>
-                    <td className="py-3 px-4">
-                      <div className="flex space-x-2">
-                        <button className="w-8 h-8 bg-[#00E676] rounded-full flex items-center justify-center text-black">
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section id="testimonials" className="py-16 bg-black">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Customers Say</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Don&apos;t just take our word for it. Here&apos;s what electronics retailers have to say about our
-              automated order processing system.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-              <div className="flex text-[#00E676] mb-4">★★★★★</div>
-              <p className="text-gray-300 mb-6">
-                &quot;The automated order processing system has transformed our operations. We&apos;ve reduced stockouts
-                by 75% and improved cash flow significantly.&quot;
-              </p>
-              <div className="flex items-center">
-                {/* <Image
-                  src="https://randomuser.me/api/portraits/men/32.jpg" 
-                  alt="Alex Johnson" 
-                  className="w-10 h-10 rounded-full object-cover"
-                  width={40}
-                  height={40}
-                /> */}
-                <div className="ml-3">
-                  <p className="font-medium">Alex Johnson</p>
-                  <p className="text-gray-500 text-sm">TechWorld Electronics</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-              <div className="flex text-[#00E676] mb-4">★★★★★</div>
-              <p className="text-gray-300 mb-6">
-                &quot;The analytics features alone are worth the investment. We can now predict trends and stock
-                accordingly. Game changer!&quot;
-              </p>
-              <div className="flex items-center">
-                {/* <Image 
-                  src="https://randomuser.me/api/portraits/women/44.jpg" 
-                  alt="Sarah Williams" 
-                  className="w-10 h-10 rounded-full object-cover"
-                  height={40}
-                  width={40}
-                /> */}
-                <div className="ml-3">
-                  <p className="font-medium">Sarah Williams</p>
-                  <p className="text-gray-500 text-sm">Gadget Galaxy</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
-              <div className="flex text-[#00E676] mb-4">★★★★★</div>
-              <p className="text-gray-300 mb-6">
-                &quot;Implementation was smooth and the customer support is exceptional. Our inventory accuracy has
-                improved from 85% to 99%.&quot;
-              </p>
-              <div className="flex items-center">
-                {/* <Image 
-                  src="https://randomuser.me/api/portraits/men/75.jpg" 
-                  alt="Michael Chen" 
-                  className="w-10 h-10 rounded-full object-cover"
-                  height={40}
-                  width={40}
-                /> */}
-                <div className="ml-3">
-                  <p className="font-medium">Michael Chen</p>
-                  <p className="text-gray-500 text-sm">ElectroMart</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-16 md:py-24 bg-gray-900">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Choose the plan that fits your manufacturing needs. All plans include our core features.
-            </p>
-
-            <div className="flex justify-center mt-6">
-              <div className="bg-black p-1 rounded-full inline-flex">
-                <button className="px-4 py-2 rounded-full bg-[#00E676] text-black">Monthly</button>
-                <button className="px-4 py-2 rounded-full text-gray-400">Annual (Save 20%)</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Free Plan */}
-            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:border-[#00E676]">
-              <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Free Plan</h3>
-                <p className="text-4xl font-bold mb-2">
-                  $0<span className="text-gray-500 text-lg">/mo</span>
-                </p>
-                <p className="text-[#00E676] mb-6">Up to 1k Requests</p>
-
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Up to 1,000 requests per month</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Basic dashboard</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Community support</span>
-                  </li>
-                  <li className="flex items-center text-gray-500">
-                    <span className="text-gray-500 mr-2">✗</span>
-                    <span>API access</span>
-                  </li>
-                </ul>
-
-                <button className="w-full border border-[#00E676] text-[#00E676] py-2 rounded-md hover:bg-[#00E676] hover:text-black transition-colors">
-                  Sign Up Free
-                </button>
-              </div>
-            </div>
-
-            {/* Small Scale Manufacturers */}
-            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:border-[#00E676]">
-              <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Small Scale Manufacturers</h3>
-                <p className="text-4xl font-bold mb-2">
-                  $125<span className="text-gray-500 text-lg">/mo</span>
-                </p>
-                <p className="text-[#00E676] mb-6">Under 10k Requests</p>
-
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Up to 10,000 requests per month</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Basic analytics</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Email support</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>API access</span>
-                  </li>
-                </ul>
-
-                <button className="w-full border border-[#00E676] text-[#00E676] py-2 rounded-md hover:bg-[#00E676] hover:text-black transition-colors">
-                  Get Started
-                </button>
-              </div>
-            </div>
-
-            {/* Medium Scale Manufacturers */}
-            <div className="bg-black rounded-lg border border-[#00E676] overflow-hidden relative transform transition-all duration-300 hover:scale-105">
-              <div className="absolute top-0 right-0 bg-[#00E676] text-black text-xs font-bold px-3 py-1">
-                MOST POPULAR
-              </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Medium Scale Manufacturers</h3>
-                <p className="text-4xl font-bold mb-2">
-                  $1,500<span className="text-gray-500 text-lg">/mo</span>
-                </p>
-                <p className="text-[#00E676] mb-6">Around 100k Requests</p>
-
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Up to 100,000 requests per month</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Advanced analytics</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Priority support</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Advanced integrations</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Dedicated account manager</span>
-                  </li>
-                </ul>
-
-                <button className="w-full bg-[#00E676] text-black py-2 rounded-md font-medium hover:bg-opacity-90 transition-colors">
-                  Get Started
-                </button>
-              </div>
-            </div>
-
-            {/* Large Scale Manufacturers */}
-            <div className="bg-black rounded-lg border border-gray-800 overflow-hidden transform transition-all duration-300 hover:scale-105 hover:border-[#00E676]">
-              <div className="p-6">
-                <h3 className="text-xl font-bold mb-4">Large Scale Manufacturers</h3>
-                <p className="text-4xl font-bold mb-2">Custom</p>
-                <p className="text-[#00E676] mb-6">100k+ Requests</p>
-
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Unlimited requests</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Custom analytics</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>24/7 dedicated support</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Enterprise-grade integrations</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-[#00E676] mr-2">✓</span>
-                    <span>Custom implementation</span>
-                  </li>
-                </ul>
-
-                <button className="w-full border border-[#00E676] text-[#00E676] py-2 rounded-md hover:bg-[#00E676] hover:text-black transition-colors">
-                  Contact Sales
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Request Calculator */}
-          <div className="mt-16 bg-black p-6 rounded-lg border border-gray-800 max-w-2xl mx-auto">
-            <h3 className="text-xl font-bold mb-4 text-center">Request Calculator</h3>
-            <p className="text-gray-400 mb-6 text-center">
-              Estimate your monthly requests and find the right plan for you
-            </p>
-
-            <div className="mb-6">
-              <label className="block text-gray-400 mb-2">Monthly Requests</label>
-              <input
-                type="range"
-                min="500"
-                max="150000"
-                step="500"
-                defaultValue="1000"
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                id="requestSlider"
-                onChange={(e) => {
-                  const value = Number.parseInt(e.target.value) || 0; // Default to 0 if parsing fails
-                  const requestValueElement = document.getElementById("requestValue");
-                  if (requestValueElement) {
-                    requestValueElement.textContent = value.toLocaleString();
-                  }
-
-                  let planName = "";
-                  let price = "";
-
-                  if (value <= 1000) {
-                    planName = "Free Plan"
-                    price = "$0/month"
-                  } else if (value < 10000) {
-                    planName = "Small Scale"
-                    price = "$125/month"
-                  } else if (value < 100000) {
-                    planName = "Medium Scale"
-                    price = "$1,500/month"
-                  } else {
-                    planName = "Large Scale"
-                    price = "Custom Pricing"
-                  const recommendedPlanElement = document.getElementById("recommendedPlan");
-                  const planPriceElement = document.getElementById("planPrice");
-
-                  if (recommendedPlanElement && planPriceElement) {
-                    recommendedPlanElement.textContent = planName;
-                    planPriceElement.textContent = price;
-                  }
-                }}}
-              />
-                  </div>
-            <div className="text-center mb-6">
-              <p className="text-gray-400">
-                Estimated monthly requests:{" "}
-                <span id="requestValue" className="text-white font-bold">
-                  10,000
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-gray-900 p-4 rounded-lg text-center">
-              <p className="text-gray-400 mb-2">Recommended Plan</p>
-              <p className="text-2xl font-bold mb-1">
-                <span id="recommendedPlan">Small Scale</span>
-              </p>
-              <p className="text-[#00E676] text-xl font-bold">
-                <span id="planPrice">$125/month</span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-16 bg-black">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Find answers to common questions about our inventory management system.
-            </p>
-          </div>
-
-          <div className="max-w-3xl mx-auto">
-            <FaqItem
-              question="How secure is my inventory data?"
-              answer="Your data is encrypted both in transit and at rest. We use industry-standard security protocols and regularly perform security audits to ensure your information is protected."
-            />
-
-            <FaqItem
-              question="Can I integrate with my existing POS system?"
-              answer="Yes, our system offers API integration with most popular POS systems. Our Pro and Enterprise plans include dedicated support for custom integrations."
-            />
-
-            <FaqItem
-              question="Do you offer mobile access?"
-              answer="Yes, our platform is fully responsive and works on all devices. We also offer dedicated mobile apps for iOS and Android for on-the-go inventory management."
-            />
-
-            <FaqItem
-              question="How does the request-based pricing work?"
-              answer="Our pricing is based on the number of API requests your system makes to our platform each month. This includes inventory checks, updates, and any other interactions with our API."
-            />
-
-            <FaqItem
-              question="Can I upgrade or downgrade my plan?"
-              answer="Yes, you can change your plan at any time. If you upgrade mid-month, we'll prorate the difference. If you downgrade, the new rate will apply at the start of your next billing cycle."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16 bg-gradient-to-r from-black to-gray-900">
-        <div className="container mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Transform Your Order Processing?</h2>
-          <p className="text-gray-400 max-w-2xl mx-auto mb-8">
-            Join 500+ retailers already saving time and money with Automated Order Processing System.
-          </p>
-          <button
-            onClick={() => navigateTo("/sign-up")}
-            className="bg-[#00E676] text-black px-8 py-4 rounded-md font-bold text-lg hover:bg-opacity-90"
-          >
-            Start Free Trial
-          </button>
-          <p className="text-gray-500 mt-4">No credit card required. 14-day free trial.</p>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-black py-12 border-t border-gray-800">
-        <div className="container mx-auto px-6">
-          <div className="flex flex-col items-center justify-center">
-            <div className="flex space-x-6 mb-6">
-              <a href="#features" className="text-gray-400 hover:text-white">
-                Features
-              </a>
-              <a href="#pricing" className="text-gray-400 hover:text-white">
-                Pricing
-              </a>
-              <a href="#testimonials" className="text-gray-400 hover:text-white">
-                Testimonials
-              </a>
-              <a href="#faq" className="text-gray-400 hover:text-white">
-                FAQ
-              </a>
-            </div>
+          <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl p-8">
             <div className="text-center">
-              <p className="text-gray-500 text-sm">© 2025 Automated Order Processing System. All rights reserved.</p>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">The Cost of Inefficiency</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                  <p className="text-3xl font-bold text-red-600 mb-2">40%</p>
+                  <p className="text-slate-700">Increase in processing costs due to manual workflows</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-red-600 mb-2">25%</p>
+                  <p className="text-slate-700">Revenue loss from delayed order fulfillment</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-red-600 mb-2">15%</p>
+                  <p className="text-slate-700">Error rate in manual order processing</p>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="solution" className="py-16 bg-gradient-to-br from-slate-100 to-blue-50">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
+              The Omni Order Solution
+            </h2>
+            <p className="text-xl text-slate-600 max-w-4xl mx-auto leading-relaxed">
+              A comprehensive AI-powered platform that unifies, automates, and optimizes 
+              your entire order management ecosystem from capture to fulfillment.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
+            <div>
+              <h3 className="text-3xl font-bold mb-6 text-slate-900">Intelligent Order Capture & Classification</h3>
+              <div className="space-y-4">
+                <div className="flex items-start">
+                  <CheckCircle className="w-6 h-6 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-slate-900">Multi-Channel Integration</h4>
+                    <p className="text-slate-600">Automatically capture orders from emails, EDI, APIs, web portals, and mobile apps</p>
+                  </div>
+                </div>
+                <div className="flex items-start">
+                  <CheckCircle className="w-6 h-6 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-slate-900">AI-Powered Classification</h4>
+                    <p className="text-slate-600">Machine learning algorithms automatically categorize and route orders based on content, priority, and business rules</p>
+                  </div>
+                </div>
+                <div className="flex items-start">
+                  <CheckCircle className="w-6 h-6 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-slate-900">Real-Time Validation</h4>
+                    <p className="text-slate-600">Instant verification against inventory, pricing, and customer data with automated exception handling</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-xl">
+              <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg p-6 text-white">
+                <h4 className="text-lg font-bold mb-4">Order Processing Pipeline</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
+                    <span>Email Orders</span>
+                    <span className="bg-green-400 text-green-900 px-2 py-1 rounded text-xs font-bold">1,247 today</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
+                    <span>EDI Integration</span>
+                    <span className="bg-blue-400 text-blue-900 px-2 py-1 rounded text-xs font-bold">523 today</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
+                    <span>API Endpoints</span>
+                    <span className="bg-purple-400 text-purple-900 px-2 py-1 rounded text-xs font-bold">892 today</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="bg-white rounded-2xl p-6 shadow-xl order-2 lg:order-1">
+              <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg p-6 text-white">
+                <h4 className="text-lg font-bold mb-4">System Integration Hub</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <Database className="w-6 h-6 mx-auto mb-2" />
+                    <span className="text-sm">ERP Systems</span>
+                  </div>
+                  <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <Layers className="w-6 h-6 mx-auto mb-2" />
+                    <span className="text-sm">CRM Platforms</span>
+                  </div>
+                  <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <Settings className="w-6 h-6 mx-auto mb-2" />
+                    <span className="text-sm">WMS Solutions</span>
+                  </div>
+                  <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <Globe className="w-6 h-6 mx-auto mb-2" />
+                    <span className="text-sm">E-commerce</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2">
+              <h3 className="text-3xl font-bold mb-6 text-slate-900">Seamless Enterprise Integration</h3>
+              <div className="space-y-4">
+                <div className="flex items-start">
+                  <CheckCircle className="w-6 h-6 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-slate-900">Universal API Connectivity</h4>
+                    <p className="text-slate-600">Connect with 500+ enterprise systems including SAP, Oracle, Salesforce, and custom applications</p>
+                  </div>
+                </div>
+                <div className="flex items-start">
+                  <CheckCircle className="w-6 h-6 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-slate-900">Real-Time Data Synchronization</h4>
+                    <p className="text-slate-600">Bi-directional sync ensures all systems maintain consistent, up-to-date information</p>
+                  </div>
+                </div>
+                <div className="flex items-start">
+                  <CheckCircle className="w-6 h-6 text-green-500 mr-3 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-slate-900">Legacy System Support</h4>
+                    <p className="text-slate-600">Work with existing infrastructure without requiring expensive system replacements</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="py-16 bg-white">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
+              Enterprise-Grade Platform Capabilities
+            </h2>
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
+              Built for scale, security, and performance. Our platform delivers the reliability 
+              and features that enterprise operations demand.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-2xl border border-blue-100 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-6 shadow-lg">
+                <Cpu className="text-white" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900">AI-Powered Automation</h3>
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Advanced machine learning algorithms automatically process, validate, and route orders 
+                with 99.97% accuracy, eliminating manual intervention.
+              </p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Natural language processing for email orders</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Intelligent data extraction and validation</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Predictive analytics for demand forecasting</li>
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-8 rounded-2xl border border-green-100 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-6 shadow-lg">
+                <Shield className="text-white" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900">Enterprise Security & Compliance</h3>
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Bank-grade security with comprehensive compliance frameworks to protect 
+                sensitive business data and meet regulatory requirements.
+              </p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />SOC 2 Type II certification</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />End-to-end encryption (AES-256)</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />GDPR, HIPAA, PCI DSS compliance</li>
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-8 rounded-2xl border border-purple-100 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-6 shadow-lg">
+                <Globe className="text-white" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900">Global Scale & Performance</h3>
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Multi-region deployment with auto-scaling infrastructure that handles 
+                peak loads while maintaining sub-second response times.
+              </p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />99.99% uptime SLA guarantee</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Auto-scaling to 1M+ orders/minute</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />150+ global data centers</li>
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-8 rounded-2xl border border-orange-100 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mb-6 shadow-lg">
+                <BarChart2 className="text-white" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900">Advanced Analytics & Insights</h3>
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Real-time dashboards and predictive analytics provide actionable insights 
+                for strategic decision-making and operational optimization.
+              </p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Real-time performance monitoring</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Custom KPI tracking and alerts</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Predictive demand analytics</li>
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 p-8 rounded-2xl border border-cyan-100 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center mb-6 shadow-lg">
+                <Database className="text-white" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900">Universal Integration Hub</h3>
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Connect seamlessly with existing enterprise systems through pre-built 
+                connectors and flexible API frameworks.
+              </p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />500+ pre-built integrations</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />RESTful APIs and webhooks</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Legacy system support</li>
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-pink-50 to-rose-50 p-8 rounded-2xl border border-pink-100 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl flex items-center justify-center mb-6 shadow-lg">
+                <Users className="text-white" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900">Enterprise Support & Success</h3>
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Dedicated customer success teams and priority support channels ensure 
+                seamless implementation and ongoing optimization.
+              </p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />24/7 dedicated support team</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Customer success manager</li>
+                <li className="flex items-center"><CheckCircle className="w-4 h-4 text-green-500 mr-2" />Implementation consulting</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow" className="py-20 bg-gradient-to-br from-slate-100 to-blue-50">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
+              How Omni Order Transforms Your Operations
+            </h2>
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+              From order capture to fulfillment - see how our platform streamlines 
+              your entire order management workflow.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 relative">
+              <div className="absolute -top-4 left-6">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">1</div>
+              </div>
+              <div className="pt-6">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                  <BookOpen className="text-blue-600" size={24} />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-slate-900">Intelligent Capture</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Orders automatically captured from emails, EDI, APIs, and portals. 
+                  AI extracts and validates all relevant data points.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 relative">
+              <div className="absolute -top-4 left-6">
+                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">2</div>
+              </div>
+              <div className="pt-6">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                  <Cpu className="text-green-600" size={24} />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-slate-900">Smart Processing</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Machine learning algorithms classify, prioritize, and route orders 
+                  based on business rules and historical patterns.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 relative">
+              <div className="absolute -top-4 left-6">
+                <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold">3</div>
+              </div>
+              <div className="pt-6">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <Settings className="text-purple-600" size={24} />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-slate-900">System Integration</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Seamless integration with ERP, CRM, and WMS systems ensures 
+                  data consistency across all platforms.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 relative">
+              <div className="absolute -top-4 left-6">
+                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold">4</div>
+              </div>
+              <div className="pt-6">
+                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
+                  <TrendingUp className="text-indigo-600" size={24} />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-slate-900">Real-Time Tracking</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Complete visibility into order status, performance metrics, 
+                  and operational insights through unified dashboards.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="benefits" className="py-16 bg-white">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
+              Measurable Business Impact
+            </h2>
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+              Enterprise customers consistently achieve significant improvements 
+              in efficiency, accuracy, and cost reduction.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">75%</span>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-900">Faster Processing Time</h3>
+              <p className="text-slate-600">
+                Reduce order processing time from hours to minutes with automated workflows 
+                and intelligent routing.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">95%</span>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-900">Error Reduction</h3>
+              <p className="text-slate-600">
+                Eliminate manual data entry errors with AI-powered validation 
+                and automated quality checks.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">40%</span>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-900">Cost Savings</h3>
+              <p className="text-slate-600">
+                Lower operational costs through automation, reduced headcount needs, 
+                and improved efficiency.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">24/7</span>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-900">Continuous Operations</h3>
+              <p className="text-slate-600">
+                Process orders around the clock without human intervention, 
+                ensuring global coverage and faster response times.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">99.9%</span>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-900">System Reliability</h3>
+              <p className="text-slate-600">
+                Enterprise-grade infrastructure ensures consistent performance 
+                and minimal downtime for business-critical operations.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-teal-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">100%</span>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-900">Visibility & Control</h3>
+              <p className="text-slate-600">
+                Complete transparency into order status, performance metrics, 
+                and business intelligence across all operations.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="bg-slate-900 text-white py-12">
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center mb-6 md:mb-0">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold mr-3">
+                <SendToBack />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Omni Order</h3>
+                <p className="text-slate-400 text-sm">Enterprise Solution</p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-8 text-slate-400">
+              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+              <a href="#" className="hover:text-white transition-colors">Security</a>
+              <a href="#" className="hover:text-white transition-colors">Contact</a>
+            </div>
+          </div>
+          
+          <div className="border-t border-slate-700 mt-8 pt-8 text-center text-slate-400">
+            <p>&copy; 2025 Omni Order. All rights reserved. Built for enterprise excellence.</p>
           </div>
         </div>
       </footer>
     </div>
   )
-interface FaqItemProps {
-  question: string;
-  answer: string;
-}
-
-function FaqItem({ question, answer }: FaqItemProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="mb-6 border border-gray-800 rounded-lg overflow-hidden">
-      <div
-        className="bg-gray-900 p-4 flex justify-between items-center cursor-pointer"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <h3 className="font-medium">{question}</h3>
-        <span className="text-[#00E676]">{isOpen ? "−" : "+"}</span>
-      </div>
-      <div className={`overflow-hidden transition-all duration-300 ${isOpen ? "max-h-40" : "max-h-0"}`}>
-        <div className="p-4 bg-black">
-          <p className="text-gray-400">{answer}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 }
