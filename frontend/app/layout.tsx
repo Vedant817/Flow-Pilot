@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Automated Order Processing System",
-  description: "A seamless way to automate your orders using emails",
+  title: "Omni-Order",
+  description: "Omni-Order is a comprehensive inventory & order management system that helps you manage your inventory in real-time.",
 };
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0A0A0A] text-white h-screen overflow-hidden`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900 h-screen overflow-hidden`}
         >
           <div className="h-full flex">
             {children}
