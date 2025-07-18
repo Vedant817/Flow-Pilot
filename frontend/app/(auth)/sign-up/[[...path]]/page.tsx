@@ -17,7 +17,7 @@ export default function SignUpPage() {
                 <SendToBack size={28} />
               </div>
             </div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-4">Omni Order</h1>
+            <h1 className="text-4xl font-bold text-slate-900 mb-4">Flow-Pilot</h1>
             <p className="text-xl text-slate-600">Create your account</p>
           </div>
         </div>

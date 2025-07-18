@@ -17,7 +17,7 @@ export default function LandingPage() {
             <SendToBack />
           </div>
           <div className="ml-4">
-            <h2 className="text-slate-900 font-bold text-xl">Omni Order</h2>
+            <h2 className="text-slate-900 font-bold text-xl">Flow-Pilot</h2>
           </div>
         </div>
 
@@ -279,7 +279,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
-              The Omni Order Solution
+              The Flow-Pilot Solution
             </h2>
             <p className="text-xl text-slate-600 max-w-4xl mx-auto leading-relaxed">
               A comprehensive AI-powered platform that unifies, automates, and optimizes 
@@ -505,7 +505,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">
-              How Omni Order Transforms Your Operations
+              How Flow-Pilot Transforms Your Operations
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
               From order capture to fulfillment - see how our platform streamlines 
@@ -671,7 +671,7 @@ export default function LandingPage() {
                 <SendToBack />
               </div>
               <div>
-                <h3 className="font-bold text-lg">Omni Order</h3>
+                <h3 className="font-bold text-lg">Flow-Pilot</h3>
                 <p className="text-slate-400 text-sm">Enterprise Solution</p>
               </div>
             </div>
@@ -685,7 +685,7 @@ export default function LandingPage() {
           </div>
           
           <div className="border-t border-slate-700 mt-8 pt-8 text-center text-slate-400">
-            <p>&copy; 2025 Omni Order. All rights reserved. Built for enterprise excellence.</p>
+            <p>&copy; 2025 Flow-Pilot. All rights reserved. Built for enterprise excellence.</p>
           </div>
         </div>
       </footer>

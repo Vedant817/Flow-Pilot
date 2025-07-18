@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Omni-Order",
-  description: "Omni-Order is a comprehensive inventory & order management system that helps you manage your inventory in real-time.",
+  title: "Flow-Pilot",
+  description: "Flow-Pilot is a comprehensive inventory & order management system that helps you manage your inventory in real-time.",
 };
 
 export default function RootLayout({
