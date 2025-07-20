@@ -1,10 +1,30 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 import { useState, useCallback, useMemo, memo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, BarChart2, IndianRupee, Package, Edit, Trash2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { 
+  Search, 
+  Plus, 
+  BarChart2, 
+  IndianRupee, 
+  Package, 
+  Edit, 
+  Trash2, 
+  RefreshCw, 
+  ChevronLeft, 
+  ChevronRight,
+  TrendingUp,
+  AlertTriangle,
+  Warehouse,
+  Tag,
+  DollarSign,
+  Filter,
+  Download,
+} from 'lucide-react'
 import axios from 'axios'
 import AddProductPopup from '@/components/AddProductDialog'
 import EditProductPopup from '@/components/EditProductDialog'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface InventoryItem {
   _id: string;
@@ -16,28 +36,12 @@ interface InventoryItem {
   stock_alert_level: number;
 }
 
-const TableHeader = memo(() => (
-  <thead className="bg-[#1A1A1A] sticky top-0">
-    <tr>
-      <th className="px-4 py-3 text-left">Serial No.</th>
-      <th className="px-4 py-3 text-left">Name</th>
-      <th className="px-4 py-3 text-left">Category</th>
-      <th className="px-4 py-3 text-left">Price</th>
-      <th className="px-4 py-3 text-left">Quantity</th>
-      <th className="px-4 py-3 text-left">Stock Alert Level</th>
-      <th className="px-4 py-3 text-left">Warehouse</th>
-      <th className="px-4 py-3 text-left">Actions</th>
-    </tr>
-  </thead>
-));
-TableHeader.displayName = 'TableHeader';
-
 interface ActionButtonProps {
   label: string;
   icon?: React.ReactNode;
   onClick?: () => void;
-  primary?: boolean;
-  danger?: boolean;
+  variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 interface InventoryRowProps {
@@ -53,16 +57,25 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
 }
 
-const ActionButton = memo(({ label, icon, onClick, primary, danger }: ActionButtonProps) => {
-  const baseClasses = "flex items-center gap-1 px-4 py-2 rounded-lg transition-colors duration-200";
-  let colorClasses = "bg-[#1A1A1A] text-white hover:bg-[#00E676] hover:text-black";
-  if (primary) colorClasses = "bg-[#00E676] text-black hover:bg-[#00ff84]";
-  if (danger) colorClasses = "bg-[#1A1A1A] text-white hover:bg-[#ff3333] hover:text-white";
+const ActionButton = memo(({ label, icon, onClick, variant = 'secondary', size = 'md' }: ActionButtonProps) => {
+  const baseClasses = "inline-flex items-center gap-2 font-medium transition-all duration-200 rounded-lg";
+  
+  let sizeClasses = "px-4 py-2 text-sm";
+  if (size === 'sm') sizeClasses = "px-3 py-1.5 text-xs";
+  if (size === 'lg') sizeClasses = "px-6 py-3 text-base";
+  
+  let variantClasses = "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow-md";
+  if (variant === 'primary') {
+    variantClasses = "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl";
+  }
+  if (variant === 'danger') {
+    variantClasses = "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 hover:border-red-300";
+  }
 
   return (
     <button
       onClick={onClick}
-      className={`${baseClasses} ${colorClasses}`}
+      className={`${baseClasses} ${sizeClasses} ${variantClasses}`}
     >
       {icon && <span className="w-4 h-4">{icon}</span>}
       {label}
@@ -71,34 +84,112 @@ const ActionButton = memo(({ label, icon, onClick, primary, danger }: ActionButt
 });
 ActionButton.displayName = 'ActionButton';
 
-const InventoryRow = memo(({ item, index, onEdit, onDelete }: InventoryRowProps) => {
+const StatsCard = memo(({ title, value, subtitle, icon, color, trend }: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+  color: string;
+  trend?: { value: string; positive: boolean };
+}) => (
+  <Card className="bg-white border border-slate-200 hover:shadow-lg transition-shadow">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-600">{title}</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{value}</p>
+          {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+          {trend && (
+            <div className={`flex items-center gap-1 mt-2 text-xs ${
+              trend.positive ? 'text-emerald-600' : 'text-red-600'
+            }`}>
+              <TrendingUp className={`w-3 h-3 ${trend.positive ? '' : 'rotate-180'}`} />
+              {trend.value}
+            </div>
+          )}
+        </div>
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
+          {icon}
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+));
+StatsCard.displayName = 'StatsCard';
+
+const InventoryRow = memo(({ item, onEdit, onDelete }: InventoryRowProps) => {
   const handleEdit = useCallback(() => onEdit(item._id), [item._id, onEdit]);
   const handleDelete = useCallback(() => onDelete(item._id), [item._id, onDelete]);
 
   const isLowStock = item.quantity <= item.stock_alert_level;
 
   return (
-    <tr className="border-b border-[#333] hover:bg-[#1A1A1A] transition-colors">
-      <td className="px-4 py-3">{index + 1}</td>
-      <td className="px-4 py-3">{item.name}</td>
-      <td className="px-4 py-3">{item.category}</td>
-      <td className="px-4 py-3">Rs.{item.price.toFixed(2)}</td>
-      <td className="px-4 py-3">
-        <span className={`${isLowStock ? 'text-red-500' : 'text-[#00E676]'} font-medium`}>
-          {item.quantity}
-        </span>
-      </td>
-      <td className="px-4 py-3">{item.stock_alert_level}</td>
-      <td className="px-4 py-3">{item.warehouse_location}</td>
-      <td className="px-4 py-3 flex gap-2">
-        <button onClick={handleEdit} className="bg-[#00E676] text-black px-3 py-1 rounded-lg hover:bg-[#00C864] transition-colors">
-          <Edit size={16} />
-        </button>
-        <button onClick={handleDelete} className="bg-[#1A1A1A] text-white px-3 py-1 rounded-lg hover:bg-[#ff3333] transition-colors">
-          <Trash2 size={16} />
-        </button>
-      </td>
-    </tr>
+    <Card className="bg-white border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+                  <Package className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900">{item.name}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Tag className="w-3 h-3 text-slate-400" />
+                    <p className="text-sm text-slate-500">{item.category}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-green-600" />
+              <div>
+                <p className="text-sm font-medium text-slate-600">Price</p>
+                <p className="font-bold text-slate-900">₹{item.price.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-slate-600">Stock</p>
+              <div className="flex items-center gap-2">
+                <p className={`text-lg font-bold ${isLowStock ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {item.quantity}
+                </p>
+                {isLowStock && <AlertTriangle className="w-4 h-4 text-red-500" />}
+              </div>
+              <p className="text-xs text-slate-500">Alert: {item.stock_alert_level}</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Warehouse className="w-4 h-4 text-purple-600" />
+              <div>
+                <p className="text-sm font-medium text-slate-600">Location</p>
+                <p className="text-sm text-slate-900">{item.warehouse_location}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={handleEdit}
+                className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center"
+                title="Edit Product"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleDelete}
+                className="w-8 h-8 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center"
+                title="Delete Product"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 });
 InventoryRow.displayName = 'InventoryRow';
@@ -154,17 +245,27 @@ const Pagination = memo(({ currentPage, totalPages, onPageChange }: PaginationPr
   return (
     <div className="flex gap-2 items-center">
       <button
-        className={`px-3 py-1 rounded flex items-center ${currentPage === 1 ? 'bg-[#1A1A1A] opacity-50 cursor-not-allowed' : 'bg-[#1A1A1A] hover:bg-[#252525]'}`}
+        className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+          currentPage === 1 
+            ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+        }`}
         onClick={handlePrevious}
         disabled={currentPage === 1}
       >
-        <ChevronLeft size={16} />
+        <ChevronLeft className="w-4 h-4" />
       </button>
 
       {pageNumbers.map((page, index) => (
         <button
           key={index}
-          className={`px-3 py-1 rounded ${page === currentPage ? 'bg-[#00E676] text-black' : page === '...' ? 'bg-transparent cursor-default' : 'bg-[#1A1A1A] hover:bg-[#252525]'}`}
+          className={`w-10 h-10 rounded-lg transition-colors ${
+            page === currentPage 
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+              : page === '...' 
+                ? 'bg-transparent cursor-default text-slate-400' 
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
           onClick={() => typeof page === 'number' && onPageChange(page)}
           disabled={page === '...'}
         >
@@ -173,11 +274,15 @@ const Pagination = memo(({ currentPage, totalPages, onPageChange }: PaginationPr
       ))}
 
       <button
-        className={`px-3 py-1 rounded flex items-center ${currentPage === totalPages ? 'bg-[#1A1A1A] opacity-50 cursor-not-allowed' : 'bg-[#1A1A1A] hover:bg-[#252525]'}`}
+        className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+          currentPage === totalPages 
+            ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+        }`}
         onClick={handleNext}
         disabled={currentPage === totalPages}
       >
-        <ChevronRight size={16} />
+        <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
@@ -194,12 +299,12 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 8;
 
   const fetchInventoryData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get<InventoryItem[]>(`${process.env.NEXT_PUBLIC_API_URL}/get-inventory`);
+      const response = await axios.get<InventoryItem[]>(`${process.env.NEXT_PUBLIC_API_URL}/inventory`);
       setInventoryData(response.data);
       setError('');
     } catch (err) {
@@ -209,12 +314,11 @@ export default function InventoryPage() {
       } else {
         console.error('Unexpected error:', err);
         setError(`An unexpected error occurred.`);
-        console.log(error);
       }
     } finally {
       setLoading(false);
     }
-  }, [error]);
+  }, []);
 
   useEffect(() => {
     fetchInventoryData();
@@ -244,6 +348,19 @@ export default function InventoryPage() {
   const totalPages = useMemo(() => {
     return Math.ceil(filteredInventory.length / itemsPerPage);
   }, [filteredInventory, itemsPerPage]);
+
+  const stats = useMemo(() => {
+    const totalValue = inventoryData.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const lowStockItems = inventoryData.filter(item => item.quantity <= item.stock_alert_level);
+    const categories = new Set(inventoryData.map(item => item.category)).size;
+    
+    return {
+      totalProducts: inventoryData.length,
+      lowStock: lowStockItems.length,
+      totalValue,
+      categories
+    };
+  }, [inventoryData]);
 
   const handlePageChange = useCallback((pageNumber: number) => {
     setCurrentPage(pageNumber);
@@ -292,123 +409,158 @@ export default function InventoryPage() {
     router.push('/inventory/deadstock');
   }, [router]);
 
-  return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white p-6 w-full flex flex-col">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-semibold">Inventory Management</h1>
-        <div className="flex gap-3">
-          <ActionButton
-            label="Refresh"
-            onClick={fetchInventoryData}
-            icon={<RefreshCw size={18} />}
-          />
-          <ActionButton
-            label="Add Product"
-            primary
-            onClick={handleAddProduct}
-            icon={<Plus size={18} />}
-          />
-          <ActionButton
-            label="Forecasting"
-            onClick={navigateToForecasting}
-            icon={<BarChart2 size={18} />}
-          />
-          <ActionButton
-            label="Price Adjustment"
-            onClick={navigateToPriceAdjustment}
-            icon={<IndianRupee size={18} />}
-          />
-          <ActionButton
-            label="DeadStock"
-            onClick={navigateToDeadStock}
-            icon={<Package size={18} />}
-          />
-        </div>
-      </div>
-
-      <div className="mb-6 relative">
-        <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search products by name, category or warehouse..."
-          value={searchQuery}
-          onChange={handleSearchChange}
-          className="w-full max-w-md pl-10 px-4 py-2 rounded-lg bg-[#1A1A1A] border border-[#333] focus:outline-none focus:border-[#00E676]"
-        />
-      </div>
-
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#1A1A1A] p-4 rounded-lg">
-          <h3 className="text-gray-400 mb-1">Total Products</h3>
-          <p className="text-2xl font-bold">{inventoryData.length}</p>
-        </div>
-        <div className="bg-[#1A1A1A] p-4 rounded-lg">
-          <h3 className="text-gray-400 mb-1">Low Stock Items</h3>
-          <p className="text-2xl font-bold text-red-500">
-            {inventoryData.filter(item => item.quantity <= item.stock_alert_level).length}
-          </p>
-        </div>
-        <div className="bg-[#1A1A1A] p-4 rounded-lg">
-          <h3 className="text-gray-400 mb-1">Total Value</h3>
-          <p className="text-2xl font-bold text-[#00E676]">
-            Rs. {inventoryData.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}
-          </p>
-        </div>
-        <div className="bg-[#1A1A1A] p-4 rounded-lg">
-          <h3 className="text-gray-400 mb-1">Categories</h3>
-          <p className="text-2xl font-bold">
-            {new Set(inventoryData.map(item => item.category)).size}
-          </p>
-        </div>
-      </div>
-
-      <div className="overflow-auto flex-1 rounded-lg border border-[#333]">
-        <table className="w-full">
-          <TableHeader />
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center">
-                  <div className="flex justify-center items-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#00E676]"></div>
-                    <span className="ml-2">Loading inventory data...</span>
-                  </div>
-                </td>
-              </tr>
-            ) : paginatedInventory.length > 0 ? (
-              paginatedInventory.map((item, index) => (
-                <InventoryRow
-                  key={item._id}
-                  index={(currentPage - 1) * itemsPerPage + index}
-                  item={item}
-                  onEdit={handleEditProduct}
-                  onDelete={handleDeleteProduct}
-                />
-              ))
-            ) : (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                  No products found matching your search criteria
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-
-      {filteredInventory.length > 0 && (
-        <div className="mt-4 flex justify-between items-center">
-          <div className="text-gray-400">
-            Showing {Math.min(itemsPerPage, paginatedInventory.length)} of {filteredInventory.length} products
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <Card className="p-12 text-center max-w-md w-full mx-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <Package className="w-8 h-8 text-white animate-pulse" />
           </div>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Loading Inventory</h2>
+          <p className="text-slate-600">Fetching your product data...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Inventory Management</h1>
+              <p className="text-slate-600 mt-1">Manage your products, stock levels, and warehouse locations</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <ActionButton
+                label="Refresh"
+                onClick={fetchInventoryData}
+                icon={<RefreshCw className="w-4 h-4" />}
+              />
+              <ActionButton
+                label="Add Product"
+                variant="primary"
+                onClick={handleAddProduct}
+                icon={<Plus className="w-4 h-4" />}
+              />
+              <ActionButton
+                label="Forecasting"
+                onClick={navigateToForecasting}
+                icon={<BarChart2 className="w-4 h-4" />}
+              />
+              <ActionButton
+                label="Price Adjustment"
+                onClick={navigateToPriceAdjustment}
+                icon={<IndianRupee className="w-4 h-4" />}
+              />
+              <ActionButton
+                label="Dead Stock"
+                onClick={navigateToDeadStock}
+                icon={<Package className="w-4 h-4" />}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
+          <StatsCard
+            title="Total Products"
+            value={stats.totalProducts}
+            icon={<Package className="w-6 h-6 text-white" />}
+            color="bg-gradient-to-br from-blue-500 to-blue-600"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={stats.lowStock}
+            subtitle="Requires attention"
+            icon={<AlertTriangle className="w-6 h-6 text-white" />}
+            color="bg-gradient-to-br from-red-500 to-red-600"
+          />
+          <StatsCard
+            title="Total Value"
+            value={`₹${stats.totalValue.toLocaleString()}`}
+            icon={<DollarSign className="w-6 h-6 text-white" />}
+            color="bg-gradient-to-br from-green-500 to-green-600"
+          />
+          <StatsCard
+            title="Categories"
+            value={stats.categories}
+            subtitle="Product types"
+            icon={<Tag className="w-6 h-6 text-white" />}
+            color="bg-gradient-to-br from-purple-500 to-purple-600"
           />
         </div>
-      )}
+
+        <Card className="mb-4">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search products by name, category, or warehouse location..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-2 mb-4">
+          {paginatedInventory.length > 0 ? (
+            paginatedInventory.map((item, index) => (
+              <InventoryRow
+                key={item._id}
+                index={(currentPage - 1) * itemsPerPage + index}
+                item={item}
+                onEdit={handleEditProduct}
+                onDelete={handleDeleteProduct}
+              />
+            ))
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Package className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">No Products Found</h3>
+                <p className="text-slate-600 mb-6">
+                  {searchQuery ? 'No products match your search criteria' : 'Get started by adding your first product'}
+                </p>
+                <ActionButton
+                  label="Add Product"
+                  variant="primary"
+                  onClick={handleAddProduct}
+                  icon={<Plus className="w-4 h-4" />}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {filteredInventory.length > 0 && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-sm text-slate-600">
+                  Showing {Math.min(itemsPerPage, paginatedInventory.length)} of {filteredInventory.length} products
+                </div>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       <AddProductPopup
         isOpen={isAddProductOpen}
         onClose={() => setIsAddProductOpen(false)}
