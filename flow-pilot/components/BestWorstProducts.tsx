@@ -1,21 +1,21 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { Chart, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { ProductSalesData } from '@/lib/types/analytics';
 
 Chart.register(...registerables);
 
 interface BestWorstProductsProps {
-  data: ProductSalesData;
+  data: any;
 }
 
 export default function BestWorstProducts({ data }: BestWorstProductsProps) {
   const bestSellingData = {
-    labels: data.bestSelling.map(item => item.name),
+    labels: data.bestSelling.map((item: any) => item.name),
     datasets: [
       {
         label: 'Units Sold',
-        data: data.bestSelling.map(item => item.quantity),
+        data: data.bestSelling.map((item: any) => item.quantity),
         backgroundColor: 'rgba(16, 185, 129, 0.8)',
         borderColor: 'rgba(16, 185, 129, 1)',
         borderWidth: 1,
@@ -24,11 +24,11 @@ export default function BestWorstProducts({ data }: BestWorstProductsProps) {
   };
 
   const worstSellingData = {
-    labels: data.worstSelling.map(item => item.name),
+    labels: data.worstSelling.map((item: any) => item.name),
     datasets: [
       {
         label: 'Units Sold',
-        data: data.worstSelling.map(item => item.quantity),
+        data: data.worstSelling.map((item: any) => item.quantity),
         backgroundColor: 'rgba(239, 68, 68, 0.8)',
         borderColor: 'rgba(239, 68, 68, 1)',
         borderWidth: 1,

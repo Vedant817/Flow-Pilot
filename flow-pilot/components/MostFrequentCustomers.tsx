@@ -1,12 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { Chart, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { FrequentCustomerData } from '@/lib/types/analytics';
 
 Chart.register(...registerables);
 
 interface MostFrequentCustomersProps {
-  data: FrequentCustomerData;
+  data: any;
 }
 
 export default function MostFrequentCustomers({ data }: MostFrequentCustomersProps) {

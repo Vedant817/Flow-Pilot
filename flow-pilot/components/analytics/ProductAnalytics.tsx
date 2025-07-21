@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from 'react';
 import BestWorstProducts from '../BestWorstProducts';
 import RevenuePerDay from '../RevenuePerDay';
 import CustomerFeedback from '../CustomerFeedback';
-import { AnalyticsData } from '@/lib/types/analytics';
 
 export interface CustomerFeedbackItem {
   name: string;
@@ -21,7 +21,7 @@ interface Feedback {
 }
 
 export default function ProductDashboard() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<any | null>(null);
   const [feedbackData, setFeedbackData] = useState<CustomerFeedbackItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export default function ProductDashboard() {
         if (!analyticsResponse.ok) {
           throw new Error(`HTTP error! Status: ${analyticsResponse.status}`);
         }
-        const analyticsData = await analyticsResponse.json() as AnalyticsData;
+        const analyticsData = await analyticsResponse.json() as any;
         setData(analyticsData);
         
         // Fetch feedback data

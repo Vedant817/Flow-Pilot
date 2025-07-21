@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Inventory } from "@/models/Inventory";
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const id = await params.id;
+        const { id } = await params;
         const inventory = await Inventory.findById(id);
         return NextResponse.json(inventory);
     } catch (error) {
@@ -12,11 +12,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const id = await params.id;
+        const { id } = await params;
 
-        if(!id){
+        if (!id) {
             return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
         }
 
@@ -29,11 +29,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const id = await params.id;
+        const { id } = await params;
 
-        if(!id){
+        if (!id) {
             return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
         }
 
