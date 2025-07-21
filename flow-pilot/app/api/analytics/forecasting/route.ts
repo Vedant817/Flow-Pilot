@@ -1,9 +1,15 @@
+
 import { NextResponse } from "next/server";
 import { Order } from "@/models/Order";
 import { Inventory } from "@/models/Inventory";
 import dbConnect from "@/lib/mongodb";
 
-// Type definitions for database models
+// Enhanced Type definitions
+interface Product {
+    name: string;
+    quantity: number;
+}
+
 interface OrderDocument {
     _id: string;
     name: string;
@@ -17,18 +23,17 @@ interface OrderDocument {
 }
 
 interface InventoryDocument {
-    _id: string;
+    _id:string;
     name: string;
     category: string;
     quantity: number;
     price: number;
     stock_alert_level: number;
     warehouse_location: string;
-}
-
-interface Product {
-    name: string;
-    quantity: number;
+    // Enterprise-level parameters
+    supplier_lead_time_days?: number;
+    supplier_reliability_score?: number; // 0 to 1
+    product_lifecycle_stage?: 'new' | 'growth' | 'maturity' | 'decline';
 }
 
 interface SalesData {
@@ -37,28 +42,22 @@ interface SalesData {
         orderCount: number;
         averagePerOrder: number;
         lastOrderDate: Date;
-        salesTrend: number[];
+        salesTrend: number[]; // Daily sales for the analysis period
     };
 }
 
-interface InventoryWithAnalytics {
-    _id: string;
-    name: string;
-    category: string;
-    quantity: number;
-    price: number;
-    stock_alert_level: number;
-    warehouse_location: string;
+interface InventoryWithAnalytics extends InventoryDocument {
     dailySalesVelocity: number;
     weeklySalesVelocity: number;
     monthlySalesVelocity: number;
     averageOrderSize: number;
     daysUntilStockout: number;
     reorderPoint: number;
+    safetyStock: number;
     economicOrderQuantity: number;
-    seasonalityFactor: number;
-    demandVariability: number;
-    forecastAccuracy: number;
+    demandVariability: number; // Coefficient of variation
+    forecastedDemand: number;
+    confidenceScore: number;
 }
 
 interface ForecastingResult {
@@ -67,13 +66,13 @@ interface ForecastingResult {
     recommended_stock: number;
     urgency_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
     days_until_stockout: number;
+    projected_stockout_date: string;
     expected_daily_demand: number;
     reorder_point: number;
     economic_order_quantity: number;
     cost_impact: number;
     confidence_score: number;
     trend_direction: 'INCREASING' | 'STABLE' | 'DECREASING';
-    seasonality_factor: number;
     reasons: string[];
     recommendations: string[];
 }
@@ -85,37 +84,67 @@ interface AnalyticsResponse {
         critical_items: number;
         high_priority_items: number;
         total_estimated_cost: number;
-        confidence_score: number;
+        average_confidence_score: number;
     };
     generated_at: string;
     next_analysis_recommended: string;
 }
 
-class InventoryAnalytics {
+class AdvancedInventoryAnalytics {
     private salesData: SalesData = {};
     private inventoryData: InventoryWithAnalytics[] = [];
-    private readonly DAYS_TO_ANALYZE = 30;
-    private readonly LEAD_TIME_DAYS = 7;
-    private readonly SERVICE_LEVEL = 0.95;
-    private readonly Z_SCORE_95 = 1.645;
+    private readonly DAYS_TO_ANALYZE = 90; // Extended for better trend analysis
+    private readonly DEFAULT_LEAD_TIME_DAYS = 7;
+    private readonly SERVICE_LEVEL = 0.95; // 95% service level
+    private readonly Z_SCORE_95 = 1.645; // Z-score for 95% confidence
 
     constructor() {}
 
-    private calculateMovingAverage(sales: number[], periods: number): number {
-        if (sales.length < periods) return sales.reduce((a, b) => a + b, 0) / sales.length;
-        const recent = sales.slice(-periods);
-        return recent.reduce((a, b) => a + b, 0) / periods;
+    private seasonalTrendSmoothing(data: number[], seasonalPeriod: number, alpha: number, beta: number, gamma: number): { forecast: number[], trend: 'INCREASING' | 'STABLE' | 'DECREASING' } {
+        if (data.length < seasonalPeriod) {
+            const simpleAvg = data.reduce((a, b) => a + b, 0) / data.length || 0;
+            const direction = this.calculateTrend(data).direction;
+            return { forecast: new Array(data.length).fill(simpleAvg), trend: direction };
+        }
+
+        let level = data.slice(0, seasonalPeriod).reduce((a, b) => a + b, 0) / seasonalPeriod;
+        let trend = (data[seasonalPeriod - 1] - data[0]) / (seasonalPeriod - 1) || 0;
+        const seasonal = new Array(seasonalPeriod).fill(0).map((_, i) => data[i] - level);
+        
+        const forecast: number[] = [];
+        for (let i = 0; i < data.length; i++) {
+            if (i < seasonalPeriod) {
+                forecast.push(data[i]);
+                continue;
+            }
+            
+            const lastLevel = level;
+            const lastTrend = trend;
+            
+            level = alpha * (data[i] - seasonal[i % seasonalPeriod]) + (1 - alpha) * (lastLevel + lastTrend);
+            trend = beta * (level - lastLevel) + (1 - beta) * lastTrend;
+            seasonal[i % seasonalPeriod] = gamma * (data[i] - level) + (1 - gamma) * seasonal[i % seasonalPeriod];
+            
+            const nextForecast = level + trend + seasonal[(i + 1) % seasonalPeriod];
+            forecast.push(Math.max(0, nextForecast));
+        }
+
+        const overallTrendDirection = this.calculateTrend(forecast.slice(-30)).direction; // Trend over the last 30 days
+
+        return { forecast, trend: overallTrendDirection };
     }
 
-    private calculateExponentialSmoothing(sales: number[], alpha: number = 0.3): number {
-        if (sales.length === 0) return 0;
-        if (sales.length === 1) return sales[0];
-        
-        let forecast = sales[0];
-        for (let i = 1; i < sales.length; i++) {
-            forecast = alpha * sales[i] + (1 - alpha) * forecast;
+    // More sophisticated forecasting using weighted moving average
+    private weightedMovingAverage(data: number[], weights: number[]): number {
+        if (data.length === 0 || weights.length === 0) return 0;
+        const recentData = data.slice(-weights.length);
+        let weightedSum = 0;
+        let weightSum = 0;
+        for (let i = 0; i < recentData.length; i++) {
+            weightedSum += recentData[i] * weights[i];
+            weightSum += weights[i];
         }
-        return forecast;
+        return weightSum > 0 ? weightedSum / weightSum : 0;
     }
 
     private calculateTrend(sales: number[]): { slope: number; direction: 'INCREASING' | 'STABLE' | 'DECREASING' } {
@@ -134,42 +163,23 @@ class InventoryAnalytics {
         const slope = denominator === 0 ? 0 : numerator / denominator;
         
         let direction: 'INCREASING' | 'STABLE' | 'DECREASING' = 'STABLE';
-        if (slope > 0.1) direction = 'INCREASING';
-        else if (slope < -0.1) direction = 'DECREASING';
+        if (slope > 0.15) direction = 'INCREASING'; // Higher threshold for significance
+        else if (slope < -0.15) direction = 'DECREASING';
         
         return { slope, direction };
     }
 
-    private calculateSeasonality(sales: number[]): number {
-        if (sales.length < 7) return 1;
-        
-        const weeklyAverages: number[] = [];
-        for (let i = 0; i < sales.length; i += 7) {
-            const week = sales.slice(i, i + 7);
-            if (week.length > 0) {
-                weeklyAverages.push(week.reduce((a, b) => a + b) / week.length);
-            }
-        }
-        
-        if (weeklyAverages.length < 2) return 1;
-        
-        const overallAverage = weeklyAverages.reduce((a, b) => a + b) / weeklyAverages.length;
-        const variance = weeklyAverages.reduce((sum, avg) => sum + Math.pow(avg - overallAverage, 2), 0) / weeklyAverages.length;
-        const coefficient = Math.sqrt(variance) / overallAverage;
-        
-        return Math.max(1, 1 + coefficient);
-    }
-
-    private calculateEOQ(annualDemand: number, orderCost: number, holdingCost: number): number {
-        if (annualDemand <= 0 || orderCost <= 0 || holdingCost <= 0) return 0;
-        return Math.sqrt((2 * annualDemand * orderCost) / holdingCost);
-    }
-
-    private calculateStandardDeviation(sales: number[]): number {
-        if (sales.length < 2) return 0;
-        const mean = sales.reduce((a, b) => a + b) / sales.length;
-        const variance = sales.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / sales.length;
+    private calculateStandardDeviation(values: number[]): number {
+        if (values.length < 2) return 0;
+        const mean = values.reduce((a, b) => a + b) / values.length;
+        const variance = values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / (values.length - 1); // Use sample stdev
         return Math.sqrt(variance);
+    }
+
+    private calculateEOQ(annualDemand: number, orderCost: number, holdingCostRate: number, itemPrice: number): number {
+        if (annualDemand <= 0 || orderCost <= 0 || holdingCostRate <= 0 || itemPrice <= 0) return 0;
+        const holdingCost = itemPrice * holdingCostRate;
+        return Math.sqrt((2 * annualDemand * orderCost) / holdingCost);
     }
 
     private async processSalesData(orders: OrderDocument[]): Promise<void> {
@@ -179,229 +189,214 @@ class InventoryAnalytics {
             const orderDate = new Date(order.date).toISOString().split('T')[0];
             if (!salesByDay[orderDate]) salesByDay[orderDate] = {};
             
-            order.products.forEach((product: Product) => {
+            order.products.forEach(product => {
                 const productName = product.name;
-                if (!salesByDay[orderDate][productName]) {
-                    salesByDay[orderDate][productName] = 0;
-                }
-                salesByDay[orderDate][productName] += product.quantity;
+                salesByDay[orderDate][productName] = (salesByDay[orderDate][productName] || 0) + product.quantity;
                 
                 if (!this.salesData[productName]) {
                     this.salesData[productName] = {
                         totalSold: 0,
                         orderCount: 0,
                         averagePerOrder: 0,
-                        lastOrderDate: new Date(order.date),
+                        lastOrderDate: new Date(0),
                         salesTrend: []
                     };
                 }
                 
                 this.salesData[productName].totalSold += product.quantity;
                 this.salesData[productName].orderCount += 1;
-                this.salesData[productName].lastOrderDate = new Date(order.date);
+                if (new Date(order.date) > this.salesData[productName].lastOrderDate) {
+                    this.salesData[productName].lastOrderDate = new Date(order.date);
+                }
             });
         });
 
         const endDate = new Date();
-        const startDate = new Date(endDate.getTime() - (this.DAYS_TO_ANALYZE * 24 * 60 * 60 * 1000));
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - this.DAYS_TO_ANALYZE);
         
-        Object.keys(this.salesData).forEach(productName => {
+        const allProductNames = Object.keys(this.salesData);
+
+        for (const productName of allProductNames) {
             const dailySales: number[] = [];
-            
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().split('T')[0];
                 dailySales.push(salesByDay[dateStr]?.[productName] || 0);
             }
-            
             this.salesData[productName].salesTrend = dailySales;
-            this.salesData[productName].averagePerOrder = 
-                this.salesData[productName].orderCount > 0 
-                    ? this.salesData[productName].totalSold / this.salesData[productName].orderCount 
-                    : 0;
-        });
+            this.salesData[productName].averagePerOrder = this.salesData[productName].totalSold / this.salesData[productName].orderCount;
+        }
     }
 
     private analyzeInventory(inventory: InventoryDocument[]): void {
         this.inventoryData = inventory.map(item => {
-            const productSales = this.salesData[item.name] || {
-                totalSold: 0,
-                orderCount: 0,
-                averagePerOrder: 0,
-                lastOrderDate: new Date(),
-                salesTrend: []
-            };
-
+            const productSales = this.salesData[item.name] || { salesTrend: [], averagePerOrder: 0, lastOrderDate: new Date(0) };
             const dailySales = productSales.salesTrend;
+
+            // Advanced Forecasting using Seasonal-Trend Smoothing
+            const { forecast, trend: forecastedTrend } = this.seasonalTrendSmoothing(dailySales, 7, 0.2, 0.1, 0.1);
+            const forecastedDemand = forecast[forecast.length - 1] || 0;
+
             const dailyAverage = dailySales.length > 0 ? dailySales.reduce((a, b) => a + b) / dailySales.length : 0;
-            const weeklyAverage = dailyAverage * 7;
-            const monthlyAverage = dailyAverage * 30;
-
             const standardDeviation = this.calculateStandardDeviation(dailySales);
-            const trend = this.calculateTrend(dailySales);
-            const seasonalityFactor = this.calculateSeasonality(dailySales);
+            
+            const leadTime = item.supplier_lead_time_days || this.DEFAULT_LEAD_TIME_DAYS;
+            
+            const reliabilityFactor = 1 / (item.supplier_reliability_score || 0.9);
+            const safetyStock = this.Z_SCORE_95 * standardDeviation * Math.sqrt(leadTime) * reliabilityFactor;
 
-            const averageDemandDuringLeadTime = dailyAverage * this.LEAD_TIME_DAYS;
-            const safetyStock = this.Z_SCORE_95 * standardDeviation * Math.sqrt(this.LEAD_TIME_DAYS);
-            const reorderPoint = averageDemandDuringLeadTime + safetyStock;
+            const reorderPoint = (forecastedDemand * leadTime) + safetyStock;
 
-            const annualDemand = dailyAverage * 365;
+            const annualDemand = forecastedDemand * 365;
             const estimatedOrderCost = 50;
-            const estimatedHoldingCost = item.price * 0.25;
-            const eoq = this.calculateEOQ(annualDemand, estimatedOrderCost, estimatedHoldingCost);
+            const estimatedHoldingCostRate = 0.25;
+            const eoq = this.calculateEOQ(annualDemand, estimatedOrderCost, estimatedHoldingCostRate, item.price);
 
-            const daysUntilStockout = dailyAverage > 0 ? Math.floor(item.quantity / dailyAverage) : 999;
-
+            const daysUntilStockout = forecastedDemand > 0 ? Math.floor(item.quantity / forecastedDemand) : Infinity;
+            
             const demandVariability = dailyAverage > 0 ? standardDeviation / dailyAverage : 0;
 
-            const forecastAccuracy = Math.max(0.5, 1 - Math.abs(trend.slope) * 0.1 - demandVariability * 0.2);
+            // Confidence score based on data volume, variability, and recency
+            const daysSinceLastSale = (new Date().getTime() - productSales.lastOrderDate.getTime()) / (1000 * 3600 * 24);
+            const recencyScore = Math.max(0, 1 - (daysSinceLastSale / this.DAYS_TO_ANALYZE));
+            const confidenceScore = Math.max(0.5, (1 - demandVariability) * (dailySales.length / this.DAYS_TO_ANALYZE) * recencyScore);
 
             return {
                 ...item,
                 dailySalesVelocity: dailyAverage,
-                weeklySalesVelocity: weeklyAverage,
-                monthlySalesVelocity: monthlyAverage,
+                weeklySalesVelocity: dailyAverage * 7,
+                monthlySalesVelocity: dailyAverage * 30,
                 averageOrderSize: productSales.averagePerOrder,
                 daysUntilStockout,
                 reorderPoint,
+                safetyStock,
                 economicOrderQuantity: eoq,
-                seasonalityFactor,
                 demandVariability,
-                forecastAccuracy
+                forecastedDemand,
+                forecastedTrend,
+                confidenceScore
             };
         });
     }
 
     private generateForecastingResults(): ForecastingResult[] {
         return this.inventoryData
-            .filter(item => {
-                return (
-                    item.quantity <= item.reorderPoint ||
-                    item.quantity <= item.stock_alert_level ||
-                    item.daysUntilStockout <= 14
-                );
-            })
+            .filter(item => item.quantity <= item.reorderPoint || item.daysUntilStockout <= (item.supplier_lead_time_days || this.DEFAULT_LEAD_TIME_DAYS) + 7)
             .map(item => {
+                const trend = this.calculateTrend(this.salesData[item.name]?.salesTrend || []).direction;
+                
+                let lifecycleMultiplier = 1.0;
+                switch(item.product_lifecycle_stage) {
+                    case 'new': lifecycleMultiplier = 1.5; break;
+                    case 'growth': lifecycleMultiplier = 1.2; break;
+                    case 'decline': lifecycleMultiplier = 0.8; break;
+                }
+
                 const recommendedStock = Math.max(
                     item.reorderPoint + item.economicOrderQuantity,
-                    item.stock_alert_level * 2,
-                    item.dailySalesVelocity * 30
-                );
+                    item.stock_alert_level * 1.5
+                ) * lifecycleMultiplier;
 
                 let urgencyLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
-                if (item.daysUntilStockout <= 3) urgencyLevel = 'CRITICAL';
-                else if (item.daysUntilStockout <= 7) urgencyLevel = 'HIGH';
-                else if (item.daysUntilStockout <= 14) urgencyLevel = 'MEDIUM';
+                const leadTime = item.supplier_lead_time_days || this.DEFAULT_LEAD_TIME_DAYS;
+                if (item.daysUntilStockout <= leadTime / 2) urgencyLevel = 'CRITICAL';
+                else if (item.daysUntilStockout <= leadTime) urgencyLevel = 'HIGH';
+                else if (item.daysUntilStockout <= leadTime + 7) urgencyLevel = 'MEDIUM';
 
-                const trend = this.calculateTrend(this.salesData[item.name]?.salesTrend || []);
-                
-                const costImpact = (recommendedStock - item.quantity) * item.price;
+                const costImpact = Math.max(0, (recommendedStock - item.quantity)) * item.price;
 
                 const reasons: string[] = [];
+                if (item.quantity <= item.reorderPoint) reasons.push(`Stock (${item.quantity}) is below reorder point (${Math.round(item.reorderPoint)})`);
+                if (item.daysUntilStockout <= leadTime) reasons.push(`Projected to stock out in ${item.daysUntilStockout} days, which is within the lead time of ${leadTime} days.`);
+                if (trend === 'INCREASING') reasons.push("Demand trend is increasing.");
+                if (item.demandVariability > 0.5) reasons.push("High demand volatility detected.");
+                if (item.product_lifecycle_stage === 'growth') reasons.push("Product is in a growth stage.");
+
                 const recommendations: string[] = [];
+                recommendations.push(`Order at least ${Math.round(recommendedStock - item.quantity)} units to reach recommended stock level.`);
+                if (item.economicOrderQuantity > 0) recommendations.push(`Optimal order quantity is ~${Math.round(item.economicOrderQuantity)} units to balance costs.`);
+                if (trend === 'INCREASING') recommendations.push("Consider adjusting baseline forecast upwards.");
+                if ((item.supplier_reliability_score || 1) < 0.9) recommendations.push(`Supplier reliability is low (${item.supplier_reliability_score}), justifying higher safety stock.`);
+                if (item.demandVariability > 0.75) recommendations.push("Demand is highly erratic. Recommend reviewing safety stock levels and forecasting model parameters.");
 
-                if (item.quantity <= item.stock_alert_level) {
-                    reasons.push("Stock below alert level");
-                }
-                if (item.daysUntilStockout <= 7) {
-                    reasons.push(`Will run out in ${item.daysUntilStockout} days`);
-                }
-                if (trend.direction === 'INCREASING') {
-                    reasons.push("Increasing demand trend detected");
-                    recommendations.push("Consider increasing regular order quantity");
-                }
-                if (item.seasonalityFactor > 1.2) {
-                    reasons.push("High demand variability detected");
-                    recommendations.push("Maintain higher safety stock levels");
-                }
-
-                recommendations.push(`Reorder when stock reaches ${Math.round(item.reorderPoint)} units`);
-                if (item.economicOrderQuantity > 0) {
-                    recommendations.push(`Optimal order quantity: ${Math.round(item.economicOrderQuantity)} units`);
-                }
+                const projectedStockoutDate = new Date();
+                projectedStockoutDate.setDate(projectedStockoutDate.getDate() + item.daysUntilStockout);
 
                 return {
                     product: item.name,
                     current_stock: item.quantity,
                     recommended_stock: Math.round(recommendedStock),
                     urgency_level: urgencyLevel,
-                    days_until_stockout: item.daysUntilStockout,
-                    expected_daily_demand: Math.round(item.dailySalesVelocity * 100) / 100,
+                    days_until_stockout: item.daysUntilStockout === Infinity ? -1 : item.daysUntilStockout,
+                    projected_stockout_date: item.daysUntilStockout === Infinity ? 'N/A' : projectedStockoutDate.toISOString().split('T')[0],
+                    expected_daily_demand: parseFloat(item.forecastedDemand.toFixed(2)),
                     reorder_point: Math.round(item.reorderPoint),
                     economic_order_quantity: Math.round(item.economicOrderQuantity),
-                    cost_impact: Math.round(costImpact * 100) / 100,
-                    confidence_score: Math.round(item.forecastAccuracy * 100) / 100,
-                    trend_direction: trend.direction,
-                    seasonality_factor: Math.round(item.seasonalityFactor * 100) / 100,
+                    cost_impact: parseFloat(costImpact.toFixed(2)),
+                    confidence_score: parseFloat(item.confidenceScore.toFixed(2)),
+                    trend_direction: trend,
                     reasons,
                     recommendations
                 };
             })
             .sort((a, b) => {
                 const urgencyOrder = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
-                const urgencyDiff = urgencyOrder[a.urgency_level] - urgencyOrder[b.urgency_level];
-                if (urgencyDiff !== 0) return urgencyDiff;
+                if (urgencyOrder[a.urgency_level] !== urgencyOrder[b.urgency_level]) {
+                    return urgencyOrder[a.urgency_level] - urgencyOrder[b.urgency_level];
+                }
                 return a.days_until_stockout - b.days_until_stockout;
             });
     }
 
     async performAnalysis(): Promise<AnalyticsResponse> {
-        try {
-            await dbConnect();
+        await dbConnect();
 
-            const sixtyDaysAgo = new Date();
-            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-            
-            const orders = await Order.find({
-                date: {
-                    $gte: sixtyDaysAgo.toISOString().split('T')[0]
-                }
-            }).lean() as unknown as OrderDocument[];
+        const analysisStartDate = new Date();
+        analysisStartDate.setDate(analysisStartDate.getDate() - this.DAYS_TO_ANALYZE);
+        
+        const orders = await Order.find({
+            date: { $gte: analysisStartDate.toISOString().split('T')[0] }
+        }).lean() as unknown as OrderDocument[];
 
-            const inventory = await Inventory.find({}).lean() as unknown as InventoryDocument[];
+        const inventory = await Inventory.find({}).lean() as unknown as InventoryDocument[];
 
-            if (!orders || !inventory) {
-                throw new Error("Unable to fetch required data");
-            }
-
-            await this.processSalesData(orders);
-            this.analyzeInventory(inventory);
-
-            const urgentRestocking = this.generateForecastingResults();
-
-            const summary = {
-                total_products_analyzed: inventory.length,
-                critical_items: urgentRestocking.filter(item => item.urgency_level === 'CRITICAL').length,
-                high_priority_items: urgentRestocking.filter(item => ['CRITICAL', 'HIGH'].includes(item.urgency_level)).length,
-                total_estimated_cost: urgentRestocking.reduce((sum, item) => sum + item.cost_impact, 0),
-                confidence_score: urgentRestocking.length > 0 
-                    ? urgentRestocking.reduce((sum, item) => sum + item.confidence_score, 0) / urgentRestocking.length 
-                    : 0
-            };
-
-            const now = new Date();
-            const nextAnalysis = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Next day
-
-            return {
-                urgent_restocking: urgentRestocking,
-                summary: {
-                    ...summary,
-                    total_estimated_cost: Math.round(summary.total_estimated_cost * 100) / 100,
-                    confidence_score: Math.round(summary.confidence_score * 100) / 100
-                },
-                generated_at: now.toISOString(),
-                next_analysis_recommended: nextAnalysis.toISOString()
-            };
-
-        } catch (error) {
-            console.error("Error in inventory analysis:", error);
-            throw error;
+        if (!orders || !inventory) {
+            throw new Error("Unable to fetch required data from the database.");
         }
+
+        await this.processSalesData(orders);
+        this.analyzeInventory(inventory);
+
+        const urgentRestocking = this.generateForecastingResults();
+
+        const totalCost = urgentRestocking.reduce((sum, item) => sum + item.cost_impact, 0);
+        const avgConfidence = urgentRestocking.length > 0 
+            ? urgentRestocking.reduce((sum, item) => sum + item.confidence_score, 0) / urgentRestocking.length 
+            : 0;
+
+        const summary = {
+            total_products_analyzed: inventory.length,
+            critical_items: urgentRestocking.filter(item => item.urgency_level === 'CRITICAL').length,
+            high_priority_items: urgentRestocking.filter(item => ['CRITICAL', 'HIGH'].includes(item.urgency_level)).length,
+            total_estimated_cost: parseFloat(totalCost.toFixed(2)),
+            average_confidence_score: parseFloat(avgConfidence.toFixed(2))
+        };
+
+        const now = new Date();
+        const nextAnalysis = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Recommend next analysis in 24 hours
+
+        return {
+            urgent_restocking: urgentRestocking,
+            summary,
+            generated_at: now.toISOString(),
+            next_analysis_recommended: nextAnalysis.toISOString()
+        };
     }
 }
 
 export async function GET(): Promise<NextResponse> {
     try {
-        const analytics = new InventoryAnalytics();
+        const analytics = new AdvancedInventoryAnalytics();
         const results = await analytics.performAnalysis();
         
         return NextResponse.json(results, {
@@ -413,16 +408,13 @@ export async function GET(): Promise<NextResponse> {
         });
     } catch (error) {
         console.error("Analytics API Error:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
         return NextResponse.json(
             { 
                 error: "Failed to generate inventory analytics",
-                message: error instanceof Error ? error.message : "Unknown error"
+                details: errorMessage
             },
             { status: 500 }
         );
     }
-}
-
-export async function POST(): Promise<NextResponse> {
-    return NextResponse.json({ message: "POST method not implemented yet" }, { status: 501 });
 }

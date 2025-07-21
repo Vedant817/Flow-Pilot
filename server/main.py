@@ -1,23 +1,16 @@
-# main.py
-from flask import Flask, jsonify, request, session # type: ignore
-# main.py
-from flask import Flask, jsonify, request, session # type: ignore
+from flask import Flask, jsonify, request, session
 import threading
 import uuid
 import os
-from new_file_monitor import start_monitoring
+from file_monitor import start_monitoring
 from config.dbConfig import db
 from feedback.feedback_handle import fetch_feedback, store_feedback
 from chatbot import ask_bot, refresh_data_and_update_vector_store, store_chat_history, get_chat_history
 from flask_cors import CORS
 from bson import ObjectId
-from bson import ObjectId
 from analytics.deadstock import identify_deadstocks
 from analytics.dynamicPricing import generate_pricing_suggestions
-from analytics.urgentRestock import get_urgent_restocking
 from werkzeug.exceptions import HTTPException
-from email_config.send_emails import send_invoice
-from email_config.send_emails import send_invoice
 import json
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -82,8 +75,6 @@ def get_feedback():
         handle_exception(e)
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
-
-
 
 #? Chatbot Endpoints
 @app.route('/chatbot', methods=['POST'])
@@ -152,47 +143,9 @@ def refresh_data():
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
 
-#? Tracking Endpoints
-@app.route('/orders/<order_id>', methods=['GET'])
-def get_order_info(order_id):
-    try:
-        if not ObjectId.is_valid(order_id):
-            return jsonify({"error": "Invalid order ID"}), 400
-
-        order_collection = db['orders']
-        order = order_collection.find_one({"_id": ObjectId(order_id)})
-
-        if not order:
-            return jsonify({"error": "Order not found"}), 404
-
-        order_data = {
-            "id": str(order["_id"]),
-            "name": order.get("name", ""),
-            "phone": order.get("phone", ""),
-            "email": order.get("email", ""),
-            "date": order.get("date", ""),
-            "time": order.get("time", ""),
-            "products": order.get("products", []),
-            "status": order.get("status", ""),
-            "orderLink": order.get("orderLink", "")
-        }
-
-        return jsonify(order_data), 200
-
-    except Exception as e:
-        handle_exception(e)
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
 #? Analytics Endpoints
 @app.route('/analytics/deadstocks', methods=['GET'])
 def get_deadstocks():
-    try:
-        deadstock_list = identify_deadstocks()
-        return jsonify(deadstock_list)
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
     try:
         deadstock_list = identify_deadstocks()
         return jsonify(deadstock_list)
@@ -205,27 +158,6 @@ def price_summary():
     try:
         summary = generate_pricing_suggestions()
         return jsonify({"Pricing Suggestions": summary})
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-    try:
-        summary = generate_pricing_suggestions()
-        return jsonify({"Pricing Suggestions": summary})
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/analytics/urgent-restocking', methods=['GET'])
-def urgent_restocking():
-    try:
-        restocking_data = get_urgent_restocking()
-        return jsonify(restocking_data)
-    except Exception as e:
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-    try:
-        restocking_data = get_urgent_restocking()
-        return jsonify(restocking_data)
     except Exception as e:
         handle_exception(e)
         return jsonify({"error": str(e)}), 500
@@ -351,18 +283,6 @@ def get_customer_analytics():
             {"$sort": {"total_spent": -1}},
             {"$limit": 10}
         ]
-            {"$match": {"date": {"$gte": thirty_days_ago.strftime('%Y-%m-%d')}}},
-            {"$unwind": "$products"},
-            {"$addFields": {
-                "item_total": {"$multiply": ["$products.price", "$products.quantity"]}
-            }},
-            {"$group": {
-                "_id": "$name", 
-                "total_spent": {"$sum": "$item_total"}
-            }},
-            {"$sort": {"total_spent": -1}},
-            {"$limit": 10}
-        ]
 
         top_spenders = list(orders_collection.aggregate(pipeline_spenders))
         
@@ -388,219 +308,6 @@ def get_customer_analytics():
         handle_exception(e)
         return jsonify({'error': str(e)}), 500
 
-#? CRUD Endpoints
-@app.route('/get-orders', methods=['GET'])
-def get_orders():
-    try:
-        orders_collection = db['orders']
-        orders = list(orders_collection.find({}).sort([('date', -1), ('time', -1)]))  # Sort in descending order of date and time
-        
-        for order in orders:
-            order['_id'] = str(order['_id'])
-            
-        return jsonify(orders), 200
-    except Exception as e:
-        print(f"Error retrieving orders: {str(e)}")
-        handle_exception(e)
-        return jsonify({'error': str(e)}), 500
-    try:
-        orders_collection = db['orders']
-        orders = list(orders_collection.find({}).sort([('date', -1), ('time', -1)]))  # Sort in descending order of date and time
-        
-        for order in orders:
-            order['_id'] = str(order['_id'])
-            
-        return jsonify(orders), 200
-    except Exception as e:
-        print(f"Error retrieving orders: {str(e)}")
-        handle_exception(e)
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/update-status', methods=['PUT', 'OPTIONS'])
-def handle_status_update():
-    if request.method == 'OPTIONS':
-        return '', 200
-
-    try:
-        data = request.get_json()
-        order_id = data.get('orderId')
-        new_status = data.get('status')
-
-        if not order_id or not new_status:
-            return jsonify({"error": "Order ID and status are required"}), 400
-
-        try:
-            order_id = ObjectId(order_id)
-        except Exception as e:
-            return jsonify({"error": f"Invalid ObjectId format: {e}"}), 400
-
-        orders_collection = db['orders']
-        existing_order = orders_collection.find_one({"_id": order_id})
-
-        if not existing_order:
-            return jsonify({"error": "Order not found"}), 404
-
-        result = orders_collection.update_one(
-            {"_id": order_id},
-            {"$set": {"status": new_status}}
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"error": "Status not changed (already set or issue with update)"}), 400
-
-        if new_status.lower() == "fulfilled":
-            try:
-                send_invoice(order_id=order_id)
-            except Exception as e:
-                print(f"Error sending invoice: {e}")
-                return jsonify({"error": f"Failed to send invoice: {str(e)}"}), 500
-
-        return jsonify({"success": True, "message": "Order status updated successfully"}), 200
-
-    try:
-        data = request.get_json()
-        order_id = data.get('orderId')
-        new_status = data.get('status')
-
-        if not order_id or not new_status:
-            return jsonify({"error": "Order ID and status are required"}), 400
-
-        try:
-            order_id = ObjectId(order_id)
-        except Exception as e:
-            return jsonify({"error": f"Invalid ObjectId format: {e}"}), 400
-
-        orders_collection = db['orders']
-        existing_order = orders_collection.find_one({"_id": order_id})
-
-        if not existing_order:
-            return jsonify({"error": "Order not found"}), 404
-
-        result = orders_collection.update_one(
-            {"_id": order_id},
-            {"$set": {"status": new_status}}
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"error": "Status not changed (already set or issue with update)"}), 400
-
-        if new_status.lower() == "fulfilled":
-            try:
-                send_invoice(order_id=order_id)
-            except Exception as e:
-                print(f"Error sending invoice: {e}")
-                return jsonify({"error": f"Failed to send invoice: {str(e)}"}), 500
-
-        return jsonify({"success": True, "message": "Order status updated successfully"}), 200
-
-    except Exception as e:
-        print(f"General error: {e}")
-        handle_exception(e)
-        return jsonify({'error': str(e)}), 500
-
-    except Exception as e:
-        print(f"General error: {e}")
-        handle_exception(e)
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/get-inventory')
-def get_inventory():
-    try:
-        inventory_collection = db['inventory']
-        inventory_items = list(inventory_collection.find({}, {}))
-        
-        for item in inventory_items:
-            item['_id'] = str(item['_id'])
-        
-        return jsonify(inventory_items), 200
-    except Exception as e:
-        print(f"Error retrieving inventory: {str(e)}")
-        handle_exception(e)
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/get-inventory/<item_id>', methods=['GET'])
-def get_inventory_item(item_id):
-    try:
-        inventory_collection = db['inventory']
-        item = inventory_collection.find_one({"_id": ObjectId(item_id)})
-        if not item:
-            return jsonify({"error": "Item not found"}), 404
-            
-        item['_id'] = str(item['_id'])
-        return jsonify(item), 200
-    except Exception as e:
-        print(f"Error retrieving item: {str(e)}")
-        handle_exception(e)
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-app.route('/add-inventory', methods=['POST'])
-app.route('/add-inventory', methods=['POST'])
-def add_inventory():
-    try:
-        inventory_collection = db['inventory']
-        data = request.json
-        
-        required_fields = ['name', 'category', 'price', 'quantity', 'warehouse_location', 'stock_alert_level']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error": f"Missing required field: {field}"}), 400
-        
-        result = inventory_collection.insert_one(data)
-        
-        new_item = data
-        new_item['_id'] = str(result.inserted_id)
-        
-        return jsonify(new_item), 201
-    except Exception as e:
-        print(f"Error adding inventory item: {str(e)}")
-        handle_exception(e)
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/update-inventory/<item_id>', methods=['PUT'])
-def update_inventory(item_id):
-    try:
-        inventory_collection = db['inventory']
-        data = request.json
-        
-        if '_id' in data:
-            del data['_id']
-        
-        result = inventory_collection.update_one(
-            {"_id": ObjectId(item_id)},
-            {"$set": data}
-        )
-        
-        if result.matched_count == 0:
-            return jsonify({"error": "Item not found"}), 404
-            
-        updated_item = inventory_collection.find_one({"_id": ObjectId(item_id)})
-        updated_item['_id'] = str(updated_item['_id'])
-        
-        return jsonify(updated_item), 200
-    except Exception as e:
-        print(f"Error updating inventory item: {str(e)}")
-        handle_exception(e)
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/delete-inventory/<item_id>', methods=['DELETE'])
-def delete_inventory(item_id):
-    try:
-        inventory_collection = db['inventory']
-        result = inventory_collection.delete_one({"_id": ObjectId(item_id)})
-        
-        if result.deleted_count == 0:
-            return jsonify({"error": "Item not found"}), 404
-        
-        return jsonify({"message": "Item deleted successfully"}), 200
-    except Exception as e:
-        print(f"Error deleting inventory item: {str(e)}")
-        handle_exception(e)
-        handle_exception(e)
-        return jsonify({"error": str(e)}), 500
 
 @app.route("/create-payment-link/<order_id>", methods=["GET"])
 def create_payment_link(order_id):
@@ -624,7 +331,3 @@ def scheduled_refresh():
     scheduler = BackgroundScheduler()
     scheduler.add_job(refresh_data_and_update_vector_store, 'interval', hours=1)
     scheduler.start()
-
-if __name__ == '__main__':
-    scheduled_refresh()
-    app.run(host = '0.0.0.0', debug=True)
