@@ -178,22 +178,6 @@ export default function FeedbackPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Debug Panel - Remove after confirming data loads */}
-        <Card className="mb-4 bg-blue-50 border border-blue-200">
-          <CardContent className="p-4">
-            <div className="text-sm text-blue-800">
-              <div className="font-semibold mb-2">Debug Status:</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div>Total Loaded: {feedbackData.length}</div>
-                <div>Filtered: {filteredFeedback.length}</div>
-                <div>Positive: {positiveFeedback}</div>
-                <div>Negative: {negativeFeedback}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">

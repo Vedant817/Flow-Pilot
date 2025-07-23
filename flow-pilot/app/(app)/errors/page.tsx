@@ -286,20 +286,6 @@ export default function ErrorsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
       <div className="container mx-auto max-w-7xl">
-        {/* Debug Information - Remove this after fixing */}
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="text-sm">
-            <div className="font-semibold text-yellow-800 mb-2">Debug Information:</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-yellow-700">
-              <div>API URL: {process.env.NEXT_PUBLIC_API_URL}/errors</div>
-              <div>Total Errors Loaded: {errors.length}</div>
-              <div>Filtered Errors: {filteredErrors.length}</div>
-              <div>API Error: {apiError || 'None'}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
