@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 // Utility functions for interacting with Feedback and Errors API
 
@@ -8,6 +9,7 @@ export interface FeedbackData {
 }
 
 export interface ErrorData {
+  timestamp: string | number | Date;
   errorMessage: string;
   type: 'System' | 'Customer';
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -297,7 +299,8 @@ export const logApplicationError = async (
   return await ErrorsAPI.logError({
     errorMessage,
     type,
-    severity
+    severity,
+    timestamp: ''
   });
 };
 
