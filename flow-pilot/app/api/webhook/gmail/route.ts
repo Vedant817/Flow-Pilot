@@ -1,7 +1,10 @@
-// app/api/webhook/gmail/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import axios from 'axios';
+import { classifyEmail, extractOrderDetails, extractFeedbackDetails } from '@/lib/gemini-utils';
+import { Order } from '@/models/Order';
+import { Feedback } from '@/models/Feedback';
+import { Error as ErrorModel } from '@/models/Error';
+import connectToDatabase from '@/lib/mongodb';
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -91,51 +94,95 @@ async function getEmailDetails(messageId: string) {
 
 
 export async function POST(req: NextRequest) {
-    const body = await req.json();
+  const body = await req.json();
 
-    console.log('Gmail Webhook Received');
+  console.log('Gmail Webhook Received');
 
-    const message = body.message;
-    if (!message?.data) {
-        console.log('No message data found');
-        return NextResponse.json({ message: 'No data found' });
-    }
+  const message = body.message;
+  if (!message?.data) {
+    console.log('No message data found');
+    return NextResponse.json({ message: 'No data found' });
+  }
 
-    try {
-        const decoded = Buffer.from(message.data, 'base64').toString('utf-8');
-        const decodedMessage = JSON.parse(decoded);
-        console.log('Decoded Message:', decodedMessage);
+  try {
+    await connectToDatabase();
+    const decoded = Buffer.from(message.data, 'base64').toString('utf-8');
+    const decodedMessage = JSON.parse(decoded);
+    console.log('Decoded Message:', decodedMessage);
 
-        const historyResponse = await gmail.users.history.list({
-            userId: 'me',
-            startHistoryId: decodedMessage.historyId,
-        });
+    const historyResponse = await gmail.users.history.list({
+      userId: 'me',
+      startHistoryId: decodedMessage.historyId,
+    });
 
-        if (historyResponse.data.history) {
-            for (const historyItem of historyResponse.data.history) {
-                if (historyItem.messagesAdded) {
-                    for (const messageAdded of historyItem.messagesAdded) {
-                        if (messageAdded.message?.id) {
-                            const emailDetails = await getEmailDetails(messageAdded.message.id);
-                            if (emailDetails) {
-                                console.log('--- New Email Received ---');
-                                console.log('Sender Name:', emailDetails.senderName);
-                                console.log('Sender Email:', emailDetails.senderEmail);
-                                console.log('Body:', emailDetails.body);
-                                console.log('Attachments:', emailDetails.attachments.map(a => a.filename).join(', ') || 'None');
-                                console.log('--------------------------');
-                                await axios.post('http://localhost:3000/api/root', emailDetails);
-                            }
-                        }
+    if (historyResponse.data.history) {
+      for (const historyItem of historyResponse.data.history) {
+        if (historyItem.messagesAdded) {
+          for (const messageAdded of historyItem.messagesAdded) {
+            if (messageAdded.message?.id) {
+              const emailDetails = await getEmailDetails(messageAdded.message.id);
+              if (emailDetails && emailDetails.body) {
+                const classification = await classifyEmail(emailDetails.body);
+                console.log(`Email classified as: ${classification}`);
+
+                switch (classification) {
+                  case 'new_order':
+                    const orderDetails = await extractOrderDetails(emailDetails.body);
+                    if (orderDetails) {
+                      const newOrder = new Order({
+                        ...orderDetails,
+                        email: emailDetails.senderEmail,
+                        status: 'pending',
+                        orderLink: '',
+                      });
+                      await newOrder.save();
+                      console.log('New order saved:', newOrder);
                     }
+                    break;
+                  case 'update_order':
+                    const updatedOrderDetails = await extractOrderDetails(emailDetails.body);
+                    if (updatedOrderDetails) {
+                      const existingOrder = await Order.findOne({ email: emailDetails.senderEmail, status: 'pending' }).sort({ date: -1, time: -1 });
+                      if (existingOrder) {
+                        existingOrder.set(updatedOrderDetails);
+                        await existingOrder.save();
+                        console.log('Order updated:', existingOrder);
+                      } else {
+                        console.log('No pending order found to update for:', emailDetails.senderEmail);
+                      }
+                    }
+                    break;
+                  case 'feedback':
+                    const feedbackDetails = await extractFeedbackDetails(emailDetails.body);
+                    if (feedbackDetails) {
+                      const newFeedback = new Feedback({
+                        ...feedbackDetails,
+                        email: emailDetails.senderEmail,
+                      });
+                      await newFeedback.save();
+                      console.log('New feedback saved:', newFeedback);
+                    }
+                    break;
+                  default:
+                    const newError = new ErrorModel({
+                      errorMessage: `Unclassified email from ${emailDetails.senderEmail}`,
+                      type: 'Customer',
+                      severity: 'low',
+                      timestamp: new Date(),
+                    });
+                    await newError.save();
+                    console.log('Unclassified email logged as error.');
+                    break;
                 }
+              }
             }
+          }
         }
-
-
-    } catch (e) {
-        console.error('Error processing webhook:', e);
+      }
     }
+  } catch (e) {
+    console.error('Error processing webhook:', e);
+  }
 
-    return new Response('ok', { status: 200 });
+  return new Response('ok', { status: 200 });
 }
