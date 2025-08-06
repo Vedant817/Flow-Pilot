@@ -1,7 +1,7 @@
-# 🚀 Automatic Order Processing System  
+# 🚀 Flow Pilot  
 
 ## 📌 Overview  
-The **Automatic Order Processing System** provides a centralized dashboard for managing orders, inventory, analytics, errors, feedback, and chatbot interactions. It streamlines order tracking, inventory management, analytics monitoring, error logging, and customer interactions through a user-friendly interface.  
+The **Flow Pilot** provides a centralized dashboard for managing orders, inventory, analytics, errors, feedback, and chatbot interactions. It streamlines order tracking, inventory management, analytics monitoring, error logging, and customer interactions through a user-friendly interface.  
 
 ## 🔥 Features  
 - **Order Management**: Track, search, and manage orders efficiently.  
@@ -23,7 +23,7 @@ The **Automatic Order Processing System** provides a centralized dashboard for m
 - **Product Details**: Track inventory with key attributes (Product ID, Name, Price, Quantity, Supplier, etc.).  
 - **Stock Management**: View total products, low-stock alerts, and inventory value.  
 - **Forecasting & Dynamic Pricing**: Predict demand and adjust prices accordingly.  
-- **Deadstock Analysis**: Identify slow-moving or obsolete products.  
+- **DeadStock Analysis**: Identify slow-moving or obsolete products.  
 
 ### 📈 Analytics Tab  
 - **Customer Insights**: Analyze order trends, top spenders, and frequent buyers.  
@@ -47,26 +47,15 @@ The **Automatic Order Processing System** provides a centralized dashboard for m
  
 ## 🛠️ Installation  
 
-Follow these steps to set up and run the **Automatic Order Processing System** locally:  
+Follow these steps to set up and run the **Flow Pilot** locally:  
 
 ### 1️⃣ Clone the Repository  
 ```bash
-git clone https://github.com/KumarShresth7/EmailAutomation.git
-cd EmailAutomation
+git clone https://github.com/Vedant817/Flow-Pilot.git
+cd flow-pilot
 ```
-### 2️⃣ Frontend  
+### 2️⃣  Start the Application 
 ```bash
-cd frontend
 npm install --force
 npm run dev
-```
-### 3️⃣ Server
-```bash 
-cd ../server
-python -m venv venv
-source venv/bin/activate
-venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
-python chatbot.py
 ```
