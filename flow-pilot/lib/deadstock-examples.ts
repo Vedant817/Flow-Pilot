@@ -1,65 +1,29 @@
-/**
- * Test script to demonstrate deadstock analysis functionality
- * This file shows example API calls and expected responses
- */
-
-// Example API calls for deadstock analysis
-
-// 1. Basic deadstock analysis
-// GET /api/analytics/deadstacks
-// Returns categorized deadstock items with risk levels
-
-// 2. Filtered deadstock analysis by category
-// GET /api/analytics/deadstacks?category=electronics&days=60&minValue=1000
-// Parameters:
-// - category: Filter by product category
-// - days: Minimum days since last sale (default: 90)
-// - minValue: Minimum stock value to consider (default: 0)
-
-// 3. Enhanced deadstock report
-// GET /api/analytics/deadstock-report?includeReports=true&warehouse=warehouse1
-// Parameters:
-// - includeReports: Include detailed reports for each item
-// - warehouse: Filter by warehouse location
-// - category: Filter by category
-// - minValue: Minimum stock value threshold
-
-// 4. Apply deadstock actions
-// POST /api/analytics/deadstacks
-// Body examples:
-
 interface DeadstockActionRequest {
     action: 'apply_discount' | 'set_price' | 'mark_for_liquidation';
     productIds: string[];
-    discountPercentage?: number; // Required for 'apply_discount'
-    newPrice?: number; // Required for 'set_price'
+    discountPercentage?: number; 
+    newPrice?: number; 
 }
 
-// Example requests:
-
 export const exampleRequests = {
-    // Apply 30% discount to critical deadstock items
     applyDiscount: {
         action: 'apply_discount',
         productIds: ['64f1b2c3d4e5f6a7b8c9d0e1', '64f1b2c3d4e5f6a7b8c9d0e2'],
         discountPercentage: 30
     } as DeadstockActionRequest,
 
-    // Set new price for specific items
     setPrice: {
         action: 'set_price',
         productIds: ['64f1b2c3d4e5f6a7b8c9d0e3'],
         newPrice: 150
     } as DeadstockActionRequest,
 
-    // Mark items for liquidation
     markForLiquidation: {
         action: 'mark_for_liquidation',
         productIds: ['64f1b2c3d4e5f6a7b8c9d0e4', '64f1b2c3d4e5f6a7b8c9d0e5']
     } as DeadstockActionRequest
 };
 
-// Expected response structure for GET /api/analytics/deadstacks
 export interface DeadstockAnalysisResponse {
     deadstock_analysis: {
         critical_deadstock: DeadstockItem[];
@@ -96,7 +60,6 @@ interface DeadstockItem {
     warehouseLocation: string;
 }
 
-// Expected response structure for GET /api/analytics/deadstock-report
 export interface DeadstockReportResponse {
     deadstock_report: {
         executive_summary: {
@@ -158,10 +121,7 @@ interface EnhancedDeadstockItem extends DeadstockItem {
     detailedReport: string;
 }
 
-// Usage examples in a React component:
-
 export const deadstockAnalysisExamples = {
-    // Fetch basic deadstock analysis
     fetchDeadstockAnalysis: async () => {
         try {
             const response = await fetch('/api/analytics/deadstacks');
@@ -173,7 +133,6 @@ export const deadstockAnalysisExamples = {
         }
     },
 
-    // Fetch filtered deadstock analysis
     fetchFilteredAnalysis: async (category?: string, days?: number, minValue?: number) => {
         const params = new URLSearchParams();
         if (category) params.append('category', category);
@@ -190,7 +149,6 @@ export const deadstockAnalysisExamples = {
         }
     },
 
-    // Fetch comprehensive deadstock report
     fetchDeadstockReport: async (includeReports: boolean = false, warehouse?: string) => {
         const params = new URLSearchParams();
         if (includeReports) params.append('includeReports', 'true');
@@ -206,7 +164,6 @@ export const deadstockAnalysisExamples = {
         }
     },
 
-    // Apply deadstock actions
     applyDeadstockActions: async (request: DeadstockActionRequest) => {
         try {
             const response = await fetch('/api/analytics/deadstacks', {
@@ -230,9 +187,7 @@ export const deadstockAnalysisExamples = {
     }
 };
 
-// Utility functions for frontend usage
 export const deadstockUtils = {
-    // Format currency values
     formatCurrency: (value: number) => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -240,18 +195,16 @@ export const deadstockUtils = {
         }).format(value);
     },
 
-    // Get risk level color for UI
     getRiskLevelColor: (riskLevel: string) => {
         const colors = {
-            critical: '#dc2626', // red-600
-            high: '#ea580c',     // orange-600
-            medium: '#d97706',   // amber-600
-            low: '#16a34a'       // green-600
+            critical: '#dc2626',
+            high: '#ea580c',
+            medium: '#d97706',
+            low: '#16a34a'
         };
         return colors[riskLevel as keyof typeof colors] || '#6b7280';
     },
 
-    // Get ABC category styling
     getABCCategoryStyle: (category: 'A' | 'B' | 'C') => {
         const styles = {
             A: { background: '#fef2f2', border: '#dc2626', text: '#dc2626' },
@@ -261,13 +214,11 @@ export const deadstockUtils = {
         return styles[category];
     },
 
-    // Calculate percentage change
     calculatePercentageChange: (oldValue: number, newValue: number) => {
         if (oldValue === 0) return 0;
         return ((newValue - oldValue) / oldValue) * 100;
     },
 
-    // Sort items by priority (critical first, then by value)
     sortByPriority: (items: DeadstockItem[]) => {
         const riskPriority = { critical: 4, high: 3, medium: 2, low: 1 };
         return items.sort((a, b) => {
@@ -283,34 +234,25 @@ export const deadstockUtils = {
     }
 };
 
-// Integration patterns for different use cases
 export const integrationPatterns = {
-    // Dashboard widget - show summary only
     dashboardWidget: `
-    // Fetch summary data for dashboard
     const summary = await deadstockAnalysisExamples.fetchDeadstockAnalysis();
     const { critical_items_count, total_deadstock_value } = summary.deadstock_analysis.summary;
     
-    // Display critical alerts
     if (critical_items_count > 0) {
         showAlert(\`⚠️ \${critical_items_count} critical deadstock items require immediate attention\`);
     }
     `,
 
-    // Detailed analysis page
     detailedAnalysis: `
-    // Fetch comprehensive report
     const report = await deadstockAnalysisExamples.fetchDeadstockReport(true);
     
-    // Display by ABC categories
     const categoryA = report.deadstock_report.abc_analysis.a_category;
     const categoryB = report.deadstock_report.abc_analysis.b_category;
     const categoryC = report.deadstock_report.abc_analysis.c_category;
     `,
 
-    // Batch operations
     batchOperations: `
-    // Apply discount to all critical items
     const criticalItems = data.deadstock_analysis.critical_deadstock;
     const criticalIds = criticalItems.map(item => item.productId);
     

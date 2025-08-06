@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
-// Utility functions for interacting with Feedback and Errors API
 
 export interface FeedbackData {
   email: string;
@@ -46,13 +45,9 @@ export interface DeleteErrorsParams {
   olderThan?: number; // days
 }
 
-// Feedback API Functions
 export class FeedbackAPI {
   private static baseUrl = '/api/feedback';
 
-  /**
-   * Fetch all feedback entries
-   */
   static async getAllFeedback(): Promise<ApiResponse<FeedbackData[]>> {
     try {
       const response = await fetch(this.baseUrl);
@@ -66,9 +61,6 @@ export class FeedbackAPI {
     }
   }
 
-  /**
-   * Add new feedback
-   */
   static async addFeedback(feedbackData: FeedbackData): Promise<ApiResponse<FeedbackData>> {
     try {
       const response = await fetch(this.baseUrl, {
@@ -89,9 +81,6 @@ export class FeedbackAPI {
     }
   }
 
-  /**
-   * Validate feedback data before submission
-   */
   static validateFeedback(data: Partial<FeedbackData>): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
@@ -122,13 +111,9 @@ export class FeedbackAPI {
   }
 }
 
-// Errors API Functions
 export class ErrorsAPI {
   private static baseUrl = '/api/errors';
 
-  /**
-   * Fetch errors with optional filtering and pagination
-   */
   static async getErrors(filters: ErrorFilters = {}): Promise<PaginatedResponse<ErrorData>> {
     try {
       const params = new URLSearchParams();
@@ -151,9 +136,6 @@ export class ErrorsAPI {
     }
   }
 
-  /**
-   * Log a new error
-   */
   static async logError(errorData: ErrorData): Promise<ApiResponse<ErrorData>> {
     try {
       const response = await fetch(this.baseUrl, {
@@ -174,9 +156,6 @@ export class ErrorsAPI {
     }
   }
 
-  /**
-   * Delete errors with optional filtering
-   */
   static async deleteErrors(params: DeleteErrorsParams): Promise<ApiResponse<{ deletedCount: number }>> {
     try {
       const searchParams = new URLSearchParams();
@@ -200,9 +179,6 @@ export class ErrorsAPI {
     }
   }
 
-  /**
-   * Validate error data before submission
-   */
   static validateError(data: Partial<ErrorData>): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
@@ -232,12 +208,8 @@ export class ErrorsAPI {
     };
   }
 
-  /**
-   * Get error statistics
-   */
   static async getErrorStats(): Promise<ApiResponse<any>> {
     try {
-      // Get all errors to calculate statistics
       const response = await this.getErrors({ limit: 1000 });
       
       if (!response.success || !response.data) {
@@ -263,13 +235,13 @@ export class ErrorsAPI {
             const errorDate = new Date(e.timestamp);
             const now = new Date();
             const diff = now.getTime() - errorDate.getTime();
-            return diff <= 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            return diff <= 24 * 60 * 60 * 1000;
           }).length,
           last7days: errors.filter(e => {
             const errorDate = new Date(e.timestamp);
             const now = new Date();
             const diff = now.getTime() - errorDate.getTime();
-            return diff <= 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+            return diff <= 7 * 24 * 60 * 60 * 1000;
           }).length
         }
       };
@@ -288,7 +260,6 @@ export class ErrorsAPI {
   }
 }
 
-// Utility function for automatic error logging
 export const logApplicationError = async (
   error: Error | string,
   type: 'System' | 'Customer' = 'System',
@@ -304,7 +275,6 @@ export const logApplicationError = async (
   });
 };
 
-// Utility function for feedback submission with validation
 export const submitFeedback = async (feedbackData: FeedbackData) => {
   const validation = FeedbackAPI.validateFeedback(feedbackData);
   
@@ -319,7 +289,6 @@ export const submitFeedback = async (feedbackData: FeedbackData) => {
   return await FeedbackAPI.addFeedback(feedbackData);
 };
 
-// React Hook for feedback management (optional)
 export const useFeedback = () => {
   const [feedback, setFeedback] = useState<FeedbackData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -346,7 +315,7 @@ export const useFeedback = () => {
   const addFeedback = async (data: FeedbackData) => {
     const response = await submitFeedback(data);
     if (response.success) {
-      await loadFeedback(); // Reload feedback list
+      await loadFeedback();
     }
     return response;
   };
@@ -360,7 +329,6 @@ export const useFeedback = () => {
   };
 };
 
-// React Hook for error management (optional)
 export const useErrors = (initialFilters: ErrorFilters = {}) => {
   const [errors, setErrors] = useState<ErrorData[]>([]);
   const [pagination, setPagination] = useState<any>(null);
@@ -389,7 +357,7 @@ export const useErrors = (initialFilters: ErrorFilters = {}) => {
   const logError = async (data: ErrorData) => {
     const response = await ErrorsAPI.logError(data);
     if (response.success) {
-      await loadErrors(); // Reload errors list
+      await loadErrors();
     }
     return response;
   };

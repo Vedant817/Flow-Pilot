@@ -1,4 +1,3 @@
-// Define interfaces for lean documents
 interface OrderLean {
     _id: unknown;
     date: string;
@@ -30,7 +29,6 @@ export async function GET(request: NextRequest) {
     try {
         await dbConnect();
 
-        // Get query parameters for customization
         const url = new URL(request.url);
         const days = parseInt(url.searchParams.get('days') || '30');
 

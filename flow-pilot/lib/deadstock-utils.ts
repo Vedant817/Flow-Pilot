@@ -1,8 +1,7 @@
-// Utility functions for deadstock analysis
 export interface DeadstockMetrics {
-    velocityScore: number; // How fast the product moves (sales per month)
-    turnoverRatio: number; // Inventory turnover ratio
-    ageScore: number; // How long since last sale
+    velocityScore: number;
+    turnoverRatio: number;
+    ageScore: number;
     demandTrend: 'increasing' | 'decreasing' | 'stable' | 'no_data';
     seasonalPattern: boolean;
 }
@@ -12,28 +11,15 @@ export interface SalesHistoryEntry {
     quantity: number;
 }
 
-/**
- * Calculate comprehensive deadstock metrics for a product
- */
 export function calculateDeadstockMetrics(
     salesHistory: SalesHistoryEntry[],
     currentStock: number
 ): DeadstockMetrics {
     const currentDate = new Date();
-    
-    // Calculate velocity score (sales per month)
     const velocityScore = calculateVelocityScore(salesHistory);
-    
-    // Calculate turnover ratio
     const turnoverRatio = calculateTurnoverRatio(salesHistory, currentStock);
-    
-    // Calculate age score
     const ageScore = calculateAgeScore(salesHistory, currentDate);
-    
-    // Determine demand trend
     const demandTrend = calculateDemandTrend(salesHistory);
-    
-    // Check for seasonal patterns
     const seasonalPattern = detectSeasonalPattern(salesHistory);
     
     return {
@@ -45,9 +31,6 @@ export function calculateDeadstockMetrics(
     };
 }
 
-/**
- * Calculate how fast the product moves (monthly velocity)
- */
 export function calculateVelocityScore(salesHistory: SalesHistoryEntry[]): number {
     if (!salesHistory.length) return 0;
     
@@ -57,13 +40,9 @@ export function calculateVelocityScore(salesHistory: SalesHistoryEntry[]): numbe
     const recentSales = salesHistory.filter(sale => new Date(sale.date) >= threeMonthsAgo);
     const totalQuantity = recentSales.reduce((sum, sale) => sum + sale.quantity, 0);
     
-    // Return monthly velocity
     return totalQuantity / 3;
 }
 
-/**
- * Calculate inventory turnover ratio
- */
 export function calculateTurnoverRatio(salesHistory: SalesHistoryEntry[], currentStock: number): number {
     if (!salesHistory.length || currentStock === 0) return 0;
     
@@ -73,16 +52,11 @@ export function calculateTurnoverRatio(salesHistory: SalesHistoryEntry[], curren
     const yearSales = salesHistory.filter(sale => new Date(sale.date) >= oneYearAgo);
     const totalSold = yearSales.reduce((sum, sale) => sum + sale.quantity, 0);
     
-    // Annual turnover ratio = Annual sales / Average inventory
-    // Using current stock as proxy for average inventory
     return totalSold / currentStock;
 }
 
-/**
- * Calculate age score based on time since last sale
- */
 export function calculateAgeScore(salesHistory: SalesHistoryEntry[], currentDate: Date): number {
-    if (!salesHistory.length) return 999; // Never sold
+    if (!salesHistory.length) return 999;
     
     const lastSale = salesHistory.reduce((latest, sale) => {
         const saleDate = new Date(sale.date);
@@ -94,16 +68,11 @@ export function calculateAgeScore(salesHistory: SalesHistoryEntry[], currentDate
     return daysSinceLastSale;
 }
 
-/**
- * Determine demand trend over time
- */
 export function calculateDemandTrend(salesHistory: SalesHistoryEntry[]): 'increasing' | 'decreasing' | 'stable' | 'no_data' {
     if (salesHistory.length < 4) return 'no_data';
     
-    // Sort by date
     const sortedSales = [...salesHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    // Split into first half and second half
     const midPoint = Math.floor(sortedSales.length / 2);
     const firstHalf = sortedSales.slice(0, midPoint);
     const secondHalf = sortedSales.slice(midPoint);
@@ -118,13 +87,9 @@ export function calculateDemandTrend(salesHistory: SalesHistoryEntry[]): 'increa
     return 'stable';
 }
 
-/**
- * Detect seasonal sales patterns
- */
 export function detectSeasonalPattern(salesHistory: SalesHistoryEntry[]): boolean {
-    if (salesHistory.length < 12) return false; // Need at least a year of data
-    
-    // Group sales by month
+    if (salesHistory.length < 12) return false;
+
     const monthlyData: { [month: number]: number } = {};
     
     salesHistory.forEach(sale => {
@@ -135,7 +100,6 @@ export function detectSeasonalPattern(salesHistory: SalesHistoryEntry[]): boolea
     const monthlyAverages = Object.values(monthlyData);
     const overallAverage = monthlyAverages.reduce((sum, val) => sum + val, 0) / monthlyAverages.length;
     
-    // Check if any month has significantly higher/lower sales (>50% deviation)
     const hasSignificantVariation = monthlyAverages.some(avg => 
         Math.abs(avg - overallAverage) / overallAverage > 0.5
     );
@@ -143,9 +107,6 @@ export function detectSeasonalPattern(salesHistory: SalesHistoryEntry[]): boolea
     return hasSignificantVariation;
 }
 
-/**
- * Generate detailed deadstock report for a single product
- */
 export function generateProductDeadstockReport(
     productName: string,
     metrics: DeadstockMetrics,
@@ -169,7 +130,6 @@ export function generateProductDeadstockReport(
     reports.push(`• Seasonal Pattern: ${metrics.seasonalPattern ? 'YES' : 'NO'}`);
     reports.push('');
     
-    // Risk-specific insights
     switch (riskLevel) {
         case 'critical':
             reports.push('⚠️ CRITICAL DEADSTOCK ALERT:');
@@ -203,9 +163,6 @@ export function generateProductDeadstockReport(
     return reports.join('\n');
 }
 
-/**
- * Calculate the financial impact of deadstock
- */
 export interface FinancialImpact {
     tiedUpCapital: number;
     storageCosts: number;
@@ -217,9 +174,9 @@ export interface FinancialImpact {
 export function calculateFinancialImpact(
     stockValue: number,
     monthsInStock: number,
-    storageRate: number = 0.02, // 2% per month default
-    opportunityRate: number = 0.01, // 1% per month default
-    depreciationRate: number = 0.005 // 0.5% per month default
+    storageRate: number = 0.02,
+    opportunityRate: number = 0.01,
+    depreciationRate: number = 0.005
 ): FinancialImpact {
     const tiedUpCapital = stockValue;
     const storageCosts = stockValue * storageRate * monthsInStock;
@@ -235,9 +192,6 @@ export function calculateFinancialImpact(
     };
 }
 
-/**
- * Generate ABC analysis for deadstock prioritization
- */
 export interface ABCAnalysis {
     category: 'A' | 'B' | 'C';
     priority: 'high' | 'medium' | 'low';
@@ -249,7 +203,6 @@ export function performABCAnalysis(
     velocityScore: number,
     ageScore: number
 ): ABCAnalysis {
-    // A items: High value, low velocity, old age (highest priority)
     if (stockValue > 50000 && velocityScore < 5 && ageScore > 60) {
         return {
             category: 'A',
@@ -258,7 +211,6 @@ export function performABCAnalysis(
         };
     }
     
-    // B items: Medium value or medium velocity with some age
     if ((stockValue > 10000 && velocityScore < 10 && ageScore > 30) ||
         (stockValue > 25000 && ageScore > 45)) {
         return {
@@ -268,7 +220,6 @@ export function performABCAnalysis(
         };
     }
     
-    // C items: Low value or recent items
     return {
         category: 'C',
         priority: 'low',

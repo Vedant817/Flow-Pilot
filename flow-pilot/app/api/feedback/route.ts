@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Feedback } from "@/models/Feedback";
 import dbConnect from "@/lib/mongodb";
 
-// GET - Fetch all feedback
 export async function GET() {
     try {
         await dbConnect();
@@ -25,7 +24,6 @@ export async function GET() {
     }
 }
 
-// POST - Add new feedback
 export async function POST(request: NextRequest) {
     try {
         await dbConnect();
@@ -33,7 +31,6 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { email, review, type } = body;
 
-        // Validation
         if (!email || !review || !type) {
             return NextResponse.json(
                 {
@@ -45,7 +42,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             return NextResponse.json(
@@ -58,7 +54,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate type
         const validTypes = ['good', 'bad', 'neutral'];
         if (!validTypes.includes(type.toLowerCase())) {
             return NextResponse.json(
@@ -71,7 +66,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate review length
         if (review.trim().length < 5) {
             return NextResponse.json(
                 {
@@ -94,7 +88,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create new feedback
         const newFeedback = new Feedback({
             email: email.trim().toLowerCase(),
             review: review.trim(),
@@ -116,7 +109,6 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error("Error adding feedback:", error);
         
-        // Handle mongoose validation errors
         if (error instanceof Error && error.name === 'ValidationError') {
             return NextResponse.json(
                 {
@@ -128,7 +120,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Handle duplicate key errors
         if (error instanceof Error && 'code' in error && error.code === 11000) {
             return NextResponse.json(
                 {
