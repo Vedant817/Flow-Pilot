@@ -1,4 +1,4 @@
-// app/api/gmail/watch/route.ts
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
@@ -28,6 +28,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: response.data });
   } catch (error) {
     console.error('Error setting up Gmail watch:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error as string }, { status: 500 });
   }
 }
