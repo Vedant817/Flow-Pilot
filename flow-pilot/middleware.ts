@@ -4,7 +4,9 @@ const publicRoutes = createRouteMatcher([
     "/",
     "/sign-in(.*)",
     "/sign-up(.*)",
-    "/track-order(.*)"
+    "/track-order(.*)",
+    "/api/webhook/gmail(.*)",
+    "/api/root(.*)"
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
