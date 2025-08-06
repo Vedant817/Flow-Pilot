@@ -10,7 +10,6 @@ export async function GET(request: NextRequest) {
         const orders = await Order.find({})
             .sort({ date: -1, time: -1 })
             .lean();
-        console.log(orders)
 
         const formattedOrders = orders.map(order => ({
             ...order,
