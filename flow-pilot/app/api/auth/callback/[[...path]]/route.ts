@@ -24,15 +24,6 @@ export async function GET(req: NextRequest) {
         const { tokens } = await oAuth2Client.getToken(code);
         oAuth2Client.setCredentials(tokens);
 
-        if (tokens.refresh_token) {
-            console.log('************************************************************');
-            console.log('** Your Refresh Token (copy this to .env.local): **');
-            console.log(tokens.refresh_token);
-            console.log('************************************************************');
-        }
-
-        console.log('Access Token:', tokens.access_token);
-
         return NextResponse.json({
             message: 'Authentication successful! Check your server console for the refresh token.',
         });
