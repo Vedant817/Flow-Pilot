@@ -290,7 +290,8 @@ describe('Utility Functions', () => {
         body: JSON.stringify({
           errorMessage: 'Test error message',
           type: 'System',
-          severity: 'medium'
+          severity: 'medium',
+          timestamp: ''
         })
       });
     });
@@ -312,7 +313,8 @@ describe('Utility Functions', () => {
         body: JSON.stringify({
           errorMessage: 'Custom error',
           type: 'Customer',
-          severity: 'critical'
+          severity: 'critical',
+          timestamp: ''
         })
       });
     });

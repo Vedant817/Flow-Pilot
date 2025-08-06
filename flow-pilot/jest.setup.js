@@ -1,3 +1,4 @@
+import 'whatwg-fetch';
 import '@testing-library/jest-dom'
 
 // Mock fetch globally for all tests
