@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "installCommand": "cd flow-pilot && npm install --legacy-peer-deps",
+  "buildCommand": "cd flow-pilot && npm run build",
+  "outputDirectory": "flow-pilot/.next",
+  "framework": "nextjs"
+}
