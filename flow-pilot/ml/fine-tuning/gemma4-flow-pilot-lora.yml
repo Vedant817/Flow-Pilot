@@ -1,9 +1,9 @@
 # Template config for Axolotl/QLoRA-style fine-tuning.
 # Fill paths and hardware settings after creating reviewed JSONL datasets.
-base_model: Qwen/Qwen3-8B
+base_model: google/gemma-4-E4B-it
 model_type: AutoModelForCausalLM
 tokenizer_type: AutoTokenizer
-is_qwen_derived_model: true
+# Keep framework-specific Gemma switches here if your trainer requires them.
 load_in_4bit: true
 strict: false
 
@@ -11,7 +11,7 @@ datasets:
   - path: ml/fine-tuning/datasets/train.jsonl
     type: chat_template
 val_set_size: 0.1
-output_dir: artifacts/qwen3-flow-pilot-lora
+output_dir: artifacts/gemma4-flow-pilot-lora
 
 sequence_len: 4096
 sample_packing: true

@@ -316,20 +316,19 @@ The project currently uses model APIs. That is the correct starting point becaus
 
 #### Recommended model policy
 
-1. **API default for production-quality reasoning:** use an API model for complex planning, user-facing explanations, and ambiguous operations questions.
-2. **Open-weight model for private extraction/classification:** use a smaller instruct model for repetitive structured tasks once you have labeled examples.
+1. **Local open-weight default:** use Gemma 4 E4B Instruct through an OpenAI-compatible local server for private extraction, classification, and copilot answers.
+2. **API fallback only when needed:** keep Gemini as an optional fallback for environments that cannot host a local model or need higher-quality reasoning.
 3. **Do not fine-tune the general copilot first:** use RAG, tools, prompts, and evaluations before training.
-4. **Fine-tune only narrow adapters:** order-email extraction, feedback taxonomy classification, SKU alias resolution, or routing intents.
+4. **Fine-tune only narrow Gemma 4 adapters:** order-email extraction, feedback taxonomy classification, SKU alias resolution, or routing intents.
 
 #### Open-weight shortlist to evaluate
 
 Model availability changes quickly, so pin the selected model and license at implementation time. As of this README update, the practical shortlist should be:
 
-- **Qwen instruct/coder family:** strong multilingual and structured-output performance; good candidate for extraction/classification adapters.
-- **Llama open-weight family:** strong ecosystem support and deployment tooling; evaluate license fit before commercial positioning.
-- **Mistral/Mixtral family:** efficient inference options and mature serving ecosystem.
-- **DeepSeek open-weight family:** strong reasoning/coding options, but validate license, hosting risk, and latency/cost for the target deployment.
-- **Gemma family:** useful for lightweight private workloads; validate license terms and task quality.
+- **Gemma 4 E4B Instruct:** default Flow Pilot base model for local demos and LoRA/QLoRA adapters because it is small enough to iterate on and aligned with structured extraction/classification work.
+- **Gemma 4 12B:** upgrade path for stronger local chat/extraction quality on developer workstations.
+- **Gemma 4 26B-A4B MoE / 31B Dense:** evaluate only when production GPU capacity justifies the cost and latency.
+- **Other open-weight models:** compare only through the same evaluation gates; do not swap models without extraction, groundedness, and latency benchmarks.
 
 #### Fine-tuning plan
 
@@ -452,10 +451,10 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 CLERK_SECRET_KEY=...
 AI_PROVIDER=local
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
-LOCAL_LLM_MODEL=qwen3:8b
-LOCAL_CLASSIFICATION_MODEL=qwen3:8b
-LOCAL_EXTRACTION_MODEL=qwen3:8b
-LOCAL_CHAT_MODEL=qwen3:8b
+LOCAL_LLM_MODEL=google/gemma-4-E4B-it
+LOCAL_CLASSIFICATION_MODEL=google/gemma-4-E4B-it
+LOCAL_EXTRACTION_MODEL=google/gemma-4-E4B-it
+LOCAL_CHAT_MODEL=google/gemma-4-E4B-it
 # Optional fallback if AI_PROVIDER=gemini:
 GEMINI_API_KEY=...
 GEMINI_CLASSIFICATION_MODEL=gemini-2.5-flash
@@ -474,11 +473,10 @@ APP_BASE_URL=http://localhost:3000
 
 ### Local open-source model mode
 
-Flow Pilot now defaults to `AI_PROVIDER=local`, which calls an OpenAI-compatible local model server instead of a paid model API. For a resume demo, download Qwen3 8B through Ollama and run:
+Flow Pilot now defaults to `AI_PROVIDER=local`, which calls an OpenAI-compatible local model server instead of a paid model API. For a resume demo, serve Gemma 4 E4B Instruct through an OpenAI-compatible runtime such as vLLM and run:
 
 ```bash
-ollama pull qwen3:8b
-ollama serve
+vllm serve google/gemma-4-E4B-it --served-model-name google/gemma-4-E4B-it --host 0.0.0.0 --port 11434
 cd flow-pilot
 npm run ai:smoke
 ```

@@ -1,5 +1,5 @@
 const baseUrl = (process.env.LOCAL_LLM_BASE_URL || 'http://localhost:11434/v1').replace(/\/$/, '');
-const model = process.env.LOCAL_LLM_MODEL || 'qwen3:8b';
+const model = process.env.LOCAL_LLM_MODEL || 'google/gemma-4-E4B-it';
 
 try {
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -27,7 +27,7 @@ try {
   const data = await response.json();
   console.log(data.choices?.[0]?.message?.content?.trim() || data);
 } catch (error) {
-  console.error(`Local model smoke check failed for ${model} at ${baseUrl}. Start the local model server first (for example: ollama pull ${model} && ollama serve).`);
+  console.error(`Local model smoke check failed for ${model} at ${baseUrl}. Start an OpenAI-compatible local model server first (for example: vLLM/TGI/LM Studio/Ollama serving ${model}).`);
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }

@@ -20,7 +20,7 @@ interface OpenAiCompatibleResponse {
 }
 
 const DEFAULT_LOCAL_BASE_URL = 'http://localhost:11434/v1';
-const DEFAULT_LOCAL_MODEL = 'qwen3:8b';
+const DEFAULT_LOCAL_MODEL = 'google/gemma-4-E4B-it';
 
 let geminiClient: GoogleGenerativeAI | null = null;
 

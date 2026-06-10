@@ -4,33 +4,34 @@ Flow Pilot can run without paid model APIs by pointing the app at a downloaded o
 
 ## Recommended base model
 
-Use **Qwen3 8B Instruct** as the default local model for this project profile:
+Use **Gemma 4 E4B Instruct** as the default local model for this project profile:
 
 - small enough for local development with quantization;
 - strong structured-output behavior for email classification and JSON extraction;
 - practical LoRA/QLoRA fine-tuning target for order extraction, feedback taxonomy, and SKU alias resolution;
-- can be served locally through Ollama for demos or through vLLM/TGI for production GPU hosting.
+- can be served locally through vLLM, Text Generation Inference, LM Studio, or an Ollama import for demos and production-like testing.
 
-Larger open-weight models such as Qwen3 14B/32B, Llama 4 Scout/Maverick, Mistral, DeepSeek, or Gemma can be evaluated later, but they need more VRAM and a license review before production use.
+Larger Gemma 4 variants such as 12B, 26B-A4B MoE, or 31B Dense can be evaluated later, but they need more VRAM and a license/deployment review before production use.
 
 ## Local inference setup
 
-Example with Ollama:
+Example with vLLM using the Hugging Face model ID:
 
 ```bash
-ollama pull qwen3:8b
-ollama serve
+vllm serve google/gemma-4-E4B-it --served-model-name google/gemma-4-E4B-it --host 0.0.0.0 --port 11434
 ```
+
+If using Ollama, import or pull the equivalent Gemma 4 E4B instruct checkpoint and set `LOCAL_LLM_MODEL` to that local tag.
 
 Configure the Next.js app:
 
 ```bash
 AI_PROVIDER=local
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
-LOCAL_LLM_MODEL=qwen3:8b
-LOCAL_CLASSIFICATION_MODEL=qwen3:8b
-LOCAL_EXTRACTION_MODEL=qwen3:8b
-LOCAL_CHAT_MODEL=qwen3:8b
+LOCAL_LLM_MODEL=google/gemma-4-E4B-it
+LOCAL_CLASSIFICATION_MODEL=google/gemma-4-E4B-it
+LOCAL_EXTRACTION_MODEL=google/gemma-4-E4B-it
+LOCAL_CHAT_MODEL=google/gemma-4-E4B-it
 ```
 
 Any OpenAI-compatible server can be used by changing `LOCAL_LLM_BASE_URL` and model names.
@@ -60,7 +61,7 @@ Use LoRA/QLoRA with Unsloth, Axolotl, or TRL. Keep the exact framework out of ap
 Example high-level command pattern:
 
 ```bash
-python -m axolotl.cli.train ml/fine-tuning/qwen3-flow-pilot-lora.yml
+python -m axolotl.cli.train ml/fine-tuning/gemma4-flow-pilot-lora.yml
 ```
 
 After training, serve the adapter merged or loaded on top of the base model through an OpenAI-compatible server and point `LOCAL_*_MODEL` to that served model name.
