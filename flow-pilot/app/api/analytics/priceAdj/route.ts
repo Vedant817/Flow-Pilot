@@ -39,7 +39,7 @@ export async function GET() {
         const productOrderData: { [key: string]: ProductOrderData } = {};
         const currentDate = new Date();
 
-        orders.forEach(order => {
+        orders.forEach((order: any) => {
             if (!order || !order.products) {
                 console.warn(`Order missing products array:`, order?._id || 'unknown ID');
                 return;
@@ -89,7 +89,7 @@ export async function GET() {
             data.averageOrderQuantity = data.totalOrdered / data.orderFrequency;
         });
 
-        const recommendations: PricingAnalysis[] = inventory.map(item => {
+        const recommendations: PricingAnalysis[] = inventory.map((item: any) => {
             const orderData = productOrderData[item.name];
             const stockLevel = item.quantity;
             const stockAlertLevel = item.stock_alert_level;
@@ -146,12 +146,16 @@ export async function GET() {
                 urgency = 'medium';
                 potentialImpact = `Revenue optimization: ₹${((recommendedPrice - currentPrice) * avgOrderQty * demandMultiplier).toFixed(0)}/month`;
             } else {
-                const adjustment = categoryPremium + (Math.random() - 0.5) * 2;
+                const adjustment = Math.max(-2, Math.min(3, categoryPremium));
                 recommendedPrice = currentPrice * (1 + adjustment / 100);
-                reason = `Stable product. Minor adjustment based on category trends and market positioning.`;
-                confidence = 60;
+                reason = adjustment === 0
+                    ? `Stable product. No price change recommended without stronger demand, margin, or competitor signals.`
+                    : `Stable product. Deterministic category-based adjustment only; requires approval before applying.`;
+                confidence = adjustment === 0 ? 70 : 62;
                 urgency = 'low';
-                potentialImpact = `Marginal impact: ₹${Math.abs((recommendedPrice - currentPrice) * avgOrderQty * 0.5).toFixed(0)}/month`;
+                potentialImpact = adjustment === 0
+                    ? `No immediate revenue impact; monitor demand and stock movement.`
+                    : `Marginal impact estimate: ₹${Math.abs((recommendedPrice - currentPrice) * avgOrderQty * 0.5).toFixed(0)}/month`;
             }
 
             const minPrice = currentPrice * 0.7;
@@ -209,11 +213,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
-        const { productId, newPrice, applyRecommendation } = await request.json();
+        const { productId, newPrice } = await request.json();
+        const parsedNewPrice = Number(newPrice);
 
-        if (!productId || (!newPrice && !applyRecommendation)) {
+        if (!productId || !Number.isFinite(parsedNewPrice)) {
             return NextResponse.json({
-                error: "Missing required fields: productId and (newPrice or applyRecommendation)"
+                error: "Missing required fields: productId and a numeric newPrice"
+            }, { status: 400 });
+        }
+
+        if (!Number.isFinite(parsedNewPrice) || parsedNewPrice <= 0) {
+            return NextResponse.json({
+                error: "newPrice must be a positive number"
             }, { status: 400 });
         }
 
@@ -225,7 +236,7 @@ export async function POST(request: NextRequest) {
         }
 
         const oldPrice = product.price;
-        product.price = newPrice;
+        product.price = parsedNewPrice;
         await product.save();
 
         return NextResponse.json({
@@ -234,9 +245,9 @@ export async function POST(request: NextRequest) {
                 id: product._id,
                 name: product.name,
                 oldPrice: oldPrice,
-                newPrice: newPrice,
-                priceChange: newPrice - oldPrice,
-                priceChangePercent: ((newPrice - oldPrice) / oldPrice * 100).toFixed(2)
+                newPrice: parsedNewPrice,
+                priceChange: parsedNewPrice - oldPrice,
+                priceChangePercent: oldPrice > 0 ? ((parsedNewPrice - oldPrice) / oldPrice * 100).toFixed(2) : null
             }
         });
 

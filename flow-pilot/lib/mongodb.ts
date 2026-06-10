@@ -3,7 +3,7 @@ import mongoose, { Mongoose } from 'mongoose';
 
 const MONGO_URI = process.env.MONGO_URI!;
 const DATABASE_NAME = "store_db";
-const collections = ["orders", "inventory", "customers", "chat_history", "feedback", "errors"];
+const collections = ["orders", "inventory", "customers", "chat_history", "feedback", "errors", "processed_emails"];
 
 if (!MONGO_URI) {
     throw new Error('Please define the MONGO_URI environment variable inside .env.local');
