@@ -16,7 +16,7 @@ interface OpenAiCompatibleResponse {
 }
 
 const DEFAULT_LOCAL_BASE_URL = 'http://localhost:11434/v1';
-const DEFAULT_LOCAL_MODEL = 'google/gemma-4-E4B-it';
+const DEFAULT_LOCAL_MODEL = 'flow-pilot-gemma4-lora';
 
 function getTaskModel(task: GenerateTextOptions['task']): string {
   if (task === 'email_classification') return process.env.LOCAL_CLASSIFICATION_MODEL || process.env.LOCAL_LLM_MODEL || DEFAULT_LOCAL_MODEL;

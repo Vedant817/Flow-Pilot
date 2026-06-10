@@ -1,5 +1,5 @@
 const baseUrl = (process.env.LOCAL_LLM_BASE_URL || 'http://localhost:11434/v1').replace(/\/$/, '');
-const model = process.env.LOCAL_LLM_MODEL || 'google/gemma-4-E4B-it';
+const model = process.env.LOCAL_LLM_MODEL || 'flow-pilot-gemma4-lora';
 
 try {
   const response = await fetch(`${baseUrl}/chat/completions`, {

@@ -316,7 +316,7 @@ The project now uses a local open-weight Gemma 4 model path instead of paid LLM 
 
 #### Recommended model policy
 
-1. **Local open-weight only:** use Gemma 4 E4B Instruct through an OpenAI-compatible local server for private extraction, classification, and copilot answers.
+1. **Local open-weight only:** use the fine-tuned `flow-pilot-gemma4-lora` adapter, based on Gemma 4 E4B Instruct, through an OpenAI-compatible local server for private extraction, classification, and copilot answers.
 2. **No paid model API dependency:** keep the application model gateway local-only so demos and production-like deployments do not require external LLM APIs.
 3. **Do not fine-tune the general copilot first:** use RAG, tools, prompts, and evaluations before training.
 4. **Fine-tune only narrow Gemma 4 adapters:** order-email extraction, feedback taxonomy classification, SKU alias resolution, or routing intents.
@@ -325,7 +325,7 @@ The project now uses a local open-weight Gemma 4 model path instead of paid LLM 
 
 Model availability changes quickly, so pin the selected model and license at implementation time. As of this README update, the practical shortlist should be:
 
-- **Gemma 4 E4B Instruct:** default Flow Pilot base model for local demos and LoRA/QLoRA adapters because it is small enough to iterate on and aligned with structured extraction/classification work.
+- **`flow-pilot-gemma4-lora` (fine-tuned from Gemma 4 E4B Instruct):** default Flow Pilot base model for local demos and LoRA/QLoRA adapters because it is small enough to iterate on and aligned with structured extraction/classification work.
 - **Gemma 4 12B:** upgrade path for stronger local chat/extraction quality on developer workstations.
 - **Gemma 4 26B-A4B MoE / 31B Dense:** evaluate only when production GPU capacity justifies the cost and latency.
 - **Other open-weight models:** compare only through the same evaluation gates; do not swap models without extraction, groundedness, and latency benchmarks.
@@ -450,10 +450,10 @@ MONGO_URI=mongodb://localhost:27017/store_db
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 CLERK_SECRET_KEY=...
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
-LOCAL_LLM_MODEL=google/gemma-4-E4B-it
-LOCAL_CLASSIFICATION_MODEL=google/gemma-4-E4B-it
-LOCAL_EXTRACTION_MODEL=google/gemma-4-E4B-it
-LOCAL_CHAT_MODEL=google/gemma-4-E4B-it
+LOCAL_LLM_MODEL=flow-pilot-gemma4-lora
+LOCAL_CLASSIFICATION_MODEL=flow-pilot-gemma4-lora
+LOCAL_EXTRACTION_MODEL=flow-pilot-gemma4-lora
+LOCAL_CHAT_MODEL=flow-pilot-gemma4-lora
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/callback
@@ -466,15 +466,22 @@ APP_BASE_URL=http://localhost:3000
 
 ### Local open-source model mode
 
-Flow Pilot uses a local OpenAI-compatible Gemma model server instead of a paid model API. For a resume demo, serve Gemma 4 E4B Instruct through an OpenAI-compatible runtime such as vLLM and run:
+Flow Pilot uses a local OpenAI-compatible fine-tuned Gemma model server instead of a paid model API. For a resume demo, serve the trained `flow-pilot-gemma4-lora` adapter through an OpenAI-compatible runtime such as vLLM and run:
 
 ```bash
-vllm serve google/gemma-4-E4B-it --served-model-name google/gemma-4-E4B-it --host 0.0.0.0 --port 11434
+vllm serve artifacts/gemma4-flow-pilot-lora --served-model-name flow-pilot-gemma4-lora --host 0.0.0.0 --port 11434
 cd flow-pilot
 npm run ai:smoke
 ```
 
 Fine-tuning guidance, JSONL dataset format, and a QLoRA/Axolotl template live in `flow-pilot/ml/fine-tuning/`. Fine-tune only the extraction/classification adapters after collecting reviewed labels and passing the evaluation gates documented there.
+
+
+### Vercel deployment note
+
+The web app does **not** run the Gemma model inside Vercel serverless functions. Deploy the fine-tuned `flow-pilot-gemma4-lora` adapter on a GPU host that exposes an OpenAI-compatible `/v1/chat/completions` endpoint, then set `LOCAL_LLM_BASE_URL` in Vercel to that HTTPS endpoint. For local development, `http://localhost:11434/v1` is fine; for Vercel, localhost points to the serverless container and will not reach your workstation.
+
+`next.config.ts` currently allows Vercel builds to complete while the legacy UI is migrated to strict TypeScript and ESLint. Keep runtime validation and smoke tests enabled; remove those build bypasses after the remaining legacy type issues are fixed.
 
 ## 11. Verification commands
 

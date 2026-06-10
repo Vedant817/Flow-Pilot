@@ -4,7 +4,7 @@ Flow Pilot can run without paid model APIs by pointing the app at a downloaded o
 
 ## Recommended base model
 
-Use **Gemma 4 E4B Instruct** as the default local model for this project profile:
+Use **Gemma 4 E4B Instruct** as the base model and serve the fine-tuned adapter as `flow-pilot-gemma4-lora`:
 
 - small enough for local development with quantization;
 - strong structured-output behavior for email classification and JSON extraction;
@@ -18,19 +18,19 @@ Larger Gemma 4 variants such as 12B, 26B-A4B MoE, or 31B Dense can be evaluated 
 Example with vLLM using the Hugging Face model ID:
 
 ```bash
-vllm serve google/gemma-4-E4B-it --served-model-name google/gemma-4-E4B-it --host 0.0.0.0 --port 11434
+vllm serve artifacts/gemma4-flow-pilot-lora --served-model-name flow-pilot-gemma4-lora --host 0.0.0.0 --port 11434
 ```
 
-If using Ollama, import or pull the equivalent Gemma 4 E4B instruct checkpoint and set `LOCAL_LLM_MODEL` to that local tag.
+If using Ollama, import a merged Gemma 4 adapter with a `Modelfile` and set `LOCAL_LLM_MODEL=flow-pilot-gemma4-lora`.
 
 Configure the Next.js app:
 
 ```bash
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
-LOCAL_LLM_MODEL=google/gemma-4-E4B-it
-LOCAL_CLASSIFICATION_MODEL=google/gemma-4-E4B-it
-LOCAL_EXTRACTION_MODEL=google/gemma-4-E4B-it
-LOCAL_CHAT_MODEL=google/gemma-4-E4B-it
+LOCAL_LLM_MODEL=flow-pilot-gemma4-lora
+LOCAL_CLASSIFICATION_MODEL=flow-pilot-gemma4-lora
+LOCAL_EXTRACTION_MODEL=flow-pilot-gemma4-lora
+LOCAL_CHAT_MODEL=flow-pilot-gemma4-lora
 ```
 
 Any OpenAI-compatible server can be used by changing `LOCAL_LLM_BASE_URL` and model names.
