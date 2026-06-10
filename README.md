@@ -481,7 +481,7 @@ Fine-tuning guidance, JSONL dataset format, and a QLoRA/Axolotl template live in
 
 The web app does **not** run the Gemma model inside Vercel serverless functions. Deploy the fine-tuned `flow-pilot-gemma4-lora` adapter on a GPU host that exposes an OpenAI-compatible `/v1/chat/completions` endpoint, then set `LOCAL_LLM_BASE_URL` in Vercel to that HTTPS endpoint. For local development, `http://localhost:11434/v1` is fine; for Vercel, localhost points to the serverless container and will not reach your workstation.
 
-`next.config.ts` currently allows Vercel builds to complete while the legacy UI is migrated to strict TypeScript and ESLint. Keep runtime validation and smoke tests enabled; remove those build bypasses after the remaining legacy type issues are fixed.
+`vercel.json` deploys the `flow-pilot/` sub-app from the repository root and uses `npm install --legacy-peer-deps` to avoid the existing peer-dependency resolver conflict. `next.config.ts` temporarily allows builds to complete while the legacy UI is migrated to strict TypeScript and ESLint; remove those build bypasses after the remaining legacy type issues are fixed.
 
 ## 11. Verification commands
 
