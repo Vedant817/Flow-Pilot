@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { classifyEmail, extractOrderDetails, extractFeedbackDetails } from '@/lib/gemini-utils';
+import { classifyEmail, extractOrderDetails, extractFeedbackDetails } from '@/lib/email-ai-utils';
 import { Order } from '@/models/Order';
 import { Feedback } from '@/models/Feedback';
 import { Error as ErrorModel } from '@/models/Error';

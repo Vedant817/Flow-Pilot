@@ -26,7 +26,6 @@ If using Ollama, import or pull the equivalent Gemma 4 E4B instruct checkpoint a
 Configure the Next.js app:
 
 ```bash
-AI_PROVIDER=local
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
 LOCAL_LLM_MODEL=google/gemma-4-E4B-it
 LOCAL_CLASSIFICATION_MODEL=google/gemma-4-E4B-it

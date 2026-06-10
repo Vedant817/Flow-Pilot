@@ -1,6 +1,6 @@
 # Flow Pilot — AI Operations Copilot for Commerce Fulfillment
 
-Flow Pilot is a Next.js operations dashboard for small-to-mid-market commerce teams that need a single control plane for orders, inventory, customer feedback, error triage, and AI-assisted operational decision making. The repository currently contains a working application shell with MongoDB-backed API routes, Clerk authentication pages, Gmail ingestion, analytics views, inventory forecasting/price-adjustment routes, and a LangChain/Gemini retrieval chatbot. This README documents the real implementation, the engineering gaps discovered during repo analysis, and the production-grade implementation plan needed to turn the project into a resume-quality, domain-aware system.
+Flow Pilot is a Next.js operations dashboard for small-to-mid-market commerce teams that need a single control plane for orders, inventory, customer feedback, error triage, and AI-assisted operational decision making. The repository currently contains a working application shell with MongoDB-backed API routes, Clerk authentication pages, Gmail ingestion, analytics views, inventory forecasting/price-adjustment routes, and a local Gemma-powered operations copilot. This README documents the real implementation, the engineering gaps discovered during repo analysis, and the production-grade implementation plan needed to turn the project into a resume-quality, domain-aware system.
 
 > **Resume positioning:** present this as an AI-assisted commerce operations platform, not a generic dashboard. The strongest narrative is: event-driven order ingestion, inventory risk analytics, retrieval-grounded operations copilot, measurable evaluation harnesses, and production controls for multi-tenant commerce data.
 
@@ -15,13 +15,13 @@ Flow Pilot is a Next.js operations dashboard for small-to-mid-market commerce te
 | Inventory | CRUD-style inventory API, inventory dashboard, forecasting, dynamic pricing, and deadstock pages. | Add SKU/location modeling, reorder-point math, supplier lead times, backorder handling, inventory ledger, and explainable recommendations. |
 | Analytics | Customer/product/overview analytics routes aggregate order and inventory data. | Move heavy analytics into typed service modules, materialized views, scheduled jobs, and quality checks. |
 | Feedback and errors | Feedback and error APIs with validation, search/filter utilities, and dashboard pages. | Add sentiment confidence, taxonomy, alert routing, source correlation, PII retention controls, and incident workflow. |
-| Gmail ingestion | Google OAuth/watch/webhook routes classify inbound email and extract order/feedback details with Gemini helpers. | Add Pub/Sub signature validation, replay protection, idempotency keys, attachment parsing pipeline, and dead-letter queues. |
+| Gmail ingestion | Google OAuth/watch/webhook routes classify inbound email and extract order/feedback details with local Gemma-backed helpers. | Add Pub/Sub signature validation, replay protection, idempotency keys, attachment parsing pipeline, and dead-letter queues. |
 | Chatbot | LangChain retrieval chain loads attachments plus MongoDB orders, inventory, errors, and feedback into an in-memory vector store. | Replace per-process memory retrieval with persistent tenant-scoped RAG, tool calling for live data, citations, authorization filters, and evaluation gates. |
 
 ### Technology snapshot
 
 - **Frontend:** Next.js 15 App Router, React 18, Tailwind CSS, Recharts/Chart.js, MUI Data Grid, table libraries, Clerk auth.
-- **Backend:** Next.js route handlers, Mongoose/MongoDB, Google APIs/PubSub/Gmail integrations, LangChain, Gemini, OpenAI package dependency available.
+- **Backend:** Next.js route handlers, Mongoose/MongoDB, Google APIs/PubSub/Gmail integrations, and a local Gemma 4 model gateway served through an OpenAI-compatible endpoint.
 - **Testing:** Jest and React Testing Library are configured, with tests for API utility clients and Gmail webhook behavior.
 - **Current persistence model:** MongoDB collections for orders, inventory, feedback, errors, conversations, and related analytics reads.
 
@@ -135,7 +135,7 @@ These are concrete issues found in the current implementation that should be fix
 13. **Conversation retention:** chat history lacks tenant/user ownership, TTL, deletion/export controls, and max-length policy.
 14. **Hardcoded environment assumptions:** localhost/public base URLs and direct public API env usage should be replaced with relative paths and validated config.
 15. **Destructive operations need guardrails:** broad delete/update routes should require role checks, typed filters, confirmation workflows, audit logs, and rollback strategy.
-16. **Tests need alignment:** webhook and API tests should be refreshed to match the current Gemini/Mongoose implementation and should include security, validation, idempotency, and failure-path cases.
+16. **Tests need alignment:** webhook and API tests should be refreshed to match the current local Gemma/Mongoose implementation and should include security, validation, idempotency, and failure-path cases.
 
 ## 5. Target production architecture
 
@@ -158,7 +158,7 @@ These are concrete issues found in the current implementation that should be fix
         │               │                               │
 ┌───────▼───────┐ ┌─────▼─────────────────┐ ┌──────────▼───────────────┐
 │ Repositories  │ │ Event/Job Pipeline     │ │ AI Gateway               │
-│ MongoDB       │ │ Pub/Sub or queue       │ │ API models + OSS models  │
+│ MongoDB       │ │ Pub/Sub or queue       │ │ Local Gemma 4 + evals    │
 │ indexes       │ │ idempotency + retries  │ │ RAG + tools + evals      │
 └───────┬───────┘ └─────┬─────────────────┘ └──────────┬───────────────┘
         │               │                               │
@@ -285,8 +285,8 @@ flow-pilot/
 ### Phase 4 — AI copilot done properly
 
 1. Build an `AiGateway` abstraction:
-   - Supports API models for high-quality reasoning and open-weight models for private/offline workloads.
-   - Records model name, prompt version, latency, token counts, cost, and safety outcome.
+   - Supports the locally served Gemma 4 model for classification, extraction, and copilot answers.
+   - Records model name, prompt version, latency, token counts where available, and safety outcome.
 2. Use RAG only for knowledge retrieval:
    - Persist embeddings in a vector database or MongoDB Atlas Vector Search.
    - Chunk curated domain documents, not raw JSON dumps.
@@ -312,12 +312,12 @@ flow-pilot/
 
 ### Phase 5 — Open-source model strategy and fine-tuning
 
-The project currently uses model APIs. That is the correct starting point because the core product risk is workflow quality, not training a generic chatbot. Fine-tuning should be introduced only where it has a measurable advantage.
+The project now uses a local open-weight Gemma 4 model path instead of paid LLM APIs. Fine-tuning should still be introduced only where it has a measurable advantage over prompts, validation, and retrieval.
 
 #### Recommended model policy
 
-1. **Local open-weight default:** use Gemma 4 E4B Instruct through an OpenAI-compatible local server for private extraction, classification, and copilot answers.
-2. **API fallback only when needed:** keep Gemini as an optional fallback for environments that cannot host a local model or need higher-quality reasoning.
+1. **Local open-weight only:** use Gemma 4 E4B Instruct through an OpenAI-compatible local server for private extraction, classification, and copilot answers.
+2. **No paid model API dependency:** keep the application model gateway local-only so demos and production-like deployments do not require external LLM APIs.
 3. **Do not fine-tune the general copilot first:** use RAG, tools, prompts, and evaluations before training.
 4. **Fine-tune only narrow Gemma 4 adapters:** order-email extraction, feedback taxonomy classification, SKU alias resolution, or routing intents.
 
@@ -347,9 +347,9 @@ Model availability changes quickly, so pin the selected model and license at imp
 5. Evaluate against holdout data and adversarial cases.
 6. Version datasets, prompts, adapters, and eval reports.
 7. Serve with vLLM/TGI/Ollama-compatible local path for demos and a hosted GPU path for production.
-8. Keep a model fallback chain:
-   - local fine-tuned extractor for routine structured work.
-   - API model fallback for low-confidence or novel cases.
+8. Keep a local model escalation chain:
+   - local fine-tuned Gemma adapter for routine structured work.
+   - larger locally hosted Gemma variant for low-confidence or novel cases.
    - human review for high-risk mutations.
 
 ### Phase 6 — Observability and production readiness
@@ -449,18 +449,11 @@ Create `flow-pilot/.env.local` with the required variables for the features you 
 MONGO_URI=mongodb://localhost:27017/store_db
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 CLERK_SECRET_KEY=...
-AI_PROVIDER=local
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
 LOCAL_LLM_MODEL=google/gemma-4-E4B-it
 LOCAL_CLASSIFICATION_MODEL=google/gemma-4-E4B-it
 LOCAL_EXTRACTION_MODEL=google/gemma-4-E4B-it
 LOCAL_CHAT_MODEL=google/gemma-4-E4B-it
-# Optional fallback if AI_PROVIDER=gemini:
-GEMINI_API_KEY=...
-GEMINI_CLASSIFICATION_MODEL=gemini-2.5-flash
-GEMINI_EXTRACTION_MODEL=gemini-2.5-flash
-GEMINI_CHAT_MODEL=gemini-2.5-flash
-OPENAI_API_KEY=...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/callback
@@ -473,7 +466,7 @@ APP_BASE_URL=http://localhost:3000
 
 ### Local open-source model mode
 
-Flow Pilot now defaults to `AI_PROVIDER=local`, which calls an OpenAI-compatible local model server instead of a paid model API. For a resume demo, serve Gemma 4 E4B Instruct through an OpenAI-compatible runtime such as vLLM and run:
+Flow Pilot uses a local OpenAI-compatible Gemma model server instead of a paid model API. For a resume demo, serve Gemma 4 E4B Instruct through an OpenAI-compatible runtime such as vLLM and run:
 
 ```bash
 vllm serve google/gemma-4-E4B-it --served-model-name google/gemma-4-E4B-it --host 0.0.0.0 --port 11434

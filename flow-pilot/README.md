@@ -29,6 +29,6 @@ npm run ai:smoke
 - Do not hardcode model names, localhost URLs, fake metrics, tenant IDs, product names as SKU identifiers, or raw AI responses.
 - Use validated environment configuration before initializing MongoDB, Gmail, Clerk, or model providers.
 - Keep `GMAIL_WEBHOOK_TOKEN` configured outside local throwaway demos so the public Gmail webhook rejects spoofed requests.
-- Prefer `AI_PROVIDER=local` with a downloaded open-weight model served through Ollama/vLLM/LM Studio; configure `LOCAL_LLM_BASE_URL` and `LOCAL_*_MODEL` instead of editing business logic.
-- Use `AI_PROVIDER=gemini` only as an optional fallback path, with Gemini model names configured via environment variables.
+- Use a downloaded/open-weight Gemma 4 model served through Ollama/vLLM/LM Studio; configure `LOCAL_LLM_BASE_URL` and `LOCAL_*_MODEL` instead of editing business logic.
+- Do not add paid LLM API fallbacks for production paths; the AI gateway is intentionally local-only.
 - Use RAG and tool calling before fine-tuning; fine-tune only task-specific extraction/classification adapters after labeled data and evaluation thresholds exist.
