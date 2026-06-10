@@ -450,11 +450,17 @@ Create `flow-pilot/.env.local` with the required variables for the features you 
 MONGO_URI=mongodb://localhost:27017/store_db
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 CLERK_SECRET_KEY=...
+AI_PROVIDER=local
+LOCAL_LLM_BASE_URL=http://localhost:11434/v1
+LOCAL_LLM_MODEL=qwen3:8b
+LOCAL_CLASSIFICATION_MODEL=qwen3:8b
+LOCAL_EXTRACTION_MODEL=qwen3:8b
+LOCAL_CHAT_MODEL=qwen3:8b
+# Optional fallback if AI_PROVIDER=gemini:
 GEMINI_API_KEY=...
 GEMINI_CLASSIFICATION_MODEL=gemini-2.5-flash
 GEMINI_EXTRACTION_MODEL=gemini-2.5-flash
 GEMINI_CHAT_MODEL=gemini-2.5-flash
-GEMINI_EMBEDDING_MODEL=embedding-001
 OPENAI_API_KEY=...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
@@ -464,6 +470,20 @@ GOOGLE_TOPIC_NAME=...
 GMAIL_WEBHOOK_TOKEN=replace-with-a-strong-shared-secret
 APP_BASE_URL=http://localhost:3000
 ```
+
+
+### Local open-source model mode
+
+Flow Pilot now defaults to `AI_PROVIDER=local`, which calls an OpenAI-compatible local model server instead of a paid model API. For a resume demo, download Qwen3 8B through Ollama and run:
+
+```bash
+ollama pull qwen3:8b
+ollama serve
+cd flow-pilot
+npm run ai:smoke
+```
+
+Fine-tuning guidance, JSONL dataset format, and a QLoRA/Axolotl template live in `flow-pilot/ml/fine-tuning/`. Fine-tune only the extraction/classification adapters after collecting reviewed labels and passing the evaluation gates documented there.
 
 ## 11. Verification commands
 
