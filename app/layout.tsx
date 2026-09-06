@@ -33,7 +33,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-900 h-screen overflow-hidden`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#08080A] text-zinc-100 h-screen overflow-hidden`}
         >
           <div className="h-full flex">
             {children}
