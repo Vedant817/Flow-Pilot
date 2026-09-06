@@ -9,6 +9,9 @@ import {
   toolCustomerProfile,
   toolInventoryValue,
   toolDealerNetwork,
+  toolSchemeEligibility,
+  toolCouponLookup,
+  toolSchemeAnalytics,
   type ToolResult,
 } from './tools';
 
@@ -24,7 +27,7 @@ import {
  * verified data, which keeps a 360M-parameter model reliable in production.
  */
 
-type Intent = 'orders_overview' | 'revenue_trend' | 'top_products' | 'low_stock' | 'customer_lookup' | 'inventory_value' | 'dealer_network' | 'general';
+type Intent = 'orders_overview' | 'revenue_trend' | 'top_products' | 'low_stock' | 'customer_lookup' | 'inventory_value' | 'dealer_network' | 'scheme_lookup' | 'general';
 
 const INTENT_EXEMPLARS: Record<Exclude<Intent, 'general'>, string[]> = {
   orders_overview: [
@@ -44,8 +47,8 @@ const INTENT_EXEMPLARS: Record<Exclude<Intent, 'general'>, string[]> = {
     'inventory running out', 'stock alerts', 'reorder recommendations',
   ],
   customer_lookup: [
-    'find customer', 'details about a dealer', 'customer order history',
-    'who ordered', 'lookup account by email or name', 'how many orders did this customer place',
+    'find customer', 'customer order history for',
+    'lookup account by email', 'orders placed by',
   ],
   inventory_value: [
     'total inventory value', 'how much stock worth', 'warehouse value',
@@ -55,6 +58,12 @@ const INTENT_EXEMPLARS: Record<Exclude<Intent, 'general'>, string[]> = {
     'dealer network performance and account health', 'which dealers are high risk or over credit limit',
     'territory sales performance', 'credit exposure and overdue accounts',
     'dealer returns and service levels', 'which country territory is strongest',
+  ],
+  scheme_lookup: [
+    'eligible for loyalty discount', 'qualify for free setup', 'at-risk winback coupon',
+    'my promotion code', 'scheme redemption rate', 'regular cadence customers',
+    'slipping customers', 'dormant tenured', 'holdout lift', 'promotion ROI',
+    'coupon by code', 'which promotion am I eligible for',
   ],
 };
 
@@ -67,6 +76,18 @@ declare global {
 }
 const routerCache: RouterCache = global.__flowpilotRouter ?? (global.__flowpilotRouter = { exemplarVectors: null });
 
+const THRESHOLDS: Record<Intent, number> = {
+  orders_overview: 0.42,
+  revenue_trend: 0.42,
+  top_products: 0.42,
+  low_stock: 0.42,
+  customer_lookup: 0.42,
+  inventory_value: 0.42,
+  dealer_network: 0.45,
+  scheme_lookup: 0.55,
+  general: 0.42,
+};
+
 async function routeIntent(queryEmbedding: number[]): Promise<Intent> {
   if (!routerCache.exemplarVectors) {
     const map = new Map<Intent, number[][]>();
@@ -78,10 +99,11 @@ async function routeIntent(queryEmbedding: number[]): Promise<Intent> {
   }
 
   let best: Intent = 'general';
-  let bestScore = 0.42; // below this → general conversation
+  let bestScore = THRESHOLDS.general;
   for (const [intent, vectors] of routerCache.exemplarVectors) {
+    const threshold = THRESHOLDS[intent as Intent] ?? 0.42;
     const max = Math.max(...vectors.map((v) => cosineSimilarity(queryEmbedding, v)));
-    if (max > bestScore) {
+    if (max > threshold && max > bestScore) {
       bestScore = max;
       best = intent;
     }
@@ -96,6 +118,10 @@ const TOOL_BY_INTENT: Partial<Record<Intent, () => Promise<ToolResult>>> = {
   low_stock: () => toolLowStock(),
   inventory_value: () => toolInventoryValue(),
   dealer_network: () => toolDealerNetwork(),
+  scheme_lookup: async () => {
+    const { toolSchemeAnalytics } = await import('./tools');
+    return toolSchemeAnalytics();
+  },
 };
 
 export interface CopilotContext {
@@ -109,17 +135,33 @@ export async function buildContext(query: string): Promise<CopilotContext> {
   const intent = await routeIntent(queryVec);
 
   const [sources, toolResult] = await Promise.all([
-    hybridRetrieve(query, { limit: 6 }),
+    intent === 'scheme_lookup' ? Promise.resolve([] as any) : hybridRetrieve(query, { limit: 6 }),
     TOOL_BY_INTENT[intent]?.().catch(() => null) ?? Promise.resolve(null),
   ]);
 
   const facts: ToolResult[] = [];
-  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(query) || /\b(customer|dealer|account)\b/i.test(query)) {
-    const m = query.match(/([\w.+-]+@[\w-]+\.[\w.]+)/) ?? query.match(/(?:about|for|of|by)\s+([A-Z][\w\s]{2,30})/i);
-    if (m) {
-      facts.push(await toolCustomerProfile(m[1].trim()).catch(() => null as never));
-    } else if (intent === 'customer_lookup') {
-      facts.push(await toolCustomerProfile(query.replace(/[^\w\s]/g, '').split(/\s+/).slice(-3).join(' ') || 'a').catch(() => null as never));
+  // Scheme lookup: single code lookup if coupon code present
+  if (intent === 'scheme_lookup') {
+    const codeMatch = query.match(/\b([A-Z0-9]{3,}-[A-Z0-9]{4,})\b/i);
+    if (codeMatch) {
+      facts.push(await toolCouponLookup(codeMatch[1].trim()).catch(() => null as never));
+    }
+    const emailMatch = query.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+    if (emailMatch) {
+      facts.push(await toolSchemeEligibility(emailMatch[0].trim()).catch(() => null as never));
+    } else if (/\b(eligible|loyal|promotion|coupon|winback|holdout)\b/i.test(query) && !codeMatch) {
+      // try to extract trailing name-ish term
+      const m = query.match(/(?:for|of|by)\s+([A-Z][\w\s]{2,30})/i);
+      if (m) facts.push(await toolSchemeEligibility(m[1].trim()).catch(() => null as never));
+    }
+  } else {
+    if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(query) || /\b(customer|dealer|account)\b/i.test(query)) {
+      const m = query.match(/([\w.+-]+@[\w-]+\.[\w.]+)/) ?? query.match(/(?:about|for|of|by)\s+([A-Z][\w\s]{2,30})/i);
+      if (m) {
+        facts.push(await toolCustomerProfile(m[1].trim()).catch(() => null as never));
+      } else if (intent === 'customer_lookup') {
+        facts.push(await toolCustomerProfile(query.replace(/[^\w\s]/g, '').split(/\s+/).slice(-3).join(' ') || 'a').catch(() => null as never));
+      }
     }
   }
   if (toolResult) facts.push(toolResult);
@@ -131,7 +173,7 @@ function formatContext(ctx: CopilotContext): string {
   const parts: string[] = [];
 
   ctx.facts.forEach((f, i) => {
-    parts.push(`[F${i + 1}] ${f.tool}: ${f.summary}\nDATA: ${JSON.stringify(f.facts).slice(0, 1400)}`);
+    parts.push(`[F${i + 1}] ${f.tool}: ${f.summary}\nDATA: ${JSON.stringify(f.facts).slice(0, 600)}`);
   });
 
   ctx.sources.forEach((s, i) => {
@@ -147,7 +189,8 @@ Rules:
 2. Cite sources inline like [S1] or [F2] when using them.
 3. Lead with the direct answer, then one short supporting insight. No preamble.
 4. Use ₹ and Indian numbering conventions where relevant.
-5. Be concise: max ~120 words unless listing data.`;
+5. Be concise: max ~120 words unless listing data.
+6. For promotion queries, cite [F1] lift numbers; if no promotions found, say "No promotions found — check /promotions" and never fabricate a code.`;
 
 export async function* streamCopilotResponse(
   query: string,

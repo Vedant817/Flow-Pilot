@@ -6,7 +6,7 @@ import { useUser, UserButton } from '@clerk/nextjs';
 import {
   ShoppingBag, Package, BarChart2, Bot, MessageSquare, AlertTriangle,
   TrendingUp, Skull, IndianRupee, Command as CommandIcon, Search,
-  ChevronLeft, Zap, CircleDot, Network,
+  ChevronLeft, Zap, CircleDot, Network, Ticket,
 } from 'lucide-react';
 
 interface NavItem {
@@ -31,6 +31,12 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
       { label: 'Analytics', href: '/analytics', icon: <BarChart2 size={16} /> },
       { label: 'Copilot', href: '/chatbot', icon: <Bot size={16} />, badge: 'AI' },
       { label: 'Forecasting', href: '/inventory/forecasting', icon: <TrendingUp size={16} /> },
+    ],
+  },
+  {
+    group: 'Commercial',
+    items: [
+      { label: 'Promotions', href: '/promotions', icon: <Ticket size={16} />, badge: 'NEW' },
     ],
   },
   {

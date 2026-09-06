@@ -201,3 +201,76 @@ export async function toolDealerNetwork(): Promise<ToolResult> {
     facts: { summary, topTerritories: territories, highestRiskAccounts: riskAccounts, source: 'UCI Online Retail, CC BY 4.0' },
   };
 }
+
+export async function toolSchemeEligibility(email: string): Promise<ToolResult> {
+  const conn = await dbConnect();
+  const db = conn.connection.db!;
+  const orgId = 'default';
+  const normalized = email.toLowerCase().trim();
+  // Try customer_signals first (O(1)), fallback to orders aggregation
+  let signal: any = await db.collection('customer_signals').findOne({ orgId, emailNormalized: normalized });
+  if (!signal) {
+    // fallback simple
+    const orders = await db.collection('orders').countDocuments({ $or: [{ emailNormalized: normalized }, { email: { $regex: `^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }] });
+    if (orders === 0) return { tool: 'scheme_eligibility', summary: `No customer found for ${email}.`, facts: {} };
+    signal = { email: normalized, frequency: orders };
+  }
+
+  const now = new Date();
+  const activeSchemes = await db.collection('promotion_schemes').find({ orgId, status: 'active', 'limits.validFrom': { $lte: now }, 'limits.validUntil': { $gte: now } }).limit(20).toArray();
+  const matched: any[] = [];
+  // Use matchesSignals if available — dynamic import to avoid cycle
+  let matchesFn: any = null;
+  try {
+    const mod = await import('@/lib/promotions/engine');
+    matchesFn = mod.matchesSignals;
+  } catch {}
+
+  for (const s of activeSchemes) {
+    if (matchesFn) {
+      try {
+        if (!matchesFn(signal, (s as any).eligibility, { toleranceOverride: (s as any).eligibility?.cadence?.toleranceMultiplier })) continue;
+      } catch { continue; }
+    }
+    matched.push({ code: (s as any).code, title: (s as any).title, benefitType: (s as any).benefitType });
+  }
+
+  const summary = matched.length
+    ? `${email} is eligible for ${matched.length} scheme(s): ${matched.map((m) => m.code).join(', ')}. Signal: recency ${signal.recencyDays ?? '?'}d, freq ${signal.frequency ?? '?'}, regular ${signal.isRegular ?? '?'}.`
+    : `${email} has no active eligible schemes. Signal: ${signal.segment || ''} recency ${signal.recencyDays ?? '?'}d.`;
+
+  // Budget ≤600 chars
+  const facts = { email: normalized, matched: matched.slice(0, 5), signal: { recencyDays: signal.recencyDays, frequency: signal.frequency, isRegular: signal.isRegular, isActiveTenured: signal.isActiveTenured, segment: signal.segment } };
+  return { tool: 'scheme_eligibility', summary: summary.slice(0, 600), facts };
+}
+
+export async function toolCouponLookup(code: string): Promise<ToolResult> {
+  const conn = await dbConnect();
+  const normalized = code.toUpperCase().trim();
+  const coupon = await conn.connection.db!.collection('coupons').findOne({ code: normalized });
+  if (!coupon) return { tool: 'coupon_lookup', summary: `No coupon found for ${code}.`, facts: {} };
+  const masked = `${String((coupon as any).email)[0]}***@${String((coupon as any).email).split('@')[1]}`;
+  return {
+    tool: 'coupon_lookup',
+    summary: `Coupon ${coupon.code} status ${coupon.status}, scheme ${coupon.schemeCodeDenorm}, expires ${new Date(coupon.expiresAt).toLocaleDateString()}, email ${masked}.`,
+    facts: { code: coupon.code, status: coupon.status, scheme: coupon.schemeCodeDenorm, expiresAt: coupon.expiresAt },
+  };
+}
+
+export async function toolSchemeAnalytics(): Promise<ToolResult> {
+  try {
+    const { getSchemeAnalytics } = await import('@/lib/promotions/analytics');
+    const data = await getSchemeAnalytics('default');
+    const totalIssued = data.reduce((s, r) => s + r.issued, 0);
+    const totalRedeemed = data.reduce((s, r) => s + r.redeemed, 0);
+    const rate = totalIssued ? Math.round((totalRedeemed / totalIssued) * 100) : 0;
+    const top = data.slice(0, 3).map((r) => `${r.code}=${r.redeemed}/${r.issued}`).join(', ');
+    return {
+      tool: 'scheme_analytics',
+      summary: `Schemes: ${data.length}, issued ${totalIssued}, redeemed ${totalRedeemed} (${rate}%). Top: ${top || 'none'}.`,
+      facts: { totalIssued, totalRedeemed, schemes: data.slice(0, 5) },
+    };
+  } catch {
+    return { tool: 'scheme_analytics', summary: 'No scheme analytics available.', facts: {} };
+  }
+}
