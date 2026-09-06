@@ -23,6 +23,19 @@ export interface OrderDetails {
     products: Product[];
     status: string;
     orderLink: string;
+    pricing?: {
+        originalMinor: number;
+        discountMinor: number;
+        finalMinor: number;
+        currency: string;
+        priceSource: string;
+    };
+    appliedCoupon?: {
+        code: string;
+        schemeId: string;
+        benefitType: string;
+        discountMinor: number;
+    };
 }
 
 export interface ProductSalesData {
