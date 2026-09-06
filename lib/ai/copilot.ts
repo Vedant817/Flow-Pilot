@@ -1,0 +1,186 @@
+import { embedText, cosineSimilarity } from './embeddings';
+import { hybridRetrieve, type RetrievedDoc } from './retriever';
+import { generate, type ChatMessage } from './generator';
+import {
+  toolOrdersOverview,
+  toolRevenueSeries,
+  toolTopProducts,
+  toolLowStock,
+  toolCustomerProfile,
+  toolInventoryValue,
+  toolDealerNetwork,
+  type ToolResult,
+} from './tools';
+
+/**
+ * Copilot orchestration.
+ *
+ * Architecture: semantic intent router → deterministic tool calls →
+ * retrieval-augmented generation with a small local model.
+ *
+ * The tiny on-device model never decides *what* to compute — an embedding
+ * classifier routes the query to typed tools whose outputs are injected as
+ * structured facts. The model's only job is composing a fluent answer over
+ * verified data, which keeps a 360M-parameter model reliable in production.
+ */
+
+type Intent = 'orders_overview' | 'revenue_trend' | 'top_products' | 'low_stock' | 'customer_lookup' | 'inventory_value' | 'dealer_network' | 'general';
+
+const INTENT_EXEMPLARS: Record<Exclude<Intent, 'general'>, string[]> = {
+  orders_overview: [
+    'how many orders today', 'order status summary', 'pending fulfilled canceled orders',
+    'recent order volume', 'show me order counts', 'how are orders looking this week',
+  ],
+  revenue_trend: [
+    'sales trend', 'revenue this month', 'week over week sales change', 'units sold last 30 days',
+    'is demand growing', 'sales going up or down', 'daily sales numbers',
+  ],
+  top_products: [
+    'best selling products', 'top products by units', 'which products sell most',
+    'fastest moving skus', 'product performance ranking', 'what is trending',
+  ],
+  low_stock: [
+    'low stock items', 'products below alert level', 'what needs restocking',
+    'inventory running out', 'stock alerts', 'reorder recommendations',
+  ],
+  customer_lookup: [
+    'find customer', 'details about a dealer', 'customer order history',
+    'who ordered', 'lookup account by email or name', 'how many orders did this customer place',
+  ],
+  inventory_value: [
+    'total inventory value', 'how much stock worth', 'warehouse value',
+    'total units in stock', 'sku count', 'capital tied in inventory',
+  ],
+  dealer_network: [
+    'dealer network performance and account health', 'which dealers are high risk or over credit limit',
+    'territory sales performance', 'credit exposure and overdue accounts',
+    'dealer returns and service levels', 'which country territory is strongest',
+  ],
+};
+
+interface RouterCache {
+  exemplarVectors: Map<Intent, number[][]> | null;
+}
+
+declare global {
+  var __flowpilotRouter: RouterCache | undefined;
+}
+const routerCache: RouterCache = global.__flowpilotRouter ?? (global.__flowpilotRouter = { exemplarVectors: null });
+
+async function routeIntent(queryEmbedding: number[]): Promise<Intent> {
+  if (!routerCache.exemplarVectors) {
+    const map = new Map<Intent, number[][]>();
+    for (const [intent, examples] of Object.entries(INTENT_EXEMPLARS)) {
+      const vectors = await Promise.all(examples.map(embedText));
+      map.set(intent as Intent, vectors);
+    }
+    routerCache.exemplarVectors = map;
+  }
+
+  let best: Intent = 'general';
+  let bestScore = 0.42; // below this → general conversation
+  for (const [intent, vectors] of routerCache.exemplarVectors) {
+    const max = Math.max(...vectors.map((v) => cosineSimilarity(queryEmbedding, v)));
+    if (max > bestScore) {
+      bestScore = max;
+      best = intent;
+    }
+  }
+  return best;
+}
+
+const TOOL_BY_INTENT: Partial<Record<Intent, () => Promise<ToolResult>>> = {
+  orders_overview: () => toolOrdersOverview(30),
+  revenue_trend: () => toolRevenueSeries(30),
+  top_products: () => toolTopProducts(30),
+  low_stock: () => toolLowStock(),
+  inventory_value: () => toolInventoryValue(),
+  dealer_network: () => toolDealerNetwork(),
+};
+
+export interface CopilotContext {
+  sources: RetrievedDoc[];
+  facts: ToolResult[];
+  intent: Intent;
+}
+
+export async function buildContext(query: string): Promise<CopilotContext> {
+  const queryVec = await embedText(query);
+  const intent = await routeIntent(queryVec);
+
+  const [sources, toolResult] = await Promise.all([
+    hybridRetrieve(query, { limit: 6 }),
+    TOOL_BY_INTENT[intent]?.().catch(() => null) ?? Promise.resolve(null),
+  ]);
+
+  const facts: ToolResult[] = [];
+  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(query) || /\b(customer|dealer|account)\b/i.test(query)) {
+    const m = query.match(/([\w.+-]+@[\w-]+\.[\w.]+)/) ?? query.match(/(?:about|for|of|by)\s+([A-Z][\w\s]{2,30})/i);
+    if (m) {
+      facts.push(await toolCustomerProfile(m[1].trim()).catch(() => null as never));
+    } else if (intent === 'customer_lookup') {
+      facts.push(await toolCustomerProfile(query.replace(/[^\w\s]/g, '').split(/\s+/).slice(-3).join(' ') || 'a').catch(() => null as never));
+    }
+  }
+  if (toolResult) facts.push(toolResult);
+
+  return { sources, facts: facts.filter(Boolean), intent };
+}
+
+function formatContext(ctx: CopilotContext): string {
+  const parts: string[] = [];
+
+  ctx.facts.forEach((f, i) => {
+    parts.push(`[F${i + 1}] ${f.tool}: ${f.summary}\nDATA: ${JSON.stringify(f.facts).slice(0, 1400)}`);
+  });
+
+  ctx.sources.forEach((s, i) => {
+    parts.push(`[S${i + 1}] (${s.kind}) ${s.title}: ${s.text.slice(0, 500)}`);
+  });
+
+  return parts.join('\n\n');
+}
+
+const SYSTEM_PROMPT = `You are Flow Pilot Copilot, an operations analyst for a distribution business.
+Rules:
+1. Answer ONLY from the CONTEXT provided. If it lacks the answer, say so plainly.
+2. Cite sources inline like [S1] or [F2] when using them.
+3. Lead with the direct answer, then one short supporting insight. No preamble.
+4. Use ₹ and Indian numbering conventions where relevant.
+5. Be concise: max ~120 words unless listing data.`;
+
+export async function* streamCopilotResponse(
+  query: string,
+  history: { role: 'user' | 'assistant'; content: string }[]
+): AsyncGenerator<{ type: 'meta'; payload: CopilotContext } | { type: 'token'; payload: string }> {
+  const ctx = await buildContext(query);
+  yield { type: 'meta', payload: ctx };
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...history.slice(-6).map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
+    {
+      role: 'user',
+      content: `CONTEXT:\n${formatContext(ctx)}\n\nQUESTION: ${query}`,
+    },
+  ];
+
+  for await (const token of generate(messages, { maxNewTokens: 300, temperature: 0.15 })) {
+    yield { type: 'token', payload: token };
+  }
+}
+
+export async function getCopilotResponse(
+  query: string,
+  history: { role: 'user' | 'assistant'; content: string }[]
+): Promise<{ response: string; context: CopilotContext }> {
+  let response = '';
+  let context: CopilotContext | null = null;
+
+  for await (const event of streamCopilotResponse(query, history)) {
+    if (event.type === 'token') response += event.payload;
+    else context = event.payload;
+  }
+
+  return { response: response.trim(), context: context! };
+}
