@@ -2,37 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Flow Pilot Enterprise Design Tokens ───────────────────────────────
-   Dark operations-console aesthetic. shadcn variable names preserved so
+/* ── Flow Pilot Design Tokens ──────────────────────────────────────────
+   Dark console with #EC4699 accent. shadcn variable names preserved so
    every existing ui/ component inherits the theme automatically. */
 @layer base {
   :root {
-    --background: 222 47% 5%;
-    --foreground: 213 31% 91%;
-    --card: 222 44% 7%;
-    --card-foreground: 213 31% 91%;
-    --popover: 224 44% 8%;
-    --popover-foreground: 213 31% 91%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 5%;
-    --secondary: 218 34% 12%;
-    --secondary-foreground: 210 28% 82%;
-    --muted: 219 33% 11%;
-    --muted-foreground: 216 15% 58%;
-    --accent: 220 36% 14%;
-    --accent-foreground: 210 30% 90%;
+    --background: 240 6% 5%;
+    --foreground: 0 0% 93%;
+    --card: 240 5% 10%;
+    --card-foreground: 0 0% 93%;
+    --popover: 240 5% 11%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 330 81% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 14%;
+    --secondary-foreground: 0 0% 82%;
+    --muted: 240 4% 13%;
+    --muted-foreground: 240 5% 62%;
+    --accent: 240 5% 15%;
+    --accent-foreground: 0 0% 93%;
     --destructive: 350 84% 56%;
     --destructive-foreground: 0 0% 98%;
-    --border: 219 30% 14%;
-    --input: 219 30% 16%;
-    --ring: 217 91% 60%;
-    --chart-1: 199 89% 48%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 262 83% 65%;
+    --border: 240 5% 15%;
+    --input: 240 5% 16%;
+    --ring: 330 81% 60%;
+    --chart-1: 330 81% 60%;
+    --chart-2: 275 80% 70%;
+    --chart-3: 160 84% 39%;
     --chart-4: 38 92% 55%;
-    --chart-5: 350 84% 60%;
-    --radius: 0.5rem;
+    --chart-5: 210 90% 60%;
+    --radius: 1.1rem;
 
+    --flux: 330 81% 60%;
     --success: 160 74% 42%;
     --warning: 38 92% 55%;
   }
@@ -49,7 +50,13 @@
 
 @layer utilities {
   .panel {
-    @apply rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))];
+    @apply rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--card))];
+  }
+  .flux-card {
+    @apply rounded-[22px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_12px_32px_-16px_rgba(0,0,0,0.7)];
+  }
+  .flux-pill {
+    @apply rounded-full bg-white text-black;
   }
   .kpi-value {
     @apply text-2xl font-semibold tracking-tight tabular-nums;
@@ -75,7 +82,7 @@
   background: hsl(219 25% 28%);
 }
 ::selection {
-  background: hsl(217 91% 60% / 0.35);
+  background: hsl(330 81% 60% / 0.4);
 }
 
 @keyframes fp-pulse-dot {
@@ -101,7 +108,7 @@
 .fp-caret::after {
   content: "▍";
   animation: fp-caret 0.9s steps(1) infinite;
-  color: hsl(217 91% 60%);
+  color: hsl(330 81% 60%);
 }
 
 /* The legacy order cards retain their information-dense structure while
