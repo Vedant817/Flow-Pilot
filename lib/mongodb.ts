@@ -1,12 +1,8 @@
 import mongoose, { Mongoose } from 'mongoose';
 import { ensureQueryIndexes } from './db-indexes';
 
-const MONGO_URI = process.env.MONGO_URI!;
+const MONGO_URI = process.env.MONGO_URI;
 const DATABASE_NAME = "store_db";
-
-if (!MONGO_URI) {
-    throw new Error('Please define the MONGO_URI environment variable inside .env.local');
-}
 
 interface MongooseCache {
     conn: Mongoose | null;
@@ -15,6 +11,7 @@ interface MongooseCache {
 
 declare global {
     var mongooseCache: MongooseCache | undefined;
+    var __flowpilotIndexPromise: Promise<void> | undefined;
 }
 
 let cached: MongooseCache;
@@ -29,6 +26,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 async function dbConnect(): Promise<Mongoose> {
+    if (!MONGO_URI) {
+        throw new Error('Please define the MONGO_URI environment variable inside .env / .env.local');
+    }
     if (cached.conn) return cached.conn;
 
     if (!cached.promise) {
@@ -41,7 +41,14 @@ async function dbConnect(): Promise<Mongoose> {
             console.log("New MongoDB connection established");
 
             const db = mongooseInstance.connection.db!;
-            void ensureQueryIndexes(db);
+            // Share global promise for index bootstrapping (awaited, not fire-and-forget)
+            const globalKey = '__flowpilotIndexPromise' as any;
+            if (!(global as any)[globalKey]) {
+                (global as any)[globalKey] = ensureQueryIndexes(db).catch((e) => {
+                    console.warn('Index ensure failed:', e instanceof Error ? e.message : e);
+                });
+            }
+            await (global as any)[globalKey];
 
             return mongooseInstance;
         }).catch(error => {
