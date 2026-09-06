@@ -5,9 +5,11 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useUser, UserButton } from '@clerk/nextjs';
 import {
   ShoppingBag, Package, BarChart2, Bot, MessageSquare, AlertTriangle,
-  TrendingUp, Skull, IndianRupee, Command as CommandIcon, Search,
-  ChevronLeft, Zap, CircleDot, Network, Ticket,
+  TrendingUp, Skull, IndianRupee, Search, Zap, Network, Ticket,
+  Bell, ChevronDown, Rocket,
 } from 'lucide-react';
+
+const ACCENT = '#EC4699';
 
 interface NavItem {
   label: string;
@@ -20,37 +22,37 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   {
     group: 'Operations',
     items: [
-      { label: 'Orders', href: '/orders', icon: <ShoppingBag size={16} /> },
-      { label: 'Inventory', href: '/inventory', icon: <Package size={16} /> },
-      { label: 'Dealer Network', href: '/network', icon: <Network size={16} />, badge: 'DEMO' },
+      { label: 'Orders', href: '/orders', icon: <ShoppingBag size={17} /> },
+      { label: 'Inventory', href: '/inventory', icon: <Package size={17} /> },
+      { label: 'Dealer Network', href: '/network', icon: <Network size={17} />, badge: 'DEMO' },
     ],
   },
   {
     group: 'Intelligence',
     items: [
-      { label: 'Analytics', href: '/analytics', icon: <BarChart2 size={16} /> },
-      { label: 'Copilot', href: '/chatbot', icon: <Bot size={16} />, badge: 'AI' },
-      { label: 'Forecasting', href: '/inventory/forecasting', icon: <TrendingUp size={16} /> },
+      { label: 'Analytics', href: '/analytics', icon: <BarChart2 size={17} /> },
+      { label: 'Copilot', href: '/chatbot', icon: <Bot size={17} />, badge: 'AI' },
+      { label: 'Forecasting', href: '/inventory/forecasting', icon: <TrendingUp size={17} /> },
     ],
   },
   {
     group: 'Commercial',
     items: [
-      { label: 'Promotions', href: '/promotions', icon: <Ticket size={16} />, badge: 'NEW' },
+      { label: 'Promotions', href: '/promotions', icon: <Ticket size={17} />, badge: 'NEW' },
     ],
   },
   {
     group: 'Supply Risk',
     items: [
-      { label: 'Deadstock', href: '/inventory/deadstock', icon: <Skull size={16} /> },
-      { label: 'Price Engine', href: '/inventory/priceAdj', icon: <IndianRupee size={16} /> },
+      { label: 'Deadstock', href: '/inventory/deadstock', icon: <Skull size={17} /> },
+      { label: 'Price Engine', href: '/inventory/priceAdj', icon: <IndianRupee size={17} /> },
     ],
   },
   {
     group: 'Trust & Voice',
     items: [
-      { label: 'Errors', href: '/errors', icon: <AlertTriangle size={16} /> },
-      { label: 'Feedback', href: '/feedback', icon: <MessageSquare size={16} /> },
+      { label: 'Errors', href: '/errors', icon: <AlertTriangle size={17} /> },
+      { label: 'Feedback', href: '/feedback', icon: <MessageSquare size={17} /> },
     ],
   },
 ];
@@ -105,21 +107,21 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 10);
-  }, [open]);
+  }, [open ]);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 pt-[12vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/70 pt-[12vh] backdrop-blur-sm"
       onClick={() => setOpen(false)}
     >
       <div
-        className="fp-enter w-full max-w-xl overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+        className="fp-enter w-full max-w-xl overflow-hidden rounded-[20px] border border-white/10 bg-[#17171C] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-border px-4">
-          <Search size={15} className="text-muted-foreground" />
+        <div className="flex items-center gap-2 border-b border-white/10 px-4">
+          <Search size={15} className="text-zinc-500" />
           <input
             ref={inputRef}
             value={query}
@@ -133,29 +135,29 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
               if (e.key === 'Enter' && results[activeIdx]) run(results[activeIdx].href);
             }}
             placeholder="Search modules or ask the copilot…"
-            className="w-full bg-transparent py-3.5 text-sm text-popover-foreground outline-none placeholder:text-muted-foreground"
+            className="w-full bg-transparent py-3.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
           />
-          <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">ESC</kbd>
+          <kbd className="rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] text-zinc-500">ESC</kbd>
         </div>
         <div className="max-h-[320px] overflow-y-auto p-1.5">
           {results.length === 0 && (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">No matches</p>
+            <p className="px-3 py-6 text-center text-xs text-zinc-500">No matches</p>
           )}
           {results.map((r, i) => {
             const showGroup = i === 0 || results[i - 1].group !== r.group;
             return (
               <div key={`${r.label}-${i}`}>
                 {showGroup && (
-                  <p className="label-xs px-3 pb-1 pt-2">{r.group}</p>
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{r.group}</p>
                 )}
                 <button
                   onMouseEnter={() => setActiveIdx(i)}
                   onClick={() => run(r.href)}
-                  className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm ${
-                    i === activeIdx ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
+                  className={`flex w-full items-center gap-2.5 rounded-full px-3 py-2 text-left text-sm transition-colors ${
+                    i === activeIdx ? 'bg-white text-black' : 'text-zinc-400 hover:text-zinc-100'
                   }`}
                 >
-                  <span className="text-muted-foreground">{r.icon}</span>
+                  <span>{r.icon}</span>
                   {r.label}
                 </button>
               </div>
@@ -167,141 +169,185 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
   );
 }
 
-function Topbar({ collapsed, onOpenPalette }: { collapsed: boolean; onOpenPalette: () => void }) {
-  const pathname = usePathname();
-
-  const title = useMemo(() => {
-    const all = NAV_GROUPS.flatMap((g) => g.items);
-    const match = [...all]
-      .sort((a, b) => b.href.length - a.href.length)
-      .find((i) => pathname.startsWith(i.href));
-    if (match) return match.label;
-    if (pathname.includes('track-order')) return 'Order Tracking';
-    return 'Overview';
-  }, [pathname]);
+function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
+  const { user } = useUser();
+  const today = useMemo(
+    () =>
+      new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+    []
+  );
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || 'Operator';
+  const displayEmail = user?.emailAddresses?.[0]?.emailAddress ?? 'operator@flowpilot.local';
 
   return (
-    <header
-      className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-border bg-background/80 px-5 backdrop-blur-md"
-    >
+    <header className="flex items-center gap-3 px-6 pt-5">
+      {/* User chip — like the reference profile block */}
+      <button className="flex min-w-0 items-center gap-3 rounded-full pr-2 text-left">
+        {user?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white/10" />
+        ) : (
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+            style={{ background: ACCENT }}
+          >
+            {(displayName?.[0] ?? 'O').toUpperCase()}
+          </span>
+        )}
+        <span className="hidden min-w-0 sm:block">
+          <span className="block truncate text-[14px] font-semibold leading-tight text-zinc-100">{displayName}</span>
+          <span className="block truncate text-[11px] leading-tight text-zinc-500">{displayEmail}</span>
+        </span>
+        <ChevronDown size={15} className="hidden text-zinc-500 sm:block" />
+      </button>
+
+      <div className="ml-auto flex items-center gap-2.5">
+        {/* Search pill */}
         <button
           onClick={onOpenPalette}
-          className="group flex h-9 min-w-[220px] items-center gap-2 rounded-md border border-border bg-card px-3 text-xs text-muted-foreground transition-colors hover:border-ring"
+          className="flex h-11 w-[210px] items-center gap-2 rounded-full border border-white/10 bg-[#222228] px-4 text-[13px] text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-200 md:w-[260px]"
         >
-          <Search size={13} />
-          <span className="flex-1 text-left">Jump to…</span>
-          <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+          <Search size={15} />
+          <span className="flex-1 text-left">Search…</span>
+          <kbd className="rounded border border-white/10 px-1 font-mono text-[10px]">⌘K</kbd>
         </button>
-
-        <h1 className={`text-sm font-semibold tracking-tight ${collapsed ? '' : 'hidden md:block'}`}>{title}</h1>
-
-        <div className="ml-auto flex items-center gap-4">
-          <span className="hidden items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground sm:flex">
-            <CircleDot size={10} className="text-emerald-400 fp-live-dot" />
-            Local inference · onnx-cpu
+        {/* Bell with count badge */}
+        <button
+          aria-label="Notifications"
+          className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#222228] text-zinc-300 transition-colors hover:border-white/20"
+        >
+          <Bell size={17} />
+          <span
+            className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+            style={{ background: ACCENT }}
+          >
+            3
           </span>
-          <UserButton afterSignOutUrl="/" />
-        </div>
+        </button>
+        <span className="hidden text-xs text-zinc-500 lg:block">{today}</span>
+        <button
+          onClick={onOpenPalette}
+          className="hidden h-11 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-transform hover:scale-[1.02] sm:flex"
+        >
+          Today <ChevronDown size={14} />
+        </button>
+      </div>
+
+      {/* Keep Clerk session controls mounted for auth state */}
+      <span className="hidden">
+        <UserButton afterSignOutUrl="/" />
+      </span>
     </header>
   );
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user } = useUser();
   const palette = useCommandPalette();
+  const operatorName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || 'Operator';
+  const operatorEmail = user?.emailAddresses?.[0]?.emailAddress ?? '';
 
   return (
-    <div className="flex h-screen overflow-hidden w-full">
-      <aside
-        className={`flex h-full shrink-0 flex-col border-r border-border bg-card transition-all duration-200 ${
-          collapsed ? 'w-[64px]' : 'w-[228px]'
-        }`}
-      >
-        <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-[13px] font-bold text-white shadow-lg shadow-indigo-950/50">
-            FP
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold leading-tight">Flow Pilot</p>
-              <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">DMS Console</p>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-2.5 py-4">
-          {NAV_GROUPS.map(({ group, items }) => (
-            <div key={group} className="mb-4">
-              {!collapsed && <p className="label-xs mb-1.5 px-2">{group}</p>}
-              {items.map((item) => {
-                const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'));
-                return (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    title={collapsed ? item.label : undefined}
-                    className={`relative mb-0.5 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors ${
-                      active
-                        ? 'bg-primary/10 font-medium text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    }`}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 h-4 w-[2.5px] -translate-y-1/2 rounded-full bg-primary" />
-                    )}
-                    <span className={active ? 'text-primary' : ''}>{item.icon}</span>
-                    {!collapsed && <span className="flex-1">{item.label}</span>}
-                    {!collapsed && item.badge && (
-                      <span className="rounded-full bg-violet-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-violet-300">
-                        {item.badge}
-                      </span>
-                    )}
-                  </a>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        <div className="border-t border-border p-2.5">
-          <div className={`flex items-center gap-2.5 rounded-md px-1.5 py-1.5 ${collapsed ? 'justify-center' : ''}`}>
-            <UserButton afterSignOutUrl="/" />
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium">{user?.firstName ?? 'Operator'}</p>
-                <p className="truncate text-[10px] text-muted-foreground">{user?.emailAddresses?.[0]?.emailAddress ?? ''}</p>
-              </div>
-            )}
-            {!collapsed && (
-              <button
-                onClick={() => setCollapsed(true)}
-                className="rounded p-1 text-muted-foreground hover:bg-accent"
-                aria-label="Collapse sidebar"
-              >
-                <ChevronLeft size={15} />
-              </button>
-            )}
-          </div>
-          {collapsed && (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="mt-1 w-full rounded-md py-1.5 text-muted-foreground hover:bg-accent"
-              aria-label="Expand sidebar"
+    <div className="h-screen w-full overflow-hidden bg-[#08080A] p-2.5 sm:p-3">
+      <div className="flex h-full w-full gap-2.5 sm:gap-3">
+        {/* ── Sidebar (reference: dark rounded rail) ─────────────────── */}
+        <aside className="flex w-[216px] shrink-0 flex-col rounded-[24px] bg-[#121217] p-3 lg:w-[232px]">
+          {/* Brand */}
+          <div className="flex items-center gap-2 px-2 pb-4 pt-1">
+            <span
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-[15px] font-black text-white"
+              style={{ background: ACCENT }}
             >
-              <CommandIcon size={15} className="mx-auto" />
-            </button>
-          )}
+              ⌁
+            </span>
+            <span className="text-[19px] font-semibold lowercase tracking-tight text-white">flux</span>
+            <span className="ml-auto hidden rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-400 lg:block">
+              DMS
+            </span>
+          </div>
+
+          {/* Nav — pill rows like the reference */}
+          <nav className="flex-1 space-y-4 overflow-y-auto px-1 py-1">
+            {NAV_GROUPS.map(({ group, items }) => (
+              <div key={group}>
+                <p className="px-3 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+                  {group}
+                </p>
+                <div className="space-y-1">
+                  {items.map((item) => {
+                    const active =
+                      pathname === item.href ||
+                      (item.href !== '/' && pathname.startsWith(item.href + '/'));
+                    return (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        className={`group flex items-center gap-3 rounded-full px-3.5 py-2.5 text-[13.5px] font-medium transition-all ${
+                          active
+                            ? 'bg-white text-black shadow-[0_8px_24px_-8px_rgba(255,255,255,0.4)]'
+                            : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <span className={active ? 'text-black' : 'text-zinc-500 group-hover:text-zinc-200'}>
+                          {item.icon}
+                        </span>
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {item.badge && (
+                          <span
+                            className={`rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wide ${
+                              active ? 'text-white' : 'text-white'
+                            }`}
+                            style={{ background: active ? ACCENT : `${ACCENT}33`, color: active ? '#fff' : ACCENT }}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          {/* Upgrade card — reference lime card, here brand pink */}
+          <div className="rounded-[20px] p-4 text-black" style={{ background: ACCENT }}>
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-black/15 text-black">
+              <Rocket size={20} />
+            </div>
+            <p className="mt-3 text-[16px] font-bold leading-tight">Scale to Pro</p>
+            <p className="mt-1 text-[11.5px] font-medium leading-snug text-black/70">
+              Unlock forecasting, copilot and network analytics.
+            </p>
+            <a
+              href="/promotions"
+              className="mt-3 flex h-10 items-center justify-center rounded-full bg-black text-[13px] font-semibold text-white transition-transform hover:scale-[1.02]"
+            >
+              Upgrade Now
+            </a>
+          </div>
+
+          {/* Operator row */}
+          <div className="mt-2 flex items-center gap-2.5 rounded-full px-2 py-1.5">
+            <UserButton afterSignOutUrl="/" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-zinc-100">{operatorName}</p>
+              <p className="truncate text-[10px] text-zinc-500">{operatorEmail}</p>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── Main panel (reference: light rounded sheet → here dark sheet) ── */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-white/[0.06] bg-[#17171C]">
+          <Topbar onOpenPalette={() => palette.setOpen(true)} />
+          <main className="flex-1 overflow-y-auto px-4 pb-6 pt-4 sm:px-6">{children}</main>
         </div>
-      </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar collapsed={collapsed} onOpenPalette={() => palette.setOpen(true)} />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <CommandPalette palette={palette} />
       </div>
-
-      <CommandPalette palette={palette} />
     </div>
   );
 }
