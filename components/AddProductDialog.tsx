@@ -92,16 +92,18 @@ const AddProductPopup: React.FC<AddProductPopupProps> = ({ isOpen, onClose, onPr
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+
         if (!validateForm()) {
             return;
         }
 
         setIsSubmitting(true);
         try {
-            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/inventory`, formData);
+            const apiBase = process.env.NEXT_PUBLIC_API_URL;
+            const url = apiBase ? `${apiBase.replace(/\/$/, '')}/inventory` : '/api/inventory';
+            const response = await axios.post(url, formData);
             onProductAdded(response.data);
             
             setFormData({
@@ -327,7 +329,8 @@ const AddProductPopup: React.FC<AddProductPopupProps> = ({ isOpen, onClose, onPr
                             Cancel
                         </button>
                         <button
-                            type="submit"
+                            type="button"
+                            onClick={() => void handleSubmit()}
                             disabled={isSubmitting}
                             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >

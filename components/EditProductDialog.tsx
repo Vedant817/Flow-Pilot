@@ -57,7 +57,9 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
 
         try {
             setLoading(true);
-            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/inventory/${productId}`);
+            const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+            const url = apiBase ? `${apiBase}/inventory/${productId}` : `/api/inventory/${productId}`;
+            const response = await axios.get(url);
             setFormData(response.data);
             setErrors({});
         } catch (err) {
@@ -127,7 +129,9 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
 
         setIsSubmitting(true);
         try {
-            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/update-inventory/${productId}`, formData);
+            const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+            const url = apiBase ? `${apiBase}/inventory/${productId}` : `/api/inventory/${productId}`;
+            await axios.put(url, formData);
             onProductUpdated(productId, formData);
             onClose();
         } catch (err) {

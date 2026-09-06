@@ -304,7 +304,9 @@ export default function InventoryPage() {
   const fetchInventoryData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get<InventoryItem[]>(`${process.env.NEXT_PUBLIC_API_URL}/inventory`);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+      const url = apiBase ? `${apiBase}/inventory` : '/api/inventory';
+      const response = await axios.get<InventoryItem[]>(url);
       setInventoryData(response.data);
       setError('');
     } catch (err) {
@@ -389,7 +391,9 @@ export default function InventoryPage() {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
 
     try {
-      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/delete-inventory/${id}`);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+      const url = apiBase ? `${apiBase}/inventory/${id}` : `/api/inventory/${id}`;
+      await axios.delete(url);
       setInventoryData(prev => prev.filter(item => item._id !== id));
     } catch (err) {
       console.error('Error deleting product:', err);
