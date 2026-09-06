@@ -125,10 +125,12 @@ export async function getDailySeries(days: number): Promise<SeriesPoint[]> {
 
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   const conn = await dbConnect();
+  // Cap at ~500k docs to protect memory on huge catalogs; typical catalogs (4k SKUs * 90d = 360k) fit safely.
+  const safeLimit = Math.min(500_000, Math.max(10_000, days * 5000));
   return conn.connection.db!
     .collection<SeriesPoint>(ROLLUP_COLLECTION)
     .find({ date: { $gte: since } }, { sort: { date: 1 } })
-    .limit(days * 500)
+    .limit(safeLimit)
     .toArray();
 }
 

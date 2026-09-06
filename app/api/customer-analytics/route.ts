@@ -30,9 +30,11 @@ export async function GET(request: NextRequest) {
         await dbConnect();
 
         const url = new URL(request.url);
-        const days = parseInt(url.searchParams.get('days') || '30');
+        const days = Math.min(365, Math.max(1, parseInt(url.searchParams.get('days') || '30') || 30));
+        const sinceStr = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 
-        const orders = await Order.find({}).lean();
+        // Bound reads: trend window uses date-filtered query; aggregate stats still bounded at 100k docs
+        const orders = await Order.find({ date: { $gte: sinceStr } }).limit(100_000).lean();
 
         if (!orders.length) {
             return NextResponse.json({

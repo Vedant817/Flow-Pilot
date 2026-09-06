@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import { Error } from "@/models/Error";
+import { Error as ErrorModel } from "@/models/Error";
 import dbConnect from "@/lib/mongodb";
 
 // GET - Fetch all errors
@@ -26,13 +26,13 @@ export async function GET(request: NextRequest) {
         }
 
         // Fetch errors with filtering and pagination
-        const errors = await Error.find(filter)
+        const errors = await ErrorModel.find(filter)
             .sort({ timestamp: -1 })
             .limit(limit)
             .skip(skip);
 
         // Get total count for pagination
-        const totalCount = await Error.countDocuments(filter);
+        const totalCount = await ErrorModel.countDocuments(filter);
 
         return NextResponse.json({
             success: true,
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
             {
                 success: false,
                 error: "Failed to fetch errors",
-                message: error instanceof Error ? error : "Unknown error"
+                message: error instanceof Error ? error.message : "Unknown error"
             },
             { status: 500 }
         );
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create new error
-        const newError = new Error({
+        const newError = new ErrorModel({
             errorMessage: errorMessage.trim(),
             type: type,
             severity: severity.toLowerCase(),
@@ -150,19 +150,19 @@ export async function POST(request: NextRequest) {
         console.error("Error adding error log:", error);
 
         // Handle mongoose validation errors
-        if (error instanceof Error) {
+        if (error instanceof Error && error.name === 'ValidationError') {
             return NextResponse.json(
                 {
                     success: false,
                     error: "Validation error",
-                    message: error
+                    message: error.message
                 },
                 { status: 400 }
             );
         }
 
         // Handle duplicate key errors
-        if (error instanceof Error && 'code' in error && error.code === 11000) {
+        if (error instanceof Error && 'code' in (error as unknown as Record<string, unknown>) && (error as unknown as { code: number }).code === 11000) {
             return NextResponse.json(
                 {
                     success: false,
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
             {
                 success: false,
                 error: "Failed to log error",
-                message: error instanceof Error ? error : "Unknown error"
+                message: error instanceof Error ? error.message : "Unknown error"
             },
             { status: 500 }
         );
@@ -223,7 +223,7 @@ export async function DELETE(request: NextRequest) {
             }
         }
 
-        const result = await Error.deleteMany(filter);
+        const result = await ErrorModel.deleteMany(filter);
 
         return NextResponse.json(
             {
@@ -237,7 +237,7 @@ export async function DELETE(request: NextRequest) {
         console.error("Error deleting errors:", error);
 
         const errorMessage = error instanceof Error
-            ? error
+            ? error.message
             : typeof error === "string"
                 ? error
                 : "Unknown error";

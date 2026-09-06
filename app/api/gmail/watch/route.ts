@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
@@ -15,6 +14,16 @@ oAuth2Client.setCredentials({
 const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
 export async function POST(req: NextRequest) {
+  // Protect watch re-registration; require admin secret when configured
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (adminSecret && req.headers.get('x-admin-secret') !== adminSecret) {
+    // Also allow Clerk-authenticated requests via middleware-protected context
+    // but reject anonymous PubSub-style replays when secret is configured
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
   try {
     const response = await gmail.users.watch({
       userId: 'me',

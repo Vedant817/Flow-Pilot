@@ -42,10 +42,13 @@ export async function GET(request: NextRequest) {
 
         // Get query parameters for customization
         const url = new URL(request.url);
-        const days = parseInt(url.searchParams.get('days') || '30');
+        const days = Math.min(365, Math.max(1, parseInt(url.searchParams.get('days') || '30') || 30));
+        const sinceStr = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 
-        const orders = await Order.find({}).lean();
-        const inventory = await Inventory.find({}).lean();
+        const [orders, inventory] = await Promise.all([
+            Order.find({ date: { $gte: sinceStr } }).limit(100_000).lean(),
+            Inventory.find({}).limit(20_000).lean(),
+        ]);
 
         if (!orders.length) {
             return NextResponse.json({

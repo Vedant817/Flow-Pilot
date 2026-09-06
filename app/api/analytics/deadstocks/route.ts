@@ -64,8 +64,11 @@ export async function GET(request: NextRequest) {
         const minStockValue = parseFloat(url.searchParams.get('minValue') || '0'); // Minimum stock value to consider
         const category = url.searchParams.get('category'); // Optional category filter
 
-        const inventory = await Inventory.find(category ? { category } : {}).lean();
-        const orders = await Order.find({}).lean();
+        const since180 = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
+        const [inventory, orders] = await Promise.all([
+            Inventory.find(category ? { category } : {}).limit(20_000).lean(),
+            Order.find({ date: { $gte: since180 } }).limit(100_000).lean(),
+        ]);
 
         if (!inventory.length) {
             return NextResponse.json({

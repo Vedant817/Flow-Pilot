@@ -105,8 +105,11 @@ export async function GET(request: NextRequest) {
         if (category) filterQuery.category = category;
         if (warehouseLocation) filterQuery.warehouse_location = warehouseLocation;
 
-        const inventory = await Inventory.find(filterQuery).lean();
-        const orders = await Order.find({}).lean();
+        const since180 = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
+        const [inventory, orders] = await Promise.all([
+            Inventory.find(filterQuery).limit(20_000).lean(),
+            Order.find({ date: { $gte: since180 } }).limit(100_000).lean(),
+        ]);
 
         if (!inventory.length) {
             return NextResponse.json({

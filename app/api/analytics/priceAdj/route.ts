@@ -25,8 +25,12 @@ export async function GET() {
     try {
         await dbConnect();
 
-        const inventory = await Inventory.find({}).lean();
-        const orders = await Order.find({}).lean();
+        // Bound reads for price-engine; 90d window keeps data volume predictable
+        const since90 = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+        const [inventory, orders] = await Promise.all([
+            Inventory.find({}).limit(20_000).lean(),
+            Order.find({ date: { $gte: since90 } }).limit(100_000).lean(),
+        ]);
 
         if (!inventory.length) {
             return NextResponse.json({
@@ -146,7 +150,10 @@ export async function GET() {
                 urgency = 'medium';
                 potentialImpact = `Revenue optimization: ₹${((recommendedPrice - currentPrice) * avgOrderQty * demandMultiplier).toFixed(0)}/month`;
             } else {
-                const adjustment = categoryPremium + (Math.random() - 0.5) * 2;
+                // Deterministic pseudo-random adjustment (-1%..+1%) derived from product name hash
+                const hash = [...item.name].reduce((a, c) => a + c.charCodeAt(0), 0);
+                const jitter = ((hash % 200) / 100) - 1; // -1 .. +0.99
+                const adjustment = categoryPremium + jitter;
                 recommendedPrice = currentPrice * (1 + adjustment / 100);
                 reason = `Stable product. Minor adjustment based on category trends and market positioning.`;
                 confidence = 60;
