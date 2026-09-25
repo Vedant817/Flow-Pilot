@@ -49,3 +49,14 @@ client_secret_333795542794-v9o1s70in2e1tct9onfgbr3qepnc3uba.apps.googleuserconte
 
 # downloaded public datasets and importer checkpoints
 /.data/
+
+# local agent worktree metadata (never commit, never test)
+/.delta/
+
+# local eval harness: python venv (GBs), derived intermediates, vector dumps
+/scripts/eval/.venv/
+scripts/eval/__pycache__/
+scripts/eval/onnx-src/
+scripts/eval/st-model/
+scripts/eval/local-model/
+scripts/eval/node-vectors*.json
