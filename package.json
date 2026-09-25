@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "jest",
+    "test": "jest && tsx scripts/eval/check-samples.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "data:import:uci": "tsx scripts/import-uci-retail.ts"
+    "data:import:uci": "tsx scripts/import-uci-retail.ts",
+    "data:import:daily": "tsx scripts/import-daily-public.ts"
   },
   "dependencies": {
     "@ariakit/react": "^0.4.15",

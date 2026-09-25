@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
-import { classifyEmail } from '@/lib/nlp/classify';
+import { NextRequest } from 'next/server';
+import crypto from 'crypto';
+import { google, type gmail_v1 } from 'googleapis';
+import { classifyEmailWithScores } from '@/lib/nlp/classify';
 import { extractOrderDetails, extractFeedbackDetails } from '@/lib/nlp/extract';
 import { applyOrderDelta } from '@/lib/analytics/rollup';
 import { ingestDocument } from '@/lib/ai/memory';
@@ -8,6 +9,13 @@ import { Order } from '@/models/Order';
 import { Feedback } from '@/models/Feedback';
 import { Error as ErrorModel } from '@/models/Error';
 import connectToDatabase from '@/lib/mongodb';
+
+function json(data: unknown, status: number): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -20,6 +28,41 @@ oAuth2Client.setCredentials({
 });
 
 const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
+
+const ORG_ID = 'default';
+const MAX_ATTACHMENTS = 3;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MAX_HISTORY_PAGES = 10;
+
+function verifyWebhookSecret(req: NextRequest): boolean {
+  const expected = process.env.GMAIL_WEBHOOK_SECRET;
+  if (!expected) {
+    console.warn('GMAIL_WEBHOOK_SECRET not set — accepting webhook in dev (no verification)');
+    return true;
+  }
+  const provided = req.headers?.get('x-webhook-secret') ?? '';
+  if (!provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+function compareHistoryId(a: string | undefined, b: string | undefined): number {
+  if (!a) return b ? -1 : 0;
+  if (!b) return 1;
+  try {
+    const ba = BigInt(a);
+    const bb = BigInt(b);
+    return ba < bb ? -1 : ba > bb ? 1 : 0;
+  } catch {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+}
 
 async function getEmailDetails(messageId: string) {
   try {
@@ -71,19 +114,31 @@ async function getEmailDetails(messageId: string) {
       body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
     }
 
-    const attachments = [];
+    const attachments: Array<{ filename: string }> = [];
     if (emailResponse.data.payload?.parts) {
       for (const part of emailResponse.data.payload.parts) {
+        if (attachments.length >= MAX_ATTACHMENTS) break;
         if (part.filename && part.body?.attachmentId) {
+          const declaredSize = (part.body as { size?: number }).size;
+          if (typeof declaredSize === 'number' && declaredSize > MAX_ATTACHMENT_BYTES) {
+            console.log(`Skipping attachment ${part.filename}: exceeds 5MB (${declaredSize} bytes)`);
+            continue;
+          }
           const attachment = await gmail.users.messages.attachments.get({
             userId: 'me',
             messageId: messageId,
             id: part.body.attachmentId,
           });
-          attachments.push({
-            filename: part.filename,
-            data: attachment.data.data,
-          });
+          const raw = (attachment.data.data as string | undefined) ?? '';
+          // Approx decoded size from base64 length without holding decoded bytes.
+          const approxBytes = Math.floor(raw.length * 0.75);
+          if (approxBytes > MAX_ATTACHMENT_BYTES) {
+            console.log(`Skipping attachment ${part.filename}: exceeds 5MB`);
+            continue;
+          }
+          // Do not store raw data in DB — just log filename.
+          console.log(`Attachment received (not stored): ${part.filename}`);
+          attachments.push({ filename: part.filename });
         }
       }
     }
@@ -97,6 +152,10 @@ async function getEmailDetails(messageId: string) {
 
 
 export async function POST(req: NextRequest) {
+  if (!verifyWebhookSecret(req)) {
+    return json({ error: 'Invalid webhook secret' }, 401);
+  }
+
   const body = await req.json();
 
   console.log('Gmail Webhook Received');
@@ -104,98 +163,169 @@ export async function POST(req: NextRequest) {
   const message = body.message;
   if (!message?.data) {
     console.log('No message data found');
-    return NextResponse.json({ message: 'No data found' });
+    return json({ error: 'Missing message.data' }, 400);
   }
 
   try {
-    await connectToDatabase();
+    const conn = await connectToDatabase();
+    const db = conn.connection.db!;
+    const processedCol = db.collection<{ _id: string; at?: Date }>('processed_gmail_messages');
+    const cursorCol = db.collection<{ _id: string; historyId?: string }>('gmail_cursors');
+
     const decoded = Buffer.from(message.data, 'base64').toString('utf-8');
-    const decodedMessage = JSON.parse(decoded);
+    const decodedMessage = JSON.parse(decoded) as { historyId?: string | number };
     console.log('Decoded Message:', decodedMessage);
 
-    const historyResponse = await gmail.users.history.list({
-      userId: 'me',
-      startHistoryId: decodedMessage.historyId,
-    });
+    const incomingHistoryId: string | undefined = decodedMessage.historyId
+      ? String(decodedMessage.historyId)
+      : undefined;
 
-    if (historyResponse.data.history) {
-      for (const historyItem of historyResponse.data.history) {
-        if (historyItem.messagesAdded) {
-          for (const messageAdded of historyItem.messagesAdded) {
-            if (messageAdded.message?.id) {
-              const emailDetails = await getEmailDetails(messageAdded.message.id);
-              if (emailDetails && emailDetails.body) {
-                const classification = await classifyEmail(emailDetails.body);
-                console.log(`Email classified as: ${classification}`);
+    const storedCursor = await cursorCol.findOne({ _id: 'default' });
+    let startHistoryId: string | undefined = incomingHistoryId;
+    if (storedCursor?.historyId) {
+      if (!incomingHistoryId || compareHistoryId(incomingHistoryId, storedCursor.historyId) <= 0) {
+        // Accept incoming historyId only if newer; otherwise resume from stored cursor.
+        startHistoryId = storedCursor.historyId;
+      }
+    }
+    if (!startHistoryId) {
+      return json({ error: 'Missing historyId' }, 400);
+    }
 
-                switch (classification) {
-                  case 'new_order':
-                    const orderDetails = await extractOrderDetails(emailDetails.body);
-                    if (orderDetails) {
-                      const newOrder = new Order({
-                        ...orderDetails,
-                        email: emailDetails.senderEmail,
-                        status: 'pending',
-                        orderLink: '',
-                      });
-                      await newOrder.save();
-                      await applyOrderDelta(newOrder.date, newOrder.products, 1).catch((e) =>
-                        console.error('Rollup delta failed:', e)
-                      );
-                      void ingestDocument(
-                        'order',
-                        String(newOrder._id),
-                        `Email order — ${emailDetails.senderName}`,
-                        `${emailDetails.senderName} (${emailDetails.senderEmail}) ordered ${newOrder.products
-                          .map((p) => `${p.quantity}x ${p.name}`)
-                          .join(', ')} for ${newOrder.date}. Source: inbound email.`
-                      ).catch(() => undefined);
-                      console.log('New order saved:', newOrder._id);
-                    }
-                    break;
-                  case 'update_order':
-                    const updatedOrderDetails = await extractOrderDetails(emailDetails.body);
-                    if (updatedOrderDetails) {
-                      const existingOrder = await Order.findOne({ email: emailDetails.senderEmail, status: 'pending' }).sort({ date: -1, time: -1 });
-                      if (existingOrder) {
-                        existingOrder.set(updatedOrderDetails);
-                        await existingOrder.save();
-                        console.log('Order updated:', existingOrder);
-                      } else {
-                        console.log('No pending order found to update for:', emailDetails.senderEmail);
-                      }
-                    }
-                    break;
-                  case 'feedback':
-                    const feedbackDetails = await extractFeedbackDetails(emailDetails.body);
-                    if (feedbackDetails) {
-                      const newFeedback = new Feedback({
-                        ...feedbackDetails,
-                        email: emailDetails.senderEmail,
-                      });
-                      await newFeedback.save();
-                      console.log('New feedback saved:', newFeedback);
-                    }
-                    break;
-                  default:
-                    const newError = new ErrorModel({
-                      errorMessage: `Unclassified email from ${emailDetails.senderEmail}`,
-                      type: 'Customer',
-                      severity: 'low',
-                      timestamp: new Date(),
-                    });
-                    await newError.save();
-                    console.log('Unclassified email logged as error.');
-                    break;
+    // Paginated history.list (cap ~10 pages).
+    const allHistory: gmail_v1.Schema$History[] = [];
+    let pageToken: string | undefined = undefined;
+    for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
+      const historyResponse = await gmail.users.history.list({
+        userId: 'me',
+        startHistoryId,
+        pageToken,
+      });
+      const historyData: gmail_v1.Schema$ListHistoryResponse = historyResponse.data;
+      if (historyData.history) {
+        allHistory.push(...historyData.history);
+      }
+      pageToken = historyData.nextPageToken ?? undefined;
+      if (!pageToken) break;
+    }
+
+    for (const historyItem of allHistory) {
+      if (historyItem.messagesAdded) {
+        for (const messageAdded of historyItem.messagesAdded) {
+          const gmailMessageId = messageAdded.message?.id;
+          if (!gmailMessageId) continue;
+          // Per-message idempotency: skip if already processed.
+          const already = await processedCol.findOne({ _id: gmailMessageId });
+          if (already) {
+            console.log(`Skipping already-processed message ${gmailMessageId}`);
+            continue;
+          }
+          const emailDetails = await getEmailDetails(gmailMessageId);
+          if (emailDetails && emailDetails.body) {
+            const { label: classification, confidence, scores } = await classifyEmailWithScores(
+              emailDetails.body,
+              emailDetails.subject
+            );
+            console.log(`Email classified as: ${classification}`);
+            // Per-mail score log: the only production signal for classifier drift/review.
+            console.log(
+              `Classification detail: confidence=${confidence.toFixed(3)} scores=${JSON.stringify(scores)}`
+            );
+
+            switch (classification) {
+              case 'new_order': {
+                const orderDetails = await extractOrderDetails(emailDetails.body);
+                if (orderDetails) {
+                  const newOrder = new Order({
+                    ...orderDetails,
+                    name: orderDetails.name || emailDetails.senderName || 'Unknown',
+                    // phone is required:true in schema — '' fails required, use 'N/A'.
+                    phone: orderDetails.phone || 'N/A',
+                    email: emailDetails.senderEmail,
+                    orgId: ORG_ID,
+                    status: 'pending fulfillment',
+                    orderLink: '',
+                  });
+                  await newOrder.save();
+                  await applyOrderDelta(newOrder.date, newOrder.products, 1).catch((e) =>
+                    console.error('Rollup delta failed:', e)
+                  );
+                  void ingestDocument(
+                    'order',
+                    String(newOrder._id),
+                    `Email order — ${emailDetails.senderName}`,
+                    `${emailDetails.senderName} (${emailDetails.senderEmail}) ordered ${newOrder.products
+                      .map((p) => `${p.quantity}x ${p.name}`)
+                      .join(', ')} for ${newOrder.date}. Source: inbound email.`
+                  ).catch(() => undefined);
+                  console.log('New order saved:', newOrder._id);
                 }
+                break;
+              }
+              case 'update_order': {
+                const updatedOrderDetails = await extractOrderDetails(emailDetails.body);
+                if (updatedOrderDetails) {
+                  const existingOrder = await Order.findOne({ email: emailDetails.senderEmail, status: 'pending fulfillment' }).sort({ date: -1, time: -1 });
+                  if (existingOrder) {
+                    existingOrder.set(updatedOrderDetails);
+                    await existingOrder.save();
+                    console.log('Order updated:', existingOrder);
+                  } else {
+                    console.log('No pending order found to update for:', emailDetails.senderEmail);
+                  }
+                }
+                break;
+              }
+              case 'feedback': {
+                const feedbackDetails = await extractFeedbackDetails(emailDetails.body);
+                if (feedbackDetails) {
+                  const newFeedback = new Feedback({
+                    ...feedbackDetails,
+                    email: emailDetails.senderEmail,
+                    ...( { orgId: ORG_ID } as Record<string, unknown> ),
+                  });
+                  await newFeedback.save();
+                  console.log('New feedback saved:', newFeedback);
+                }
+                break;
+              }
+              default: {
+                const newError = new ErrorModel({
+                  errorMessage: `Unclassified email from ${emailDetails.senderEmail}`,
+                  type: 'Customer',
+                  severity: 'low',
+                  timestamp: new Date(),
+                  ...( { orgId: ORG_ID } as Record<string, unknown> ),
+                });
+                await newError.save();
+                console.log('Unclassified email logged as error.');
+                break;
               }
             }
           }
+          await processedCol.updateOne(
+            { _id: gmailMessageId },
+            { $setOnInsert: { _id: gmailMessageId, at: new Date() } },
+            { upsert: true }
+          );
         }
+      }
+    }
+
+    // Update persistent cursor only after success, and only forward.
+    if (incomingHistoryId) {
+      const current = await cursorCol.findOne({ _id: 'default' });
+      if (!current?.historyId || compareHistoryId(incomingHistoryId, current.historyId) > 0) {
+        await cursorCol.updateOne(
+          { _id: 'default' },
+          { $set: { historyId: incomingHistoryId } },
+          { upsert: true }
+        );
       }
     }
   } catch (e) {
     console.error('Error processing webhook:', e);
+    return json({ error: 'Failed to process webhook' }, 500);
   }
 
   return new Response('ok', { status: 200 });

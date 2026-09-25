@@ -9,10 +9,10 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
+  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/.delta/'],
+  modulePathIgnorePatterns: ['<rootDir>/.delta/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
-    '^@huggingface/transformers$': '<rootDir>/__mocks__/transformers.js',
     '^@/lib/analytics/rollup$': '<rootDir>/__mocks__/rollup.js',
     '^@/lib/ai/memory$': '<rootDir>/__mocks__/memory.js',
     '^@/lib/mongodb$': '<rootDir>/__mocks__/mongodb.js',

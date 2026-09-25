@@ -3,6 +3,19 @@
 import { POST } from '../app/api/webhook/gmail/route';
 import { NextRequest } from 'next/server';
 import { google } from 'googleapis';
+import { classifyEmailWithScores } from '../lib/nlp/classify';
+
+jest.mock('../lib/nlp/classify', () => ({
+  classifyEmailWithScores: jest.fn(),
+  classifyEmail: jest.fn(),
+}));
+
+const mockClassify = classifyEmailWithScores as jest.Mock;
+const mockScores = (label: string) => ({
+  label,
+  confidence: 0.9,
+  scores: { new_order: 0, update_order: 0, feedback: 0, other: 0, [label]: 0.9 },
+});
 
 jest.mock('../lib/analytics/rollup', () => ({
   applyOrderDelta: jest.fn(async () => undefined),
@@ -31,7 +44,18 @@ jest.mock('../models/Error', () => ({ Error: class {
   constructor(data: Record<string, unknown> = {}) { Object.assign(this, data); }
   async save() { return this; }
 } }));
-jest.mock('../lib/mongodb', () => ({ __esModule: true, default: jest.fn(async () => undefined) }));
+jest.mock('../lib/mongodb', () => {
+  const collectionStub = () => ({
+    findOne: jest.fn(async () => null),
+    updateOne: jest.fn(async () => ({})),
+    insertOne: jest.fn(async () => ({})),
+    find: jest.fn(() => ({ toArray: jest.fn(async () => []) })),
+  });
+  return {
+    __esModule: true,
+    default: jest.fn(async () => ({ connection: { db: { collection: collectionStub } } })),
+  };
+});
 
 // Mock the googleapis library
 jest.mock('googleapis', () => {
@@ -70,6 +94,8 @@ describe('Gmail Webhook API', () => {
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
+    // Deterministic webhook secret so verification is exercised, not skipped.
+    process.env.GMAIL_WEBHOOK_SECRET = 'test-webhook-secret';
     // Spy on console.log and console.error to track their calls
     consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -89,7 +115,8 @@ describe('Gmail Webhook API', () => {
     };
     return {
       json: async () => webhookPayload,
-    } as NextRequest;
+      headers: new Headers({ 'x-webhook-secret': 'test-webhook-secret' }),
+    } as unknown as NextRequest;
   };
 
   const mockHistoryList = (messageId: string) => {
@@ -112,6 +139,7 @@ describe('Gmail Webhook API', () => {
 
   it('should process a standard plain-text email with an attachment', async () => {
     // Arrange
+    mockClassify.mockResolvedValue(mockScores('new_order'));
     mockHistoryList('test-message-id-1');
     (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
       data: {
@@ -154,6 +182,7 @@ describe('Gmail Webhook API', () => {
 
   it('should process an HTML-only email and strip HTML tags from the body', async () => {
     // Arrange
+    mockClassify.mockResolvedValue(mockScores('update_order'));
     mockHistoryList('test-message-id-2');
     (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
       data: {
@@ -180,11 +209,45 @@ describe('Gmail Webhook API', () => {
     await POST(request);
 
     // Assert
-    expect(consoleSpy).toHaveBeenCalledWith('Email classified as: new_order');
+    expect(consoleSpy).toHaveBeenCalledWith('Email classified as: update_order');
+  });
+
+  it('should log unclassified email as a low-severity error', async () => {
+    // Arrange
+    mockClassify.mockResolvedValue(mockScores('other'));
+    mockHistoryList('test-message-id-4');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
+      data: {
+        id: 'test-message-id-4',
+        payload: {
+          headers: [
+            { name: 'From', value: 'newsletter@example.com' },
+            { name: 'Subject', value: 'Festive offers' },
+          ],
+          parts: [
+            {
+              mimeType: 'text/plain',
+              body: {
+                data: Buffer.from('Check out our festive offers on the website.').toString('base64'),
+              },
+            },
+          ],
+        },
+      },
+    });
+    const request = mockWebhookRequest('12348');
+
+    // Act
+    await POST(request);
+
+    // Assert
+    expect(consoleSpy).toHaveBeenCalledWith('Email classified as: other');
+    expect(consoleSpy).toHaveBeenCalledWith('Unclassified email logged as error.');
   });
 
   it('should handle emails with no attachments gracefully', async () => {
     // Arrange
+    mockClassify.mockResolvedValue(mockScores('feedback'));
     mockHistoryList('test-message-id-3');
     (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
       data: {
@@ -211,7 +274,7 @@ describe('Gmail Webhook API', () => {
     await POST(request);
 
     // Assert
-    expect(consoleSpy).toHaveBeenCalledWith('Email classified as: new_order');
+    expect(consoleSpy).toHaveBeenCalledWith('Email classified as: feedback');
   });
 
   it('should handle errors when fetching email details and continue processing', async () => {

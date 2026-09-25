@@ -4,6 +4,15 @@ import '@testing-library/jest-dom'
 // Mock fetch globally for all tests
 global.fetch = jest.fn()
 
+// Global stub for the transformers runtime: deterministic constant vectors,
+// so suites exercise routing logic without downloading models.
+// Suites needing the REAL runtime (classifier-accuracy) override this with:
+//   jest.mock('@huggingface/transformers', () => jest.requireActual('@huggingface/transformers'))
+jest.mock('@huggingface/transformers', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('./__mocks__/transformers.js');
+});
+
 // Mock Next.js router
 jest.mock('next/router', () => ({
   useRouter() {
