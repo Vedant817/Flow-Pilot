@@ -1,4 +1,4 @@
-import { hasExplicitNewOrderRequest, hasUsableOrderLines } from '../lib/nlp/order-intent';
+import { hasExplicitNewOrderRequest, hasUsableOrderLines, hasExistingOrderChangeLanguage } from '../lib/nlp/order-intent';
 
 describe('order write guard', () => {
   it.each([
@@ -14,9 +14,15 @@ describe('order write guard', () => {
     ['rate kya hai?', 'Sir aaj cheeni ka rate kya hai? order baad me dunga.'],
     ['as discussed', 'As discussed on call. Please proceed.'],
     ['catalog', 'Please send a price list for 20 cartons, will place an order later.'],
+    ['Rate confirmation and order placement', 'Please confirm the current rate. On confirmation, we will place an order.'],
   ])('rejects inquiries and ambiguous mail', (subject, body) => {
     expect(hasExplicitNewOrderRequest(subject, body)).toBe(false);
   });
+});
+
+it('recognizes changes even when they also say send the remaining items', () => {
+  expect(hasExistingOrderChangeLanguage('items kam kar do', 'biscuits hata do, baaki bhej do')).toBe(true);
+  expect(hasExistingOrderChangeLanguage('Purchase Order', 'Please send 50 bags rice')).toBe(false);
 });
 
 it('rejects numeric parser artefacts while accepting product quantities', () => {

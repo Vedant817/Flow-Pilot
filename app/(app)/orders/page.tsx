@@ -130,6 +130,7 @@ const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps)
                             <p className="text-sm font-medium text-slate-600">Order Date</p>
                             <p className="text-slate-900 font-medium">{order.date}</p>
                             <p className="text-xs text-slate-500">{order.time}</p>
+                            {order.requestedDeliveryDate && <p className="mt-1 text-xs text-blue-700">Requested delivery: {order.requestedDeliveryDate}{order.requestedDeliveryTime ? ` at ${order.requestedDeliveryTime}` : ''}</p>}
                         </div>
                     </div>
                     {order.pricing && order.pricing.discountMinor > 0 && (

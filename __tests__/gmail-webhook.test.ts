@@ -7,9 +7,13 @@ import { classifyEmailWithScores } from '../lib/nlp/classify';
 import { Error as ErrorModel } from '../models/Error';
 import { Order } from '../models/Order';
 import { EmailReview } from '../models/EmailReview';
+import { InboundOrderDraft } from '../models/InboundOrderDraft';
 
 jest.mock('../models/EmailReview', () => ({
   EmailReview: { updateOne: jest.fn(async () => ({ upsertedCount: 1 })) },
+}));
+jest.mock('../models/InboundOrderDraft', () => ({
+  InboundOrderDraft: { updateOne: jest.fn(async () => ({ upsertedCount: 1 })), exists: jest.fn(async () => false) },
 }));
 
 jest.mock('../lib/nlp/classify', () => ({
@@ -253,7 +257,7 @@ describe('Gmail Webhook API', () => {
         payload: {
           headers: [
             { name: 'From', value: 'Customer <buyer@example.com>' },
-            { name: 'Subject', value: 'New order' },
+            { name: 'Subject', value: 'As discussed' },
           ],
           body: { data: Buffer.from('As discussed on call, please proceed.').toString('base64') },
         },
@@ -266,7 +270,7 @@ describe('Gmail Webhook API', () => {
     orderSave.mockRestore();
   });
 
-  it('does not create an order from a numeric product-name parser artefact', async () => {
+  it('captures an order without a delivery slot as a draft, not a fulfillment order', async () => {
     mockClassify.mockResolvedValue(mockScores('new_order'));
     const orderSave = jest.spyOn(Order.prototype, 'save');
     mockHistoryList('malformed-lines');
@@ -283,7 +287,25 @@ describe('Gmail Webhook API', () => {
     });
     await POST(mockWebhookRequest('12350'));
     expect(orderSave).not.toHaveBeenCalled();
+    expect(InboundOrderDraft.updateOne).toHaveBeenCalledTimes(1);
+    expect(EmailReview.updateOne).not.toHaveBeenCalled();
+    orderSave.mockRestore();
+  });
+
+  it('does not draft a change request when the model mislabels it as a new order', async () => {
+    mockClassify.mockResolvedValue(mockScores('new_order'));
+    const orderSave = jest.spyOn(Order.prototype, 'save');
+    mockHistoryList('mislabelled-amendment');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({ data: {
+      payload: {
+        headers: [{ name: 'From', value: 'Buyer <buyer@example.com>' }, { name: 'Subject', value: 'items kam kar do' }],
+        body: { data: Buffer.from('sir list me se biscuits hata do, baaki bhej do.').toString('base64') },
+      },
+    } });
+    await POST(mockWebhookRequest('12351'));
     expect(EmailReview.updateOne).toHaveBeenCalledTimes(1);
+    expect(InboundOrderDraft.updateOne).not.toHaveBeenCalled();
+    expect(orderSave).not.toHaveBeenCalled();
     orderSave.mockRestore();
   });
 

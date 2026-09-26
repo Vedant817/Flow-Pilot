@@ -54,7 +54,7 @@ export default function EmailReviewsPage() {
     <header className="flex items-center justify-between gap-4">
       <div><h1 className="text-2xl font-semibold">Email order reviews</h1>
         <p className="text-sm text-slate-500">Verify the original message before editing orders. Mark resolved only after completing the work.</p></div>
-      <Link href="/orders" className="text-sm underline">View orders</Link>
+      <div className="flex gap-4"><Link href="/email-drafts" className="text-sm underline">Order drafts</Link><Link href="/orders" className="text-sm underline">View orders</Link></div>
     </header>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
     {loading ? <p>Loading reviews…</p> : reviews.length === 0 ? <p>No open email reviews.</p> :

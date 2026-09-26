@@ -17,6 +17,9 @@ interface IOrder extends Document {
     date: string;
     time: string;
     orderedAt?: Date;
+    placedAt?: Date;
+    requestedDeliveryDate?: string;
+    requestedDeliveryTime?: string;
     products: Product[];
     status: string;
     orderLink: string;
@@ -54,6 +57,9 @@ const OrderSchema = new Schema<IOrder>({
     date: { type: String, required: true },
     time: { type: String, required: true },
     orderedAt: { type: Date, sparse: true } as any,
+    placedAt: { type: Date },
+    requestedDeliveryDate: { type: String },
+    requestedDeliveryTime: { type: String },
     products: { type: [ProductSchema], required: true },
     status: { type: String, required: true },
     orderLink: { type: String, required: true },

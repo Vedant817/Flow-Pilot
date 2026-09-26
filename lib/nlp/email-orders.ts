@@ -10,7 +10,8 @@ export type Change =
 
 export type NewOrderParse =
   | { ready: true; products: Array<{ name: string; quantity: number; evidence: string }>; date: Evidence<string>; time: Evidence<string> }
-  | { ready: false; reason: string; evidence: string[] };
+  | { ready: false; reason: string; evidence: string[]; intent: boolean;
+      products: Array<{ name: string; quantity: number; evidence: string }>; date: Evidence<string> | null; time: Evidence<string> | null };
 
 function dateFrom(text: string): Evidence<string> | null {
   const match = text.match(/\b(20\d\d)-(\d\d)-(\d\d)\b|\b(\d{1,2})[/.](\d{1,2})[/.](20\d\d)\b/);
@@ -47,21 +48,45 @@ function productLine(line: string): { name: string; quantity: number; evidence: 
   return { name, quantity, evidence: line.trim() };
 }
 
+/** Suggestions only: these are never sufficient to automatically fulfill an order. */
+function suggestProducts(body: string): Array<{ name: string; quantity: number; evidence: string }> {
+  const found: Array<{ name: string; quantity: number; evidence: string }> = [];
+  const seen = new Set<string>();
+  for (const line of body.split('\n')) {
+    if (/\b(?:delivery|date|time|phone|mobile|contact|address|rate|price|invoice|gst)\b/i.test(line) &&
+        !/\b(?:send|dispatch|bhej)\b/i.test(line)) continue;
+    for (const segment of line.split(/[,;+]|\s+and\s+|\s+aur\s+/i)) {
+      const exact = productLine(segment);
+      const match = segment.match(/\b(\d{1,5})\s*(?:x|×|bags?|packets?|units?|cartons?|crates?|tins?|kilo|kg|dabba|peti)?\s+(?:of\s+)?([a-z][\w ]{2,55})/i);
+      const quantity = exact?.quantity ?? Number(match?.[1]);
+      const name = (exact?.name ?? match?.[2] ?? '')
+        .replace(/\b(?:bhej|deliver|dispatch|kal|tomorrow|aaj|today|please|urgent|chahiye)\b.*$/i, '')
+        .trim();
+      const key = name.toLowerCase();
+      if (Number.isInteger(quantity) && quantity > 0 && name.length >= 3 &&
+          !/^(?:order|po|phone|contact|date|time|delivery|gst|invoice|price|rate)\b/i.test(name) && !seen.has(key)) {
+        found.push({ name, quantity, evidence: segment.trim().slice(0, 180) });
+        seen.add(key);
+      }
+    }
+  }
+  return found;
+}
+
 export function parseNewOrder(subject: string, body: string): NewOrderParse {
   const clean = cleanEmailBody(body);
-  if (!hasExplicitNewOrderRequest(subject, clean)) {
-    return { ready: false, reason: 'Purchase request is not explicit', evidence: [] };
-  }
+  const intent = hasExplicitNewOrderRequest(subject, clean);
   const products = clean.split('\n').map(productLine).filter((p): p is NonNullable<typeof p> => p !== null);
   const date = dateFrom(clean);
   const time = timeFrom(clean);
   const names = new Set(products.map((p) => p.name.toLowerCase()));
-  if (!products.length || names.size !== products.length || !date || !time) {
+  if (!intent || !products.length || names.size !== products.length || !date || !time) {
     return {
       ready: false,
-      reason: !products.length ? 'No structured product lines' : names.size !== products.length
+      reason: !intent ? 'Purchase request is not explicit' : !products.length ? 'No structured product lines' : names.size !== products.length
         ? 'Duplicate products' : !date ? 'Missing explicit delivery date' : 'Missing explicit delivery time',
       evidence: products.map((p) => p.evidence),
+      intent, products: suggestProducts(clean), date, time,
     };
   }
   return { ready: true, products, date, time };

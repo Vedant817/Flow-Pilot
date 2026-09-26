@@ -42,6 +42,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           const changes = parseOrderChanges(review.body);
           const planned = planOrderChanges({
             date: order.date, status: order.status,
+            placedAt: order.placedAt, requestedDeliveryDate: order.requestedDeliveryDate,
             products: order.products.map((p) => ({ name: p.name, quantity: p.quantity })),
             pricing: order.pricing?.originalMinor != null ? order.pricing : undefined,
           }, changes);
@@ -49,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           const before = { date: order.date, products: order.products.map((p) => ({ name: p.name, quantity: p.quantity })) };
           const updated = await Order.updateOne(
             { _id: order._id, orgId: ctx.orgId ?? 'default', status: 'pending fulfillment', __v: order.get('__v') as number, date: order.date },
-            { $set: { date: planned.date, products: planned.products, status: planned.status }, $inc: { __v: 1 } },
+            { $set: { date: planned.date, ...(planned.requestedDeliveryDate ? { requestedDeliveryDate: planned.requestedDeliveryDate } : {}), products: planned.products, status: planned.status }, $inc: { __v: 1 } },
             { session }
           );
           if (updated.modifiedCount !== 1) throw new ReviewConflict('Order changed during review; reload before retrying');

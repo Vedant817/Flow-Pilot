@@ -2,15 +2,17 @@ import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 import { google, type gmail_v1 } from 'googleapis';
 import { classifyEmailWithScores } from '@/lib/nlp/classify';
-import { hasExplicitNewOrderRequest, hasUsableOrderLines } from '@/lib/nlp/order-intent';
+import { hasExplicitNewOrderRequest, hasUsableOrderLines, hasExistingOrderChangeLanguage } from '@/lib/nlp/order-intent';
 import { extractFeedbackDetails } from '@/lib/nlp/extract';
 import { parseNewOrder, parseOrderChanges } from '@/lib/nlp/email-orders';
+import { prepareConfirmedEmailOrder } from '@/lib/nlp/order-placement';
 import { applyOrderDelta } from '@/lib/analytics/rollup';
 import { ingestDocument } from '@/lib/ai/memory';
 import { Order } from '@/models/Order';
 import { Feedback } from '@/models/Feedback';
 import { Error as ErrorModel } from '@/models/Error';
 import { EmailReview } from '@/models/EmailReview';
+import { InboundOrderDraft } from '@/models/InboundOrderDraft';
 import connectToDatabase from '@/lib/mongodb';
 
 function json(data: unknown, status: number): Response {
@@ -146,7 +148,9 @@ async function getEmailDetails(messageId: string) {
       }
     }
 
-    return { from: fromRaw, senderName, senderEmail, subject, body, attachments };
+    const receivedAt = Number(emailResponse.data.internalDate);
+    return { from: fromRaw, senderName, senderEmail, subject, body, attachments,
+      placedAt: Number.isFinite(receivedAt) && receivedAt > 0 ? new Date(receivedAt) : new Date() };
   } catch (error) {
     console.error(`Failed to get email details for message ${messageId}:`, error);
     return null;
@@ -254,12 +258,46 @@ export async function POST(req: NextRequest) {
               console.log(`Email queued for review: ${reason}`);
             };
 
+            const draft = async (parsed: ReturnType<typeof parseNewOrder> & { ready: false }) => {
+              if (await Order.exists({ idempotencyKey: `gmail:${gmailMessageId}` })) return;
+              await InboundOrderDraft.updateOne(
+                { orgId: ORG_ID, gmailMessageId },
+                { $setOnInsert: {
+                  orgId: ORG_ID, gmailMessageId,
+                  senderEmail: emailDetails.senderEmail,
+                  senderName: emailDetails.senderName || 'Unknown',
+                  subject: emailDetails.subject || 'No Subject',
+                  body: emailDetails.body.slice(0, 6000),
+                  placedAt: emailDetails.placedAt,
+                  products: parsed.products,
+                  ...(parsed.date ? { requestedDeliveryDate: parsed.date.value } : {}),
+                  ...(parsed.time ? { requestedDeliveryTime: parsed.time.value } : {}),
+                  reason: parsed.reason, status: 'draft', createdAt: new Date(),
+                } }, { upsert: true }
+              );
+              console.log(`Email order captured as draft: ${parsed.reason}`);
+            };
+
             switch (classification) {
               case 'new_order': {
+                if (hasExistingOrderChangeLanguage(emailDetails.subject ?? '', emailDetails.body)) {
+                  await review('Possible existing-order change classified as new');
+                  break;
+                }
                 const orderDetails = parseNewOrder(emailDetails.subject ?? '', emailDetails.body);
                 if (orderDetails.ready && hasUsableOrderLines(orderDetails.products) &&
                     hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
+                  const prepared = prepareConfirmedEmailOrder({
+                    products: orderDetails.products, placedAt: emailDetails.placedAt,
+                    requestedDeliveryDate: orderDetails.date.value,
+                    requestedDeliveryTime: orderDetails.time.value,
+                  });
+                  if (!prepared.ok) { await review(prepared.reason); break; }
                   const idempotencyKey = `gmail:${gmailMessageId}`;
+                  if (await InboundOrderDraft.exists({ orgId: ORG_ID, gmailMessageId })) {
+                    console.log('Existing draft must be confirmed by a reviewer:', gmailMessageId);
+                    break;
+                  }
                   if (await Order.exists({ idempotencyKey })) {
                     console.log('Order already created from Gmail message:', gmailMessageId);
                     break;
@@ -269,9 +307,13 @@ export async function POST(req: NextRequest) {
                     phone: 'N/A',
                     email: emailDetails.senderEmail,
                     orgId: ORG_ID,
-                    products: orderDetails.products.map(({ name, quantity }) => ({ name, quantity })),
-                    date: orderDetails.date.value,
-                    time: orderDetails.time.value,
+                    products: prepared.products,
+                    date: prepared.date,
+                    time: prepared.time,
+                    placedAt: prepared.placedAt,
+                    orderedAt: prepared.placedAt,
+                    requestedDeliveryDate: prepared.requestedDeliveryDate,
+                    requestedDeliveryTime: prepared.requestedDeliveryTime,
                     idempotencyKey,
                     status: 'pending fulfillment',
                     orderLink: '',
@@ -296,7 +338,8 @@ export async function POST(req: NextRequest) {
                   ).catch(() => undefined);
                   console.log('New order saved:', newOrder._id);
                 } else {
-                  await review(orderDetails.ready ? 'Invalid product lines' : orderDetails.reason);
+                  if (!orderDetails.ready && orderDetails.intent) await draft(orderDetails);
+                  else await review(orderDetails.ready ? 'Invalid product lines' : orderDetails.reason);
                 }
                 break;
               }
@@ -321,8 +364,14 @@ export async function POST(req: NextRequest) {
                 break;
               }
               default: {
+                if (hasExistingOrderChangeLanguage(emailDetails.subject ?? '', emailDetails.body)) {
+                  await review('Possible existing-order change classified as other');
+                  break;
+                }
                 if (hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
-                  await review('Potential order classified as other');
+                  const parsed = parseNewOrder(emailDetails.subject ?? '', emailDetails.body);
+                  if (!parsed.ready && parsed.intent) await draft(parsed);
+                  else await review('Potential order classified as other');
                   break;
                 }
                 const newError = new ErrorModel({

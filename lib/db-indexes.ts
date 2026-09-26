@@ -31,6 +31,8 @@ export async function ensureQueryIndexes(db: Db): Promise<void> {
     db.collection('errors').createIndex({ severity: 1 }),
     db.collection('email_reviews').createIndex({ orgId: 1, gmailMessageId: 1 }, { unique: true }),
     db.collection('email_reviews').createIndex({ orgId: 1, status: 1, createdAt: -1 }),
+    db.collection('inbound_order_drafts').createIndex({ orgId: 1, gmailMessageId: 1 }, { unique: true }),
+    db.collection('inbound_order_drafts').createIndex({ orgId: 1, status: 1, createdAt: -1 }),
     // promotion_schemes
     db.collection('promotion_schemes').createIndex({ orgId: 1, code: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } as any }),
     db.collection('promotion_schemes').createIndex({ status: 1, 'limits.validFrom': 1, 'limits.validUntil': 1 }),

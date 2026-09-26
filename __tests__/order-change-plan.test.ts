@@ -32,4 +32,10 @@ describe('reviewed order-change planning', () => {
       { op: 'reschedule', date: { value: '2026-10-08', text: '2026-10-08' } },
     ])).toMatchObject({ ok: false });
   });
+
+  it('reschedules delivery without changing the placement date of a new email order', () => {
+    expect(planOrderChanges({ ...original, placedAt: new Date('2026-09-26T10:00:00Z'), requestedDeliveryDate: '2026-10-05' },
+      [{ op: 'reschedule', date: { value: '2026-10-09', text: '2026-10-09' } }]))
+      .toMatchObject({ ok: true, date: '2026-10-05', requestedDeliveryDate: '2026-10-09' });
+  });
 });
