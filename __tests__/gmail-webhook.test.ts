@@ -4,6 +4,8 @@ import { POST } from '../app/api/webhook/gmail/route';
 import { NextRequest } from 'next/server';
 import { google } from 'googleapis';
 import { classifyEmailWithScores } from '../lib/nlp/classify';
+import { Error as ErrorModel } from '../models/Error';
+import { Order } from '../models/Order';
 
 jest.mock('../lib/nlp/classify', () => ({
   classifyEmailWithScores: jest.fn(),
@@ -147,13 +149,13 @@ describe('Gmail Webhook API', () => {
         payload: {
           headers: [
             { name: 'From', value: '"Test Sender" <test@example.com>' },
-            { name: 'Subject', value: 'Test Subject' },
+            { name: 'Subject', value: 'Purchase Order PO-2214' },
           ],
           parts: [
             {
               mimeType: 'text/plain',
               body: {
-                data: Buffer.from('This is the email body.').toString('base64'),
+                data: Buffer.from('Please process our purchase order:\nBasmati Rice 5kg x 50').toString('base64'),
               },
             },
             {
@@ -178,11 +180,14 @@ describe('Gmail Webhook API', () => {
 
     // Assert
     expect(consoleSpy).toHaveBeenCalledWith('Email classified as: new_order');
+    expect(consoleSpy).toHaveBeenCalledWith('New order saved:', 'mock-id');
   });
 
   it('should process an HTML-only email and strip HTML tags from the body', async () => {
     // Arrange
     mockClassify.mockResolvedValue(mockScores('update_order'));
+    const orderSave = jest.spyOn(Order.prototype, 'save');
+    const reviewSave = jest.spyOn(ErrorModel.prototype, 'save');
     mockHistoryList('test-message-id-2');
     (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
       data: {
@@ -210,6 +215,58 @@ describe('Gmail Webhook API', () => {
 
     // Assert
     expect(consoleSpy).toHaveBeenCalledWith('Email classified as: update_order');
+    expect(consoleSpy).toHaveBeenCalledWith('Email queued for review: order change requires verification');
+    expect(orderSave).not.toHaveBeenCalled();
+    expect(reviewSave).toHaveBeenCalledTimes(1);
+    orderSave.mockRestore();
+    reviewSave.mockRestore();
+  });
+
+  it('queues a classified order with no parseable products for review', async () => {
+    mockClassify.mockResolvedValue(mockScores('new_order'));
+    const orderSave = jest.spyOn(Order.prototype, 'save');
+    const reviewSave = jest.spyOn(ErrorModel.prototype, 'save');
+    mockHistoryList('incomplete-order');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
+      data: {
+        payload: {
+          headers: [
+            { name: 'From', value: 'Customer <buyer@example.com>' },
+            { name: 'Subject', value: 'New order' },
+          ],
+          body: { data: Buffer.from('As discussed on call, please proceed.').toString('base64') },
+        },
+      },
+    });
+    await POST(mockWebhookRequest('12349'));
+    expect(orderSave).not.toHaveBeenCalled();
+    expect(reviewSave).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledWith('Email queued for review: order details incomplete');
+    orderSave.mockRestore();
+    reviewSave.mockRestore();
+  });
+
+  it('does not create an order from a numeric product-name parser artefact', async () => {
+    mockClassify.mockResolvedValue(mockScores('new_order'));
+    const orderSave = jest.spyOn(Order.prototype, 'save');
+    const reviewSave = jest.spyOn(ErrorModel.prototype, 'save');
+    mockHistoryList('malformed-lines');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
+      data: {
+        payload: {
+          headers: [
+            { name: 'From', value: 'buyer@example.com' },
+            { name: 'Subject', value: 'Purchase Order' },
+          ],
+          body: { data: Buffer.from('Please process our purchase order:\n50 x Basmati Rice').toString('base64') },
+        },
+      },
+    });
+    await POST(mockWebhookRequest('12350'));
+    expect(orderSave).not.toHaveBeenCalled();
+    expect(reviewSave).toHaveBeenCalledTimes(1);
+    orderSave.mockRestore();
+    reviewSave.mockRestore();
   });
 
   it('should log unclassified email as a low-severity error', async () => {

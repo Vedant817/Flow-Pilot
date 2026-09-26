@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 import { google, type gmail_v1 } from 'googleapis';
 import { classifyEmailWithScores } from '@/lib/nlp/classify';
+import { hasExplicitNewOrderRequest, hasUsableOrderLines } from '@/lib/nlp/order-intent';
 import { extractOrderDetails, extractFeedbackDetails } from '@/lib/nlp/extract';
 import { applyOrderDelta } from '@/lib/analytics/rollup';
 import { ingestDocument } from '@/lib/ai/memory';
@@ -232,10 +233,24 @@ export async function POST(req: NextRequest) {
               `Classification detail: confidence=${confidence.toFixed(3)} scores=${JSON.stringify(scores)}`
             );
 
+            const review = async (reason: string) => {
+              // Keep the message reference rather than copying private mail content into errors.
+              const newError = new ErrorModel({
+                errorMessage: `Email review (${reason}): Gmail ${gmailMessageId}, subject ${String(emailDetails.subject ?? '').slice(0, 100)}, sender ${emailDetails.senderEmail}`,
+                type: 'Customer',
+                severity: 'medium',
+                timestamp: new Date(),
+                orgId: ORG_ID,
+              });
+              await newError.save();
+              console.log(`Email queued for review: ${reason}`);
+            };
+
             switch (classification) {
               case 'new_order': {
                 const orderDetails = await extractOrderDetails(emailDetails.body);
-                if (orderDetails) {
+                if (orderDetails && hasUsableOrderLines(orderDetails.products) &&
+                    hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
                   const newOrder = new Order({
                     ...orderDetails,
                     name: orderDetails.name || emailDetails.senderName || 'Unknown',
@@ -259,21 +274,17 @@ export async function POST(req: NextRequest) {
                       .join(', ')} for ${newOrder.date}. Source: inbound email.`
                   ).catch(() => undefined);
                   console.log('New order saved:', newOrder._id);
+                } else {
+                  await review(!orderDetails || !hasUsableOrderLines(orderDetails.products)
+                    ? 'order details incomplete' : 'purchase intent unclear');
                 }
                 break;
               }
               case 'update_order': {
-                const updatedOrderDetails = await extractOrderDetails(emailDetails.body);
-                if (updatedOrderDetails) {
-                  const existingOrder = await Order.findOne({ email: emailDetails.senderEmail, status: 'pending fulfillment' }).sort({ date: -1, time: -1 });
-                  if (existingOrder) {
-                    existingOrder.set(updatedOrderDetails);
-                    await existingOrder.save();
-                    console.log('Order updated:', existingOrder);
-                  } else {
-                    console.log('No pending order found to update for:', emailDetails.senderEmail);
-                  }
-                }
+                // extractOrderDetails produces default dates/times and a *partial* product list.
+                // Applying it with .set() can overwrite the entire original order. Until a
+                // validated change parser exists, route amendments/cancellations for review.
+                await review('order change requires verification');
                 break;
               }
               case 'feedback': {

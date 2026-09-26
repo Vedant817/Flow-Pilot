@@ -8,7 +8,7 @@ export type EmailClass = 'new_order' | 'update_order' | 'feedback' | 'other';
 
 export interface ClassScores {
   label: EmailClass;
-  /** Max class probability (calibrated on the training set). */
+  /** Max softmax score; not calibrated on real-world email traffic. */
   confidence: number;
   /** Full per-class probability distribution. */
   scores: Record<EmailClass, number>;
