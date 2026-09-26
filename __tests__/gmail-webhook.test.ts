@@ -108,6 +108,7 @@ describe('Gmail Webhook API', () => {
     jest.clearAllMocks();
     // Deterministic webhook secret so verification is exercised, not skipped.
     process.env.GMAIL_WEBHOOK_SECRET = 'test-webhook-secret';
+    process.env.GMAIL_ORG_ID = 'default';
     // Spy on console.log and console.error to track their calls
     consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

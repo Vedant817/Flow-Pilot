@@ -50,7 +50,7 @@ const ProductSchema = new Schema<Product>({
 
 const OrderSchema = new Schema<IOrder>({
     name: { type: String, required: true },
-    phone: { type: String, required: true },
+    phone: { type: String, default: '' },
     email: { type: String, required: true, trim: true },
     emailNormalized: { type: String, trim: true, lowercase: true, index: true },
     orgId: { type: String, default: 'default' },
@@ -90,5 +90,7 @@ const OrderSchema = new Schema<IOrder>({
     }
     next();
 });
+
+OrderSchema.index({ orgId: 1, date: -1 });
 
 export const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);

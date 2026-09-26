@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "jest && tsx scripts/eval/check-samples.ts",
+    "test": "jest && tsx scripts/verify-email-classifier.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "data:import:uci": "tsx scripts/import-uci-retail.ts",

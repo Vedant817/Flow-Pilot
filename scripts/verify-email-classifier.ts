@@ -1,8 +1,8 @@
-/* Accuracy gate for the production classifier (8 formal/casual samples, all 4 classes).
+/* Accuracy regression gate for the production classifier (all 4 classes).
  * Runs OUTSIDE jest (wired into `npm test`): onnxruntime cannot execute inside
  * jest's sandboxed vm contexts (realm instanceof failure on tensors).
  * Uses the REAL local encoder + head — fails loudly if behavior regresses. */
-import { classifyEmail } from '../../lib/nlp/classify';
+import { classifyEmail } from '../lib/nlp/classify';
 
 const CASES: Array<{ subject: string; body: string; expected: string }> = [
   { subject: 'Purchase Order PO-2214 - Kirana Stores', body: 'Please process our purchase order PO-2214: 50 x Basmati Rice 5kg, 20 x Sunflower Oil 1L. Delivery by 2026-10-05. Contact: Ramesh Kumar, phone 9876543210.', expected: 'new_order' },
@@ -23,7 +23,7 @@ async function main() {
     if (good) ok++;
     console.log(`[${good ? 'OK  ' : 'MISS'}] expected=${c.expected} predicted=${pred} :: ${c.subject}`);
   }
-  console.log(`${ok}/${CASES.length} gate samples pass`);
+  console.log(`${ok}/${CASES.length} classifier regression cases pass`);
   if (ok !== CASES.length) process.exit(1);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

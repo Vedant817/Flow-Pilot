@@ -55,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           requestedDeliveryDate: deliveryDate, requestedDeliveryTime: deliveryTime });
         if (!prepared.ok) throw new DraftConflict(prepared.reason);
         const [order] = await Order.create([{
-          name: draft.senderName || 'Unknown', phone: 'N/A', email: draft.senderEmail,
+          name: draft.senderName || draft.senderEmail, phone: '', email: draft.senderEmail,
           orgId: ctx.orgId ?? 'default', products: prepared.products,
           date: prepared.date, time: prepared.time, placedAt: prepared.placedAt,
           orderedAt: prepared.placedAt,

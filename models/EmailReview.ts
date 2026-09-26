@@ -20,8 +20,8 @@ export interface EmailReviewRecord {
 const EmailReviewSchema = new Schema<EmailReviewRecord>({
   orgId: { type: String, required: true },
   gmailMessageId: { type: String, required: true },
-  senderEmail: { type: String, required: true },
-  subject: { type: String, required: true },
+  senderEmail: { type: String, default: '' },
+  subject: { type: String, default: '' },
   body: { type: String, required: true },
   classification: { type: String, required: true },
   reason: { type: String, required: true },

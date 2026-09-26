@@ -24,7 +24,7 @@ const DraftSchema = new Schema<InboundOrderDraftRecord>({
   gmailMessageId: { type: String, required: true },
   senderEmail: { type: String, required: true },
   senderName: { type: String, required: true },
-  subject: { type: String, required: true },
+  subject: { type: String, default: '' },
   body: { type: String, required: true },
   placedAt: { type: Date, required: true },
   products: { type: [{ name: String, quantity: Number, evidence: String }], default: [] },

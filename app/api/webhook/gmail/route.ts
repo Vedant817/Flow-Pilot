@@ -34,7 +34,6 @@ oAuth2Client.setCredentials({
 
 const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
-const ORG_ID = 'default';
 const MAX_ATTACHMENTS = 3;
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const MAX_HISTORY_PAGES = 10;
@@ -42,6 +41,7 @@ const MAX_HISTORY_PAGES = 10;
 function verifyWebhookSecret(req: NextRequest): boolean {
   const expected = process.env.GMAIL_WEBHOOK_SECRET;
   if (!expected) {
+    if (process.env.NODE_ENV === 'production') return false;
     console.warn('GMAIL_WEBHOOK_SECRET not set — accepting webhook in dev (no verification)');
     return true;
   }
@@ -80,8 +80,8 @@ async function getEmailDetails(messageId: string) {
     const fromHeader = headers?.find((h) => h.name === 'From');
     const subjectHeader = headers?.find((h) => h.name === 'Subject');
 
-    const fromRaw = fromHeader ? fromHeader.value : 'Unknown Sender';
-    const subject = subjectHeader ? subjectHeader.value : 'No Subject';
+    const fromRaw = fromHeader?.value ?? '';
+    const subject = subjectHeader?.value ?? '';
 
     let senderName = '';
     let senderEmail = '';
@@ -159,6 +159,8 @@ async function getEmailDetails(messageId: string) {
 
 
 export async function POST(req: NextRequest) {
+  const orgId = process.env.GMAIL_ORG_ID?.trim();
+  if (!orgId) return json({ error: 'Gmail organization is not configured' }, 503);
   if (!verifyWebhookSecret(req)) {
     return json({ error: 'Invalid webhook secret' }, 401);
   }
@@ -243,11 +245,11 @@ export async function POST(req: NextRequest) {
               // One persistent, resolvable item per Gmail message, including the source
               // and candidate changes. Retries cannot reopen a resolved item.
               await EmailReview.updateOne(
-                { orgId: ORG_ID, gmailMessageId },
+                { orgId, gmailMessageId },
                 { $setOnInsert: {
-                  orgId: ORG_ID, gmailMessageId,
+                  orgId, gmailMessageId,
                   senderEmail: emailDetails.senderEmail,
-                  subject: emailDetails.subject || 'No Subject',
+                  subject: emailDetails.subject,
                   body: emailDetails.body.slice(0, 6000),
                   classification, reason,
                   proposedChanges: classification === 'update_order' ? parseOrderChanges(emailDetails.body) : [],
@@ -261,12 +263,12 @@ export async function POST(req: NextRequest) {
             const draft = async (parsed: ReturnType<typeof parseNewOrder> & { ready: false }) => {
               if (await Order.exists({ idempotencyKey: `gmail:${gmailMessageId}` })) return;
               await InboundOrderDraft.updateOne(
-                { orgId: ORG_ID, gmailMessageId },
+                { orgId, gmailMessageId },
                 { $setOnInsert: {
-                  orgId: ORG_ID, gmailMessageId,
+                  orgId, gmailMessageId,
                   senderEmail: emailDetails.senderEmail,
-                  senderName: emailDetails.senderName || 'Unknown',
-                  subject: emailDetails.subject || 'No Subject',
+                  senderName: emailDetails.senderName || emailDetails.senderEmail,
+                  subject: emailDetails.subject,
                   body: emailDetails.body.slice(0, 6000),
                   placedAt: emailDetails.placedAt,
                   products: parsed.products,
@@ -278,7 +280,9 @@ export async function POST(req: NextRequest) {
               console.log(`Email order captured as draft: ${parsed.reason}`);
             };
 
-            switch (classification) {
+            if (!emailDetails.senderEmail.includes('@')) {
+              await review('Sender email is missing or invalid');
+            } else switch (classification) {
               case 'new_order': {
                 if (hasExistingOrderChangeLanguage(emailDetails.subject ?? '', emailDetails.body)) {
                   await review('Possible existing-order change classified as new');
@@ -294,7 +298,7 @@ export async function POST(req: NextRequest) {
                   });
                   if (!prepared.ok) { await review(prepared.reason); break; }
                   const idempotencyKey = `gmail:${gmailMessageId}`;
-                  if (await InboundOrderDraft.exists({ orgId: ORG_ID, gmailMessageId })) {
+                  if (await InboundOrderDraft.exists({ orgId, gmailMessageId })) {
                     console.log('Existing draft must be confirmed by a reviewer:', gmailMessageId);
                     break;
                   }
@@ -303,10 +307,10 @@ export async function POST(req: NextRequest) {
                     break;
                   }
                   const newOrder = new Order({
-                    name: emailDetails.senderName || 'Unknown',
-                    phone: 'N/A',
+                    name: emailDetails.senderName || emailDetails.senderEmail,
+                    phone: '',
                     email: emailDetails.senderEmail,
-                    orgId: ORG_ID,
+                    orgId,
                     products: prepared.products,
                     date: prepared.date,
                     time: prepared.time,
@@ -356,7 +360,7 @@ export async function POST(req: NextRequest) {
                   const newFeedback = new Feedback({
                     ...feedbackDetails,
                     email: emailDetails.senderEmail,
-                    ...( { orgId: ORG_ID } as Record<string, unknown> ),
+                    orgId,
                   });
                   await newFeedback.save();
                   console.log('New feedback saved:', newFeedback);
@@ -379,7 +383,7 @@ export async function POST(req: NextRequest) {
                   type: 'Customer',
                   severity: 'low',
                   timestamp: new Date(),
-                  ...( { orgId: ORG_ID } as Record<string, unknown> ),
+                  orgId,
                 });
                 await newError.save();
                 console.log('Unclassified email logged as error.');
