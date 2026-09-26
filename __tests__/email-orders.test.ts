@@ -44,4 +44,10 @@ describe('typed change proposals', () => {
     ]);
     expect(parseOrderChanges('sirf 30 bag bhejo, 50 nahi.')).toEqual([]);
   });
+
+  it('uses the new date, never the old date, when rescheduling', () => {
+    expect(parseOrderChanges('Please reschedule delivery from 2026-10-05 to 2026-10-09.'))
+      .toEqual([{ op: 'reschedule', date: { value: '2026-10-09', text: '2026-10-09' } }]);
+    expect(parseOrderChanges('Please reschedule delivery on 2026-10-05 or 2026-10-09.')).toEqual([]);
+  });
 });

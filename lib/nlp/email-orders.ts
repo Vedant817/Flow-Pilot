@@ -76,7 +76,10 @@ export function parseOrderChanges(body: string): Change[] {
   }
   const reschedule = clean.match(/\b(?:reschedule|postpone|change (?:the )?delivery (?:date|to)|deliver (?:on|by|at))\b[^\n]{0,90}/i);
   if (reschedule) {
-    const date = dateFrom(reschedule[0]);
+    // "change from old-date to new-date": never take the first (old) date.
+    const explicitTarget = reschedule[0].match(/\bto\s+(20\d\d-\d\d-\d\d|\d{1,2}[/.]\d{1,2}[/.]20\d\d)\b/i);
+    const allDates = reschedule[0].match(/\b20\d\d-\d\d-\d\d\b|\b\d{1,2}[/.]\d{1,2}[/.]20\d\d\b/g) ?? [];
+    const date = explicitTarget ? dateFrom(explicitTarget[1]) : allDates.length === 1 ? dateFrom(allDates[0]) : null;
     if (date) changes.push({ op: 'reschedule', date });
   }
   for (const line of clean.split('\n')) {
