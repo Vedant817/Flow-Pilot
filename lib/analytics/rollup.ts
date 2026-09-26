@@ -1,4 +1,5 @@
 import { dbConnect } from '@/lib/mongodb';
+import type { ClientSession } from 'mongodb';
 
 /**
  * Daily sales rollup engine.
@@ -37,7 +38,8 @@ interface ProductLine {
 export async function applyOrderDelta(
   date: string,
   products: ProductLine[],
-  sign: 1 | -1
+  sign: 1 | -1,
+  session?: ClientSession
 ): Promise<void> {
   if (!products?.length) return;
   const conn = await dbConnect();
@@ -54,7 +56,7 @@ export async function applyOrderDelta(
     },
   }));
 
-  await col.bulkWrite(ops, { ordered: false });
+  await col.bulkWrite(ops, { ordered: false, session });
 }
 
 /**

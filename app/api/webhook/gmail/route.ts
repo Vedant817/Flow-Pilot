@@ -3,12 +3,14 @@ import crypto from 'crypto';
 import { google, type gmail_v1 } from 'googleapis';
 import { classifyEmailWithScores } from '@/lib/nlp/classify';
 import { hasExplicitNewOrderRequest, hasUsableOrderLines } from '@/lib/nlp/order-intent';
-import { extractOrderDetails, extractFeedbackDetails } from '@/lib/nlp/extract';
+import { extractFeedbackDetails } from '@/lib/nlp/extract';
+import { parseNewOrder, parseOrderChanges } from '@/lib/nlp/email-orders';
 import { applyOrderDelta } from '@/lib/analytics/rollup';
 import { ingestDocument } from '@/lib/ai/memory';
 import { Order } from '@/models/Order';
 import { Feedback } from '@/models/Feedback';
 import { Error as ErrorModel } from '@/models/Error';
+import { EmailReview } from '@/models/EmailReview';
 import connectToDatabase from '@/lib/mongodb';
 
 function json(data: unknown, status: number): Response {
@@ -234,34 +236,53 @@ export async function POST(req: NextRequest) {
             );
 
             const review = async (reason: string) => {
-              // Keep the message reference rather than copying private mail content into errors.
-              const newError = new ErrorModel({
-                errorMessage: `Email review (${reason}): Gmail ${gmailMessageId}, subject ${String(emailDetails.subject ?? '').slice(0, 100)}, sender ${emailDetails.senderEmail}`,
-                type: 'Customer',
-                severity: 'medium',
-                timestamp: new Date(),
-                orgId: ORG_ID,
-              });
-              await newError.save();
+              // One persistent, resolvable item per Gmail message, including the source
+              // and candidate changes. Retries cannot reopen a resolved item.
+              await EmailReview.updateOne(
+                { orgId: ORG_ID, gmailMessageId },
+                { $setOnInsert: {
+                  orgId: ORG_ID, gmailMessageId,
+                  senderEmail: emailDetails.senderEmail,
+                  subject: emailDetails.subject || 'No Subject',
+                  body: emailDetails.body.slice(0, 6000),
+                  classification, reason,
+                  proposedChanges: classification === 'update_order' ? parseOrderChanges(emailDetails.body) : [],
+                  status: 'open', createdAt: new Date(),
+                } },
+                { upsert: true }
+              );
               console.log(`Email queued for review: ${reason}`);
             };
 
             switch (classification) {
               case 'new_order': {
-                const orderDetails = await extractOrderDetails(emailDetails.body);
-                if (orderDetails && hasUsableOrderLines(orderDetails.products) &&
+                const orderDetails = parseNewOrder(emailDetails.subject ?? '', emailDetails.body);
+                if (orderDetails.ready && hasUsableOrderLines(orderDetails.products) &&
                     hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
+                  const idempotencyKey = `gmail:${gmailMessageId}`;
+                  if (await Order.exists({ idempotencyKey })) {
+                    console.log('Order already created from Gmail message:', gmailMessageId);
+                    break;
+                  }
                   const newOrder = new Order({
-                    ...orderDetails,
-                    name: orderDetails.name || emailDetails.senderName || 'Unknown',
-                    // phone is required:true in schema — '' fails required, use 'N/A'.
-                    phone: orderDetails.phone || 'N/A',
+                    name: emailDetails.senderName || 'Unknown',
+                    phone: 'N/A',
                     email: emailDetails.senderEmail,
                     orgId: ORG_ID,
+                    products: orderDetails.products.map(({ name, quantity }) => ({ name, quantity })),
+                    date: orderDetails.date.value,
+                    time: orderDetails.time.value,
+                    idempotencyKey,
                     status: 'pending fulfillment',
                     orderLink: '',
                   });
-                  await newOrder.save();
+                  try {
+                    await newOrder.save();
+                  } catch (error) {
+                    // Unique idempotencyKey index handles overlapping webhook deliveries.
+                    if ((error as { code?: number }).code === 11000 && await Order.exists({ idempotencyKey })) break;
+                    throw error;
+                  }
                   await applyOrderDelta(newOrder.date, newOrder.products, 1).catch((e) =>
                     console.error('Rollup delta failed:', e)
                   );
@@ -275,8 +296,7 @@ export async function POST(req: NextRequest) {
                   ).catch(() => undefined);
                   console.log('New order saved:', newOrder._id);
                 } else {
-                  await review(!orderDetails || !hasUsableOrderLines(orderDetails.products)
-                    ? 'order details incomplete' : 'purchase intent unclear');
+                  await review(orderDetails.ready ? 'Invalid product lines' : orderDetails.reason);
                 }
                 break;
               }
@@ -301,6 +321,10 @@ export async function POST(req: NextRequest) {
                 break;
               }
               default: {
+                if (hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
+                  await review('Potential order classified as other');
+                  break;
+                }
                 const newError = new ErrorModel({
                   errorMessage: `Unclassified email from ${emailDetails.senderEmail}`,
                   type: 'Customer',
