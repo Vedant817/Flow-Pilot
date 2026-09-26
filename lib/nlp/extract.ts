@@ -18,16 +18,27 @@ export interface FeedbackDetails {
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
+function isValidISODate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 function normalizeDate(raw: string | undefined): string {
-  if (!raw) return new Date().toISOString().slice(0, 10);
+  const fallback = new Date().toISOString().slice(0, 10);
+  if (!raw) return fallback;
 
   const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  if (iso) {
+    const candidate = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    return isValidISODate(candidate) ? candidate : fallback;
+  }
 
   const dmy = raw.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
   if (dmy) {
     const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
-    return `${year}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+    const candidate = `${year}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+    return isValidISODate(candidate) ? candidate : fallback;
   }
 
   const dMon = raw.match(/(\d{1,2})\s*([a-zA-Z]{3,9})/);
@@ -35,11 +46,12 @@ function normalizeDate(raw: string | undefined): string {
     const m = MONTHS.indexOf(dMon[2].slice(0, 3).toLowerCase());
     if (m >= 0) {
       const year = new Date().getFullYear();
-      return `${year}-${String(m + 1).padStart(2, '0')}-${dMon[1].padStart(2, '0')}`;
+      const candidate = `${year}-${String(m + 1).padStart(2, '0')}-${dMon[1].padStart(2, '0')}`;
+      return isValidISODate(candidate) ? candidate : fallback;
     }
   }
 
-  return new Date().toISOString().slice(0, 10);
+  return fallback;
 }
 
 /**
@@ -55,8 +67,8 @@ export function extractOrderDetails(emailBody: string): OrderDetails | null {
     body.match(/\b([6-9]\d{9})\b/);
   const phone = phoneMatch ? phoneMatch[1].replace(/[\s-]/g, '') : '';
 
-  const nameMatch = body.match(/(?:name|customer|attn|attention)\s*[:\-]\s*([A-Z][\w.]+(?:\s+[A-Z][\w.]+){0,3})/);
-  const name = nameMatch ? nameMatch[1].trim() : '';
+  const nameMatch = body.match(/(?:name|customer|attn|attention)\s*[:\-]\s*([A-Za-z][\w.]+(?:\s+[A-Za-z][\w.]+){0,3})/i);
+  const name = nameMatch ? nameMatch[1].trim().slice(0, 80) : '';
 
   const dateRaw =
     body.match(/(?:date|delivery|deliver by|required by)\s*(?:on|by|:|-)?\s*((?:\d{4}-\d{2}-\d{2})|(?:\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})|(?:\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*))/i)?.[1];
@@ -82,18 +94,19 @@ export function extractOrderDetails(emailBody: string): OrderDetails | null {
 
   for (const rx of lineParsers) {
     for (const m of body.matchAll(rx)) {
-      const namePart = (m[1] || m[2] || '').trim();
+      const rawName = (m[1] || m[2] || '').trim();
       const qty = parseInt(m[2] && /^\d+$/.test(m[2]) ? m[2] : m[1], 10);
       const quantity = Number.isFinite(qty) ? qty : NaN;
-      if (!namePart || !Number.isFinite(quantity)) continue;
-      if (/^(total|subtotal|amount|price|gst|tax)/i.test(namePart)) continue;
-      if (products.some((p) => p.name.toLowerCase() === namePart.toLowerCase())) continue;
-      products.push({ name: namePart.slice(0, 80), quantity });
+      if (!rawName || rawName.length < 2) continue;
+      if (!Number.isFinite(quantity) || quantity < 1 || quantity > 100000) continue;
+      if (/^(total|subtotal|amount|price|gst|tax)/i.test(rawName)) continue;
+      if (products.some((p) => p.name.toLowerCase() === rawName.toLowerCase())) continue;
+      products.push({ name: rawName.slice(0, 80), quantity });
     }
     if (products.length > 0) break;
   }
 
-  if (!phone && !products.length) return null;
+  if (!products.length) return null;
 
   return { name, phone, products, date, time };
 }

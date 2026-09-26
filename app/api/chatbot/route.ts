@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
+import mongoose from 'mongoose';
 import { dbConnect } from '@/lib/mongodb';
+import { getAuthContext } from '@/lib/auth';
 import { Conversation } from '@/models/Conversation';
 import type { IMessage } from '@/models/Conversation';
 import { streamCopilotResponse, type CopilotContext } from '@/lib/ai/copilot';
@@ -22,9 +24,32 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Query is required' }, { status: 400 });
   }
 
+  if (conversationId && !mongoose.Types.ObjectId.isValid(conversationId)) {
+    return Response.json({ error: 'Invalid conversationId' }, { status: 400 });
+  }
+
   await dbConnect();
 
+  const authCtx = await getAuthContext().catch(() => ({ userId: null as string | null, orgId: 'default' as string }));
+  const ownerKey: string = authCtx.userId || 'anon';
+  const orgId: string = authCtx.orgId || 'default';
+
   let conversation = conversationId ? await Conversation.findById(conversationId) : null;
+  if (conversationId && !conversation) {
+    // Stale/unknown id — start fresh rather than leaking another user's history.
+    conversation = null;
+  }
+  if (conversation) {
+    const doc = conversation as unknown as Record<string, unknown>;
+    const storedClerkUserId = (doc.clerkUserId ?? doc.userId ?? doc.ownerKey) as string | undefined;
+    if (typeof storedClerkUserId === 'string' && storedClerkUserId.length > 0 && storedClerkUserId !== ownerKey) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const storedOrgId = doc.orgId as string | undefined;
+    if (typeof storedOrgId === 'string' && storedOrgId.length > 0 && storedOrgId !== orgId) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  }
   const history = (conversation?.messages ?? [])
     .slice(-8)
     .map((msg) => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
@@ -70,9 +95,13 @@ export async function POST(req: NextRequest) {
               { role: 'user', content: query, timestamp: new Date() },
               { role: 'assistant', content: fullResponse, timestamp: new Date() },
             ],
+            clerkUserId: ownerKey,
+            orgId,
           });
         }
-        if (context && context.sources.length > 0 && fullResponse.length > 40) {
+        // Self-ingest of Q&A into global knowledge is opt-in only (avoids
+        // polluting shared retrieval with per-user chatter).
+        if (process.env.COPILOT_SELF_INGEST === '1' && context && context.sources.length > 0 && fullResponse.length > 40) {
           void ingestDocument(
             'knowledge',
             undefined,

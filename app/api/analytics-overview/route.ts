@@ -4,6 +4,11 @@ import { getDailySeries } from '@/lib/analytics/rollup';
 
 const DAY_MS = 86_400_000;
 
+// TODO: full multi-tenancy — backfill orgId on orders/inventory then scope every
+// aggregation below by ORG_ID (currently tolerated as missing for legacy rows).
+const ORG_ID = 'default';
+const ORG_OR_MISSING = { $or: [{ orgId: ORG_ID }, { orgId: { $exists: false } }] };
+
 export async function GET(request: NextRequest) {
   try {
     const days = Math.min(365, Math.max(7, Number(request.nextUrl.searchParams.get('days')) || 30));
@@ -16,18 +21,19 @@ export async function GET(request: NextRequest) {
     const [rollups, orderDaily, statusRows, inventory, customerRows] = await Promise.all([
       getDailySeries(days * 2),
       db.collection('orders').aggregate([
-        { $match: { date: { $gte: previousStart } } },
+        { $match: { date: { $gte: previousStart }, ...ORG_OR_MISSING } },
         { $group: { _id: '$date', orders: { $sum: 1 }, fulfilled: { $sum: { $cond: [{ $eq: ['$status', 'fulfilled'] }, 1, 0] } } } },
         { $sort: { _id: 1 } },
       ]).toArray(),
       db.collection('orders').aggregate([
+        { $match: { ...ORG_OR_MISSING } },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]).toArray(),
       db.collection('inventory').find({}, {
         projection: { name: 1, category: 1, quantity: 1, price: 1, stock_alert_level: 1 },
       }).limit(100_000).toArray(),
       db.collection('orders').aggregate([
-        { $match: { date: { $gte: currentStart } } },
+        { $match: { date: { $gte: currentStart }, ...ORG_OR_MISSING } },
         { $unwind: '$products' },
         { $lookup: { from: 'inventory', localField: 'products.name', foreignField: 'name', as: 'sku' } },
         { $set: { lineValue: { $multiply: ['$products.quantity', { $ifNull: [{ $first: '$sku.price' }, 50] }] } } },
@@ -101,10 +107,11 @@ export async function GET(request: NextRequest) {
         lowStockItems: inventory.filter((sku) => Number(sku.quantity) <= Number(sku.stock_alert_level)).length,
       },
       performanceMetrics: {
-        conversionRate: 0,
+        conversionRate: null,
         fulfillmentRate: totalOrders ? Math.round((fulfilled / totalOrders) * 100) : 0,
-        averageProcessingTime: 'Requires fulfillment timestamps',
-        customerSatisfaction: 0,
+        averageProcessingTime: null,
+        customerSatisfaction: null,
+        notes: 'conversionRate, averageProcessingTime and customerSatisfaction are unavailable — no visitor/funnel, fulfillment-timestamp, or survey data is collected yet',
       },
       chartData: {
         orderTrends: {

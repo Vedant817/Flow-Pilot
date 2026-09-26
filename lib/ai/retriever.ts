@@ -16,14 +16,22 @@ const VECTOR_INDEX_NAME = 'vec_idx';
  */
 export async function hybridRetrieve(
   query: string,
-  opts: { limit?: number; kinds?: MemoryKind[] } = {}
+  opts: { limit?: number; kinds?: MemoryKind[]; orgId?: string } = {}
 ): Promise<RetrievedDoc[]> {
   const limit = opts.limit ?? 6;
+  const orgId = opts.orgId;
   await bootstrapKnowledge();
 
   const conn = await dbConnect();
   const col = conn.connection.db!.collection<MemoryDoc>('semantic_memory');
   const queryVec = await embedText(query);
+
+  const kindFilter = opts.kinds ? { kind: { $in: opts.kinds } } : {};
+  // Tenant scoping that preserves curated global docs (which carry no orgId).
+  const mongoFilter: Record<string, unknown> = {
+    ...kindFilter,
+    ...(orgId ? { $or: [{ orgId }, { orgId: { $exists: false } }] } : {}),
+  };
 
   let tier1: RetrievedDoc[] = [];
   let usedVectorSearch = false;
@@ -39,14 +47,28 @@ export async function hybridRetrieve(
           ...(opts.kinds ? { filter: { kind: { $in: opts.kinds } } } : {}),
         },
       },
-      { $project: { kind: 1, title: 1, text: 1, score: { $meta: 'vectorSearchScore' } } },
+      { $project: { kind: 1, title: 1, text: 1, orgId: 1, score: { $meta: 'vectorSearchScore' } } },
     ];
-    tier1 = (await col.aggregate(pipeline, { maxTimeMS: 3000 }).toArray()).map((d) => ({
+    interface VectorRow {
+      _id: unknown;
+      kind: MemoryKind;
+      title: string;
+      text: string;
+      orgId?: unknown;
+      score?: unknown;
+    }
+    const raw = (await col.aggregate(pipeline, { maxTimeMS: 3000 }).toArray()) as unknown as VectorRow[];
+    tier1 = raw
+      .filter((d) => {
+        if (!orgId) return true;
+        return d.orgId === undefined || d.orgId === orgId;
+      })
+      .map((d) => ({
       _id: String(d._id),
       kind: d.kind,
       title: d.title,
       text: d.text,
-      score: d.score ?? 0,
+      score: typeof d.score === 'number' ? d.score : 0,
     }));
     usedVectorSearch = tier1.length > 0;
   } catch {
@@ -64,7 +86,7 @@ export async function hybridRetrieve(
   let tier2: RetrievedDoc[] = [];
   if (!usedVectorSearch && tokens.length > 0) {
     const candidates = await col
-      .find(opts.kinds ? { kind: { $in: opts.kinds } } : {}, {
+      .find(mongoFilter, {
         limit: 500,
         sort: { createdAt: -1 },
         projection: { kind: 1, title: 1, text: 1, embedding: 1 },

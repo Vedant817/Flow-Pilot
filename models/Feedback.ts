@@ -5,6 +5,7 @@ interface IFeedback extends Document {
     review: string;
     type: string;
     createdAt: Date;
+    orgId?: string;
 }
 
 const FeedbackSchema = new Schema<IFeedback>({
@@ -16,9 +17,12 @@ const FeedbackSchema = new Schema<IFeedback>({
         enum: ['good', 'bad', 'neutral']
     },
     createdAt: { type: Date, required: true, default: Date.now },
+    orgId: { type: String, default: 'default' },
 }, {
     collection: 'feedback',
     timestamps: false,
 });
+
+FeedbackSchema.index({ orgId: 1, createdAt: -1 });
 
 export const Feedback: Model<IFeedback> = mongoose.models.Feedback || mongoose.model<IFeedback>('Feedback', FeedbackSchema);

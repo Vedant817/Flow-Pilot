@@ -2,9 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Error as ErrorModel } from "@/models/Error";
 import dbConnect from "@/lib/mongodb";
+import { getAuthContext } from "@/lib/auth";
 
 // GET - Fetch all errors
 export async function GET(request: NextRequest) {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
     try {
         await dbConnect();
 
@@ -17,7 +23,7 @@ export async function GET(request: NextRequest) {
         const skip = (page - 1) * limit;
 
         // Build filter object
-        const filter: any = {};
+        const filter: any = { orgId };
         if (type && ['System', 'Customer'].includes(type)) {
             filter.type = type;
         }
@@ -60,6 +66,11 @@ export async function GET(request: NextRequest) {
 
 // POST - Add new error
 export async function POST(request: NextRequest) {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
     try {
         await dbConnect();
 
@@ -132,8 +143,9 @@ export async function POST(request: NextRequest) {
             errorMessage: errorMessage.trim(),
             type: type,
             severity: severity.toLowerCase(),
-            timestamp: new Date()
-        });
+            timestamp: new Date(),
+            orgId,
+        } as any);
 
         const savedError = await newError.save();
 
@@ -186,6 +198,11 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Clear errors (optional utility endpoint)
 export async function DELETE(request: NextRequest) {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
     try {
         await dbConnect();
 
@@ -207,7 +224,7 @@ export async function DELETE(request: NextRequest) {
         }
 
         // Build filter for deletion
-        const filter: any = {};
+        const filter: any = { orgId };
         if (type && ['System', 'Customer'].includes(type)) {
             filter.type = type;
         }

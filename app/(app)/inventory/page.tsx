@@ -299,7 +299,13 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const itemsPerPage = 8;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const fetchInventoryData = useCallback(async () => {
     try {
@@ -332,15 +338,15 @@ export default function InventoryPage() {
   }, []);
 
   const filteredInventory = useMemo(() => {
-    if (!searchQuery.trim()) return inventoryData;
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return inventoryData;
 
-    const query = searchQuery.toLowerCase();
     return inventoryData.filter(item =>
-      item.name?.toLowerCase().includes(query) ||
-      item.category?.toLowerCase().includes(query) ||
-      item.warehouse_location?.toLowerCase().includes(query)
+      item.name?.toLowerCase().includes(q) ||
+      item.category?.toLowerCase().includes(q) ||
+      item.warehouse_location?.toLowerCase().includes(q)
     );
-  }, [inventoryData, searchQuery]);
+  }, [inventoryData, debouncedQuery]);
 
   const paginatedInventory = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -348,8 +354,12 @@ export default function InventoryPage() {
   }, [filteredInventory, currentPage, itemsPerPage]);
 
   const totalPages = useMemo(() => {
-    return Math.ceil(filteredInventory.length / itemsPerPage);
+    return Math.max(1, Math.ceil(filteredInventory.length / itemsPerPage));
   }, [filteredInventory, itemsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const stats = useMemo(() => {
     const totalValue = inventoryData.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -552,7 +562,9 @@ export default function InventoryPage() {
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="text-sm text-slate-600">
-                  Showing {Math.min(itemsPerPage, paginatedInventory.length)} of {filteredInventory.length} products
+                  {filteredInventory.length === 0
+                    ? 'Showing 0 of 0 products'
+                    : `Showing ${(currentPage - 1) * itemsPerPage + 1}–${Math.min(currentPage * itemsPerPage, filteredInventory.length)} of ${filteredInventory.length} products`}
                 </div>
                 <Pagination
                   currentPage={currentPage}

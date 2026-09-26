@@ -26,8 +26,8 @@ interface ProductItem {
 interface Order {
     id: string;
     name: string;
-    email: string;
-    phone: string;
+    email?: string;
+    phone?: string;
     date: string;
     time: string;
     products: ProductItem[];
@@ -117,7 +117,7 @@ const StatusTimeline = ({ status }: { status: string }) => {
     const currentStep = getCurrentStep();
 
     return (
-        <div className="bg-white rounded-2xl p-8 shadow-lg border border-slate-200 w-screen">
+        <div className="bg-white rounded-2xl p-8 shadow-lg border border-slate-200 w-full">
             <h3 className="text-2xl font-bold text-slate-900 mb-8 flex items-center gap-3">
                 <MapPin className="w-6 h-6 text-blue-600" />
                 Order Progress
@@ -198,21 +198,49 @@ export default function OrderTrackingPage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchOrderData = useCallback(async () => {
+    const fetchOrderData = useCallback(async (signal?: AbortSignal) => {
         if (!orderId) return;
 
         try {
             setLoading(true);
-            const controller = new AbortController();
-            const signal = controller.signal;
+            setError(null);
 
-            const response = await fetch(`http://localhost:3000/orders/track/${orderId}`, { signal });
+            const rawId = Array.isArray(orderId) ? orderId[0] : String(orderId);
+            // Opaque tracking tokens (issued at order creation) resolve via the
+            // public token endpoint; raw Mongo IDs use the authenticated route.
+            const isRawId = /^[0-9a-fA-F]{24}$/.test(rawId);
+            const endpoint = isRawId
+                ? `/orders/track/${encodeURIComponent(rawId)}`
+                : `/api/track-order/${encodeURIComponent(rawId)}`;
+            const response = await fetch(endpoint, { signal });
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch order data');
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                // Most commonly a Clerk sign-in redirect returning HTML.
+                const text = await response.text().catch(() => '');
+                if (text.trimStart().startsWith('<') || response.status === 401 || response.status === 403) {
+                    throw new Error('This tracking link requires no sign-in, but the server returned a sign-in page. Please try again or contact support.');
+                }
+                throw new Error(`Unexpected server response (status ${response.status}). Please try again later.`);
             }
 
-            const data = await response.json();
+            if (!response.ok) {
+                let message = 'Failed to fetch order data';
+                try {
+                    const errBody = await response.json() as { error?: string };
+                    if (errBody?.error) message = errBody.error;
+                } catch {
+                    // keep default message when error body is not JSON
+                }
+                throw new Error(message);
+            }
+
+            let data: Order;
+            try {
+                data = await response.json();
+            } catch {
+                throw new Error('Invalid server response. Please try again later.');
+            }
             setOrder(data);
             setError(null);
         } catch (err) {
@@ -229,7 +257,7 @@ export default function OrderTrackingPage() {
         if (orderId) {
             const controller = new AbortController();
 
-            fetchOrderData();
+            fetchOrderData(controller.signal);
 
             return () => {
                 controller.abort();
@@ -238,7 +266,7 @@ export default function OrderTrackingPage() {
     }, [orderId, fetchOrderData]);
 
     const loadingView = useMemo(() => (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-full">
             <div className="bg-white rounded-2xl p-12 shadow-2xl border border-slate-200 text-center max-w-md w-full mx-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                     <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -250,7 +278,7 @@ export default function OrderTrackingPage() {
     ), []);
 
     const errorView = useMemo(() => error && (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-red-50 to-pink-50 flex items-center justify-center w-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-red-50 to-pink-50 flex items-center justify-center w-full">
             <div className="bg-white rounded-2xl p-12 shadow-2xl border border-red-200 text-center max-w-md w-full mx-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                     <AlertCircle className="w-8 h-8 text-white" />
@@ -268,7 +296,7 @@ export default function OrderTrackingPage() {
     ), [error, router]);
 
     const emptyView = useMemo(() => (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-full">
             <div className="bg-white rounded-2xl p-12 shadow-2xl border border-slate-200 text-center max-w-md w-full mx-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-400 to-slate-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                     <Package className="w-8 h-8 text-white" />

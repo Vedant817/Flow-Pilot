@@ -462,6 +462,7 @@ export default function OrdersPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [totalOrders, setTotalOrders] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
+    const [statusCounts, setStatusCounts] = useState<{ fulfilled: number; pending: number; partial: number } | null>(null);
     const ordersPerPage = 9;
     const deferredFilter = useDeferredValue(filterText);
 
@@ -493,6 +494,30 @@ export default function OrdersPage() {
         fetchOrders();
     }, [currentPage, deferredFilter, statusFilter]);
 
+    useEffect(() => {
+        let cancelled = false;
+        const fetchStatusCounts = async () => {
+            try {
+                const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+                const statuses = ['fulfilled', 'pending fulfillment', 'partially fulfilled'];
+                const results = await Promise.all(
+                    statuses.map(async (status) => {
+                        const params = new URLSearchParams({ page: '1', limit: '1', status });
+                        const res = await axios.get(`${apiBase}/orders?${params}`);
+                        return res.data.pagination?.total ?? (Array.isArray(res.data.data) ? res.data.data.length : 0);
+                    })
+                );
+                if (!cancelled) {
+                    setStatusCounts({ fulfilled: results[0], pending: results[1], partial: results[2] });
+                }
+            } catch {
+                if (!cancelled) setStatusCounts(null);
+            }
+        };
+        fetchStatusCounts();
+        return () => { cancelled = true; };
+    }, []);
+
     const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setFilterText(e.target.value);
         setCurrentPage(1);
@@ -504,13 +529,29 @@ export default function OrdersPage() {
     }, []);
 
     const handleStatusChange = useCallback((orderId: string, newStatus: string) => {
-        setOrders(prevOrders =>
-            prevOrders.map(order =>
+        setOrders(prevOrders => {
+            const prev = prevOrders.find(order => order._id === orderId);
+            const prevStatus = prev?.status;
+            if (prevStatus && prevStatus !== newStatus) {
+                setStatusCounts(prevCounts => {
+                    if (!prevCounts) return prevCounts;
+                    const dec = (n: number) => Math.max(0, n - 1);
+                    const next = { ...prevCounts };
+                    if (prevStatus === 'fulfilled') next.fulfilled = dec(next.fulfilled);
+                    else if (prevStatus === 'pending fulfillment') next.pending = dec(next.pending);
+                    else if (prevStatus === 'partially fulfilled') next.partial = dec(next.partial);
+                    if (newStatus === 'fulfilled') next.fulfilled += 1;
+                    else if (newStatus === 'pending fulfillment') next.pending += 1;
+                    else if (newStatus === 'partially fulfilled') next.partial += 1;
+                    return next;
+                });
+            }
+            return prevOrders.map(order =>
                 order._id === orderId
                     ? { ...order, status: newStatus }
                     : order
-            )
-        );
+            );
+        });
     }, []);
 
     const handleRefresh = useCallback(() => {
@@ -529,12 +570,14 @@ export default function OrdersPage() {
 
     const stats = useMemo(() => {
         const total = totalOrders;
-        const fulfilled = orders.filter(o => o.status === 'fulfilled').length;
-        const pending = orders.filter(o => o.status === 'pending fulfillment').length;
-        const partial = orders.filter(o => o.status === 'partially fulfilled').length;
+        // Global status counts from dedicated count queries; fall back to
+        // page-local counts only if the count queries have not resolved yet.
+        const fulfilled = statusCounts?.fulfilled ?? orders.filter(o => o.status === 'fulfilled').length;
+        const pending = statusCounts?.pending ?? orders.filter(o => o.status === 'pending fulfillment').length;
+        const partial = statusCounts?.partial ?? orders.filter(o => o.status === 'partially fulfilled').length;
 
         return { total, fulfilled, pending, partial };
-    }, [orders, totalOrders]);
+    }, [orders, totalOrders, statusCounts]);
 
     const indexOfFirstOrder = (currentPage - 1) * ordersPerPage;
     const currentOrders = orders;

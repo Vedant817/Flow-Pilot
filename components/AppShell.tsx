@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useUser, UserButton } from '@clerk/nextjs';
 import {
   ShoppingBag, Package, BarChart2, Bot, MessageSquare, AlertTriangle,
@@ -171,6 +172,7 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
 
 function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const { user } = useUser();
+  const [errorCount, setErrorCount] = useState<number | null>(null);
   const today = useMemo(
     () =>
       new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
@@ -179,6 +181,23 @@ function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || 'Operator';
   const displayEmail = user?.emailAddresses?.[0]?.emailAddress ?? 'operator@flowpilot.local';
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchErrorCount = async () => {
+      try {
+        const res = await fetch('/api/errors?limit=1');
+        if (!res.ok) return;
+        const body = await res.json() as { pagination?: { totalCount?: number }; success?: boolean; data?: unknown[] };
+        const count = body.pagination?.totalCount ?? (Array.isArray(body.data) ? body.data.length : 0);
+        if (!cancelled) setErrorCount(typeof count === 'number' ? count : 0);
+      } catch {
+        if (!cancelled) setErrorCount(null);
+      }
+    };
+    fetchErrorCount();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <header className="flex items-center gap-3 px-6 pt-5">
@@ -218,20 +237,22 @@ function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
           className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#222228] text-zinc-300 transition-colors hover:border-white/20"
         >
           <Bell size={17} />
-          <span
-            className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
-            style={{ background: ACCENT }}
-          >
-            3
-          </span>
+          {typeof errorCount === 'number' && errorCount > 0 && (
+            <span
+              className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+              style={{ background: ACCENT }}
+            >
+              {errorCount > 99 ? '99+' : errorCount}
+            </span>
+          )}
         </button>
         <span className="hidden text-xs text-zinc-500 lg:block">{today}</span>
-        <button
-          onClick={onOpenPalette}
-          className="hidden h-11 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-transform hover:scale-[1.02] sm:flex"
+        <span
+          aria-label={`Today, ${today}`}
+          className="hidden h-11 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black sm:flex"
         >
-          Today <ChevronDown size={14} />
-        </button>
+          Today, {today}
+        </span>
       </div>
 
       {/* Keep Clerk session controls mounted for auth state */}
@@ -263,10 +284,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               ⌁
             </span>
-            <span className="text-[19px] font-semibold lowercase tracking-tight text-white">flux</span>
-            <span className="ml-auto hidden rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-400 lg:block">
-              DMS
-            </span>
+            <span className="text-[19px] font-semibold tracking-tight text-white">Flow-Pilot</span>
           </div>
 
           {/* Nav — pill rows like the reference */}
@@ -282,7 +300,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       pathname === item.href ||
                       (item.href !== '/' && pathname.startsWith(item.href + '/'));
                     return (
-                      <a
+                      <Link
                         key={item.href}
                         href={item.href}
                         className={`group flex items-center gap-3 rounded-full px-3.5 py-2.5 text-[13.5px] font-medium transition-all ${
@@ -305,7 +323,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                             {item.badge}
                           </span>
                         )}
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
@@ -322,12 +340,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <p className="mt-1 text-[11.5px] font-medium leading-snug text-black/70">
               Unlock forecasting, copilot and network analytics.
             </p>
-            <a
+            <Link
               href="/promotions"
               className="mt-3 flex h-10 items-center justify-center rounded-full bg-black text-[13px] font-semibold text-white transition-transform hover:scale-[1.02]"
             >
               Upgrade Now
-            </a>
+            </Link>
           </div>
 
           {/* Operator row */}

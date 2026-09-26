@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Feedback } from "@/models/Feedback";
 import dbConnect from "@/lib/mongodb";
+import { getAuthContext } from "@/lib/auth";
 
 export async function GET() {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
     try {
         await dbConnect();
-        const feedback = await Feedback.find({}).sort({ createdAt: -1 });
+        const feedback = await Feedback.find({ orgId }).sort({ createdAt: -1 });
         return NextResponse.json({
             success: true,
             data: feedback,
@@ -25,6 +31,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
     try {
         await dbConnect();
         
@@ -92,7 +103,8 @@ export async function POST(request: NextRequest) {
             email: email.trim().toLowerCase(),
             review: review.trim(),
             type: type.toLowerCase(),
-            createdAt: new Date()
+            createdAt: new Date(),
+            orgId,
         });
 
         const savedFeedback = await newFeedback.save();

@@ -10,6 +10,7 @@ import { ingestDocument } from '@/lib/ai/memory';
 import { rateLimitAsync } from '@/lib/rate-limit';
 import { getAuthContext } from '@/lib/auth';
 import { priceOrder, computeDiscount, parseOrderDateToIST } from '@/lib/promotions/pricing';
+import { createTrackingToken } from '@/app/api/track-order/[token]/route';
 import { refreshCustomerSignalForEmail } from '@/lib/promotions/signals';
 import { matchesSignals } from '@/lib/promotions/engine';
 
@@ -23,6 +24,12 @@ const ESCAPE_RX = /[.*+?^${}()|[\]\\]/g;
  */
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
+
     await dbConnect();
 
     const sp = request.nextUrl.searchParams;
@@ -32,7 +39,7 @@ export async function GET(request: NextRequest) {
     const q = sp.get('q')?.trim();
     const since = sp.get('since');
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { orgId };
     if (status && ['pending', 'pending fulfillment', 'partially fulfilled', 'fulfilled', 'canceled'].includes(status)) filter.status = status;
     if (since) filter.date = { ...(filter.date as object ?? {}), $gte: since };
     if (q) {
@@ -72,7 +79,7 @@ export async function POST(req: NextRequest) {
   let idempotencyKey: string | undefined;
   try {
     const body = await req.json();
-    const { name, phone, email, products, date, time, couponCode, idempotencyKey: bodyKey, orgId: bodyOrg } = body ?? {};
+    const { name, phone, email, products, date, time, couponCode, idempotencyKey: bodyKey } = body ?? {};
 
     if (!name || !email || !Array.isArray(products) || products.length === 0) {
       return NextResponse.json(
@@ -84,14 +91,17 @@ export async function POST(req: NextRequest) {
     // Derive auth email if Clerk session present
     let authEmail: string | undefined;
     let clerkUserId: string | undefined;
+    let ctxOrgId: string | undefined;
     try {
       const ctx = await getAuthContext().catch(() => null as any);
       if (ctx?.email) authEmail = ctx.email;
       if (ctx?.userId) clerkUserId = ctx.userId;
+      if (ctx?.orgId) ctxOrgId = ctx.orgId;
     } catch {}
     const effectiveEmail = (authEmail && authEmail.includes('@') ? authEmail : email).toString().toLowerCase().trim();
     const emailNormalized = effectiveEmail;
-    const orgId = bodyOrg || 'default';
+    // orgId is always derived from auth — never trust the client body.
+    const orgId = ctxOrgId ?? 'default';
     const headerKey = req.headers.get('idempotency-key') || req.headers.get('x-idempotency-key');
     idempotencyKey = (bodyKey || headerKey || undefined) as string | undefined;
 
@@ -116,7 +126,11 @@ export async function POST(req: NextRequest) {
     if (idempotencyKey) {
       const existing = await Order.findOne({ idempotencyKey }).lean();
       if (existing) {
-        return NextResponse.json({ order: { ...existing, _id: String((existing as any)._id) }, dedup: true }, { status: 200 });
+        const existingId = String((existing as any)._id);
+        return NextResponse.json(
+          { order: { ...existing, _id: existingId }, dedup: true, trackingToken: createTrackingToken(existingId) },
+          { status: 200 }
+        );
       }
     }
 
@@ -403,7 +417,14 @@ export async function POST(req: NextRequest) {
         .join(', ')} on ${(createdOrder as any).date}. Status pending.`
     ).catch(() => undefined);
 
-    return NextResponse.json({ order: { ...(createdOrder as any).toObject(), _id: String((createdOrder as any)._id) } }, { status: 201 });
+    const createdId = String((createdOrder as any)._id);
+    return NextResponse.json(
+      {
+        order: { ...(createdOrder as any).toObject(), _id: createdId },
+        trackingToken: createTrackingToken(createdId),
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     // Idempotency duplicate key — return existing order as 200 dedup
     if (error?.code === 11000 && idempotencyKey) {
@@ -411,7 +432,11 @@ export async function POST(req: NextRequest) {
         await dbConnect();
         const existing = await Order.findOne({ idempotencyKey }).lean();
         if (existing) {
-          return NextResponse.json({ order: { ...existing, _id: String((existing as any)._id) }, dedup: true }, { status: 200 });
+          const existingId = String((existing as any)._id);
+          return NextResponse.json(
+            { order: { ...existing, _id: existingId }, dedup: true, trackingToken: createTrackingToken(existingId) },
+            { status: 200 }
+          );
         }
       } catch {}
     }
@@ -428,6 +453,12 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const ctx = await getAuthContext();
+    if (!ctx.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const orgId = ctx.orgId ?? 'default';
+
     const { orderId, status } = await req.json();
     if (!orderId || !status) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
@@ -435,10 +466,14 @@ export async function PUT(req: NextRequest) {
     if (!['pending', 'pending fulfillment', 'partially fulfilled', 'fulfilled', 'canceled'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
+    // Whitelist: only `status` may change via this endpoint.
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return NextResponse.json({ error: 'Invalid orderId' }, { status: 400 });
+    }
 
     await dbConnect();
 
-    const updatedOrder = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
+    const updatedOrder = await Order.findOneAndUpdate({ _id: orderId, orgId }, { status }, { new: true });
 
     if (!updatedOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });

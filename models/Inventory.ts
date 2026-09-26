@@ -8,6 +8,7 @@ interface IInventory extends Document {
     price: number;
     stock_alert_level: number;
     warehouse_location: string;
+    orgId?: string;
 }
 
 const InventorySchema = new Schema<IInventory>({
@@ -18,6 +19,7 @@ const InventorySchema = new Schema<IInventory>({
     price: { type: Number, required: true },
     stock_alert_level: { type: Number, required: true },
     warehouse_location: { type: String, required: true },
+    orgId: { type: String, default: 'default', index: true },
 }, {
     collection: 'inventory',
     timestamps: false,
@@ -30,5 +32,7 @@ const InventorySchema = new Schema<IInventory>({
     }
     next();
 });
+
+InventorySchema.index({ orgId: 1, name: 1 });
 
 export const Inventory: Model<IInventory> = mongoose.models.Inventory || mongoose.model<IInventory>('Inventory', InventorySchema);

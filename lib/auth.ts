@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
 
 export interface AuthContext {
   userId: string | null;
@@ -8,36 +9,79 @@ export interface AuthContext {
   orgId?: string;
 }
 
+interface ClerkAuthShape {
+  userId?: string | null;
+  orgId?: string | null;
+  org_id?: string | null;
+  orgRole?: string | null;
+  email?: string | null;
+  sessionClaims?: Record<string, unknown> | null;
+}
+
+function claimStr(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 export async function getAuthContext(): Promise<AuthContext> {
   try {
-    const a = await auth() as any;
+    const a = (await auth()) as unknown as ClerkAuthShape;
     const userId: string | null = a?.userId ?? null;
     // Clerk sessionClaims structure varies by version
-    const claims = a?.sessionClaims ?? {};
-    const email: string | undefined = claims?.email ?? claims?.email_address ?? a?.email;
+    const claims: Record<string, unknown> = a?.sessionClaims ?? {};
+    const email: string | undefined =
+      claimStr(claims, 'email') ?? claimStr(claims, 'email_address') ?? a?.email ?? undefined;
     // publicMetadata.role or orgRole
-    const publicMeta = claims?.publicMetadata ?? claims?.public_metadata ?? {};
-    const role: string | undefined = publicMeta?.role ?? claims?.orgRole ?? claims?.org_role ?? a?.orgRole;
-    const orgId: string | undefined = claims?.orgId ?? a?.orgId ?? 'default';
-    return { userId, email, role, orgId: orgId || 'default' };
+    const publicMeta = (claims['publicMetadata'] ?? claims['public_metadata'] ?? {}) as Record<string, unknown>;
+    const role: string | undefined =
+      claimStr(publicMeta, 'role') ?? claimStr(claims, 'orgRole') ?? claimStr(claims, 'org_role') ?? a?.orgRole ?? undefined;
+    const rawOrg: string | undefined =
+      claimStr(claims, 'orgId') ?? claimStr(claims, 'org_id') ?? a?.orgId ?? a?.org_id ?? undefined;
+    // Never silently fall back to 'default' when unauthenticated — callers
+    // must see `undefined` so org scoping cannot leak across sessions.
+    if (!userId) {
+      return { userId: null, email, role, orgId: rawOrg || undefined };
+    }
+    // Authenticated users with no org resolve to the shared default workspace.
+    return { userId, email, role, orgId: rawOrg || 'default' };
   } catch {
-    return { userId: null, orgId: 'default' };
+    return { userId: null, orgId: undefined };
   }
 }
 
-export async function requireRole(req: NextRequest, roles: string[]): Promise<AuthContext> {
+export class HttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export async function requireAuth(): Promise<AuthContext> {
   const ctx = await getAuthContext();
   if (!ctx.userId) {
-    const err: any = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
+    throw new HttpError('Unauthorized', 401);
   }
-  // If no role configured, allow admin secret path elsewhere; here we enforce if roles provided
-  if (roles.length > 0 && ctx.role && !roles.includes(ctx.role)) {
-    // Allow if role is undefined but we can't block — treat as admin in dev
-    // In production, you would strictly enforce. For now, if role missing, allow but warn.
-    // To strictly enforce, uncomment:
-    // const err: any = new Error('Forbidden'); err.status = 403; throw err;
+  return ctx;
+}
+
+export function getOrgFilter(ctx: AuthContext): { orgId: string } {
+  return { orgId: ctx.orgId ?? 'default' };
+}
+
+export async function requireRole(_req: NextRequest, roles: string[]): Promise<AuthContext> {
+  const ctx = await getAuthContext();
+  if (!ctx.userId) {
+    throw new HttpError('Unauthorized', 401);
+  }
+  // No roles required — any authenticated user may proceed.
+  if (roles.length === 0) {
+    return ctx;
+  }
+  const wanted = roles.map((r) => r.toLowerCase());
+  const actual = (ctx.role ?? '').toLowerCase();
+  if (!actual || !wanted.includes(actual)) {
+    throw new HttpError('Forbidden', 403);
   }
   return ctx;
 }
@@ -49,7 +93,6 @@ export function isAdminSecretValid(req: NextRequest): boolean {
   // timingSafeEqual would require Buffers of equal length; fallback to direct compare if length mismatch
   if (provided.length !== secret.length) return false;
   try {
-    const crypto = require('crypto') as typeof import('crypto');
     return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
   } catch {
     return provided === secret;

@@ -57,3 +57,5 @@ client_secret_333795542794-v9o1s70in2e1tct9onfgbr3qepnc3uba.apps.googleuserconte
 # Local synthetic evaluation corpora, generated predictions and training artifacts.
 # The deployed classifier weights in lib/nlp/model are intentionally tracked.
 /scripts/eval/
+# SetFit training checkpoints (90MB+ optimizer state, reproducible from scripts)
+/checkpoints/

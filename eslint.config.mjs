@@ -30,5 +30,8 @@ export default defineConfig([
     '.next/**',
     'coverage/**',
     'next-env.d.ts',
+    '.data/**',
+    '.delta/**',
+    'attachments/**',
   ]),
 ]);
