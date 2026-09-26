@@ -10,6 +10,7 @@ Flow Pilot is a distribution management and sales-intelligence console for order
 - **Incremental analytics:** a `daily_sales_rollup` read model reduces forecasting and trend reads from `O(raw orders)` to `O(days × active SKUs)`.
 - **Sales intelligence:** Holt-Winters demand forecasting, EWMA anomaly detection, RFM account segmentation, ABC/XYZ concepts, EOQ, reorder-point and deadstock analysis.
 - **Enterprise operations UI:** grouped navigation, dense order workflows, command palette, source-cited copilot, and a consistent dark operations-console theme.
+- **Draft-first inbound email orders:** a classifier proposes intent, but only validated evidence creates or changes orders. Incomplete requests become confirmable drafts; amendments always go through human review.
 
 ## Architecture
 
@@ -23,6 +24,10 @@ Gmail / Web / Operator
           │                              │
           │                              ├── query-pattern indexes
           │                              └── incremental sales rollup
+          │
+          ├── Inbound email path ── classify intent ── parse evidence ──┬── validated order
+          │        (subject + cleaned body)      (typed parser)          ├── confirmable draft
+          │                                                             └── human review queue
           │
           ├── Intelligence path ── Rollups ── Forecast / EWMA / RFM
           │
@@ -53,14 +58,26 @@ Gmail / Web / Operator
 
 MongoDB remains the operational source of truth because orders are document-shaped and transactional access dominates. The analytical read model avoids introducing ClickHouse operational overhead at the current scale. A future CDC sink can mirror the same rollup events into ClickHouse without changing route contracts.
 
+## Inbound Email Orders
+
+The Gmail webhook (`/api/webhook/gmail`) classifies each message as `new_order`, `update_order`, `feedback`, or `other` using the subject plus quote/signature-stripped body, and logs per-mail scores for drift review. Classification is an intent hint only — **no order is created or changed on a label alone**:
+
+- A new order is created only with explicit purchase wording, parseable product lines with usable names and quantities, and an explicit valid delivery date and time. Each Gmail message maps to one order via a `gmail:<messageId>` idempotency key.
+- Clear purchase intent with missing details becomes an **inbound order draft** (`/email-drafts`) carrying the original message, placement timestamp, and editable product suggestions. A reviewer corrects the lines, enters the delivery slot, and confirms; confirmation validates again and atomically creates the order and resolves the draft.
+- Amendments and cancellations are **never applied from email alone**. They become typed change proposals (`set_quantity`, `remove_product`, `reschedule`, `cancel_order`) in the **review queue** (`/email-reviews`), where a reviewer selects the pending order and applies a verified change. Order, review state, and rollup update together in one MongoDB transaction.
+- New `Order` documents record `placedAt` separately from `requestedDeliveryDate`/`requestedDeliveryTime`, so a missing delivery slot is never silently stored as today at noon. The webhook tenant comes from `GMAIL_ORG_ID` (fails closed when unset); production also requires `GMAIL_WEBHOOK_SECRET`.
+
+See `docs/EMAIL_ORDER_REVIEW.md` for the operating details.
+
 ## Local Models
 
 Default models:
 
 - Generator: `HuggingFaceTB/SmolLM2-360M-Instruct` (`q4`)
 - Embeddings/router: `Xenova/all-MiniLM-L6-v2` (`q8`, 384 dimensions)
+- Email intent classifier: SetFit-tuned MiniLM encoder (`q8` ONNX, committed under `lib/nlp/model/`) plus a logistic-regression head (`lib/nlp/model/head.json`)
 
-No Gemini, OpenAI, or hosted LLM inference API is used. Model weights are downloaded from Hugging Face and inference executes in-process through `onnxruntime-node`.
+No Gemini, OpenAI, or hosted LLM inference API is used. Generator and router weights are downloaded from Hugging Face and inference executes in-process through `onnxruntime-node`. The email classifier encoder is committed to the repo so the webhook does not depend on a weight download; a hosted decision model (Laya) was evaluated locally and rejected — it scored lower on the author-held comparison set and would have added a Python service for no accuracy gain.
 
 Override models with:
 
@@ -162,6 +179,17 @@ npx tsc --noEmit
 npm test
 npm run build
 ```
+
+`npm test` runs the Jest suites plus an 8-case classifier regression gate (`scripts/verify-email-classifier.ts`) against the real local encoder. The larger synthetic evaluation corpus used during development is intentionally not committed; evaluate future classifier changes against independently labeled, securely held mail.
+
+## Known Limitations (Not Yet Built)
+
+- **No automatic amendments or confirmations.** Every order change requires human review, and drafts require manual confirmation. On the retired synthetic set this meant high review volume by design; widen automation only with measured evidence from real labeled mail.
+- **Confidence is uncalibrated.** The classifier's softmax scores have not been calibrated on production traffic — do not use them as automation thresholds without a validation study.
+- **No production metrics yet.** Per-mail scores are logged, but there is no dashboard for harmful-write rate, review rate, or draft confirmation rate.
+- **Transactions required.** Draft confirmation and reviewed amendments commit order, review, and rollup writes in one MongoDB transaction and fail closed on deployments without transaction support.
+- **Weakest on casual Hinglish mail.** Short mixed-language messages (e.g. reschedules, praise mentioning past orders) are the largest residual error group; rate/freight inquiries adjacent to orders are the main false-new-order risk.
+- **No sender-history signal.** The pipeline does not yet bias thin rescheduling mail toward a sender's pending order, and the review UI does not submit arbitrary order edits.
 
 ## Vercel Notes
 
