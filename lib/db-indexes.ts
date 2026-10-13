@@ -13,14 +13,14 @@ import type { Db } from 'mongodb';
  * promotions:    schemes, coupons, customer_signals, audits, daily stats
  */
 export async function ensureQueryIndexes(db: Db): Promise<void> {
-  const ops: Promise<any>[] = [
+  const ops: Promise<unknown>[] = [
     db.collection('orders').createIndex({ orgId: 1, orderedAt: -1, _id: -1 }),
     db.collection('orders').createIndex({ orgId: 1, email: 1, date: -1 }),
     db.collection('orders').createIndex({ orgId: 1, status: 1, orderedAt: -1 }),
     db.collection('orders').createIndex({ orgId: 1, name: 1 }),
     db.collection('orders').createIndex({ emailNormalized: 1, orderedAt: 1 }),
     db.collection('orders').createIndex({ orderedAt: -1 }, { sparse: true } as any),
-    db.collection('orders').createIndex({ orgId: 1, idempotencyKey: 1 }, { unique: true, sparse: true } as any),
+    db.collection('orders').createIndex({ orgId: 1, idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }),
     db.collection('orders').createIndex({ trackingTokenHash: 1 }, { unique: true, sparse: true } as any),
     db.collection('orders').createIndex({ 'appliedCoupon.schemeId': 1 }, { partialFilterExpression: { 'appliedCoupon.schemeId': { $exists: true } } as any }),
     db.collection('orders').createIndex({ orgId: 1, emailNormalized: 1, orderedAt: 1 }),
@@ -71,12 +71,19 @@ export async function ensureQueryIndexes(db: Db): Promise<void> {
     db.collection('rate_limit_buckets').createIndex({ resetAt: 1 }, { expireAfterSeconds: 0 } as any),
     db.collection('distributed_locks').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 } as any),
     db.collection('integration_cursors').createIndex({ orgId: 1, provider: 1 }, { unique: true }),
+    db.collection('outbox_events').createIndex({ orgId: 1, eventKey: 1 }, { unique: true }),
+    db.collection('outbox_events').createIndex({ orgId: 1, status: 1, availableAt: 1, lockedUntil: 1 }),
+    db.collection('order_events').createIndex({ orgId: 1, orderId: 1, at: 1 }),
   ];
 
   const results = await Promise.allSettled(ops);
-  for (const r of results) {
-    if (r.status === 'rejected') {
-      console.warn('Index ensure skipped:', r.reason instanceof Error ? r.reason.message : r.reason);
-    }
+  const failures = results.filter(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
+  );
+  if (failures.length) {
+    throw new AggregateError(
+      failures.map((failure) => failure.reason),
+      'Required database indexes could not be created'
+    );
   }
 }

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { dbConnect } from '@/lib/mongodb';
 
 /**
@@ -24,6 +25,7 @@ export interface SeriesPoint extends RollupDoc {
 }
 
 export const ROLLUP_COLLECTION = 'daily_sales_rollup';
+const PROJECTION_RECEIPTS_COLLECTION = 'projection_receipts';
 
 function docId(orgId: string, date: string, product: string): string {
   return `${orgId}|${date}|${product}`;
@@ -57,6 +59,73 @@ export async function applyOrderDelta(
   }));
 
   await col.bulkWrite(ops, { ordered: false });
+}
+
+/**
+ * Applies an outbox event exactly once. The receipt and rollup mutation share
+ * one MongoDB transaction, so a worker crash cannot double-count an order.
+ */
+export async function applyOrderDeltaOnce(
+  eventId: string,
+  orgId: string,
+  date: string,
+  products: ProductLine[],
+  sign: 1 | -1
+): Promise<boolean> {
+  if (!products?.length) return false;
+  const conn = await dbConnect();
+  const db = conn.connection.db!;
+  const session = await mongoose.startSession();
+  let applied = false;
+
+  try {
+    await session.withTransaction(async () => {
+      await db.collection(PROJECTION_RECEIPTS_COLLECTION).insertOne(
+        {
+          _id: `daily-sales:${eventId}`,
+          orgId,
+          consumer: 'daily-sales',
+          eventId,
+          createdAt: new Date(),
+        } as never,
+        { session }
+      );
+
+      const ops = products.map((product) => ({
+        updateOne: {
+          filter: { _id: docId(orgId, date, product.name) },
+          update: {
+            $inc: {
+              units: sign * product.quantity,
+              orders: sign,
+            },
+            $setOnInsert: {
+              orgId,
+              date,
+              product: product.name,
+            },
+          },
+          upsert: true,
+        },
+      }));
+      await db
+        .collection<RollupDoc>(ROLLUP_COLLECTION)
+        .bulkWrite(ops, { ordered: false, session });
+      applied = true;
+    });
+  } catch (error: unknown) {
+    if ((error as { code?: number })?.code !== 11000) throw error;
+    const receipt = await db.collection(PROJECTION_RECEIPTS_COLLECTION).findOne({
+      _id: `daily-sales:${eventId}`,
+      orgId,
+    } as never);
+    if (!receipt) throw error;
+    applied = false;
+  } finally {
+    await session.endSession();
+  }
+
+  return applied;
 }
 
 /**

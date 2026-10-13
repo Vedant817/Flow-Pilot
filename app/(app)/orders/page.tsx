@@ -4,6 +4,7 @@ import { Search, Filter, RefreshCw, Package, Calendar, User, Mail, Clock, CheckC
 import axios from 'axios';
 import { OrderDetails } from '@/constants/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { allowedOrderTransitions } from '@/lib/orders/lifecycle';
 
 interface Product {
     name: string;
@@ -26,23 +27,37 @@ interface ActionButtonProps {
 
 const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps) => {
     const [statusError, setStatusError] = useState('');
-    const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newStatus = e.target.value;
+    const [updatingStatus, setUpdatingStatus] = useState(false);
+    const [cancelRequested, setCancelRequested] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const updateStatus = useCallback((newStatus: string, reason?: string) => {
         setStatusError('');
+        setUpdatingStatus(true);
         const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '/api';
         axios.put(`${apiBase}/orders`, {
             orderId: order._id,
-            status: newStatus
+            status: newStatus,
+            expectedStatus: order.status,
+            ...(reason ? { reason } : {})
         })
             .then(response => {
-                console.log(response);
-                onStatusChange(order._id, newStatus);
+                onStatusChange(order._id, response.data?.order?.status || newStatus);
+                setCancelRequested(false);
+                setCancelReason('');
             })
             .catch(error => {
                 console.error('Error updating order status:', error);
-                setStatusError('Failed to update order status. Please try again.');
+                setStatusError(error.response?.data?.error || 'Failed to update order status. Please try again.');
             })
+            .finally(() => setUpdatingStatus(false));
     }, [order, onStatusChange]);
+    const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (e.target.value === 'canceled') {
+            setCancelRequested(true);
+            return;
+        }
+        updateStatus(e.target.value);
+    }, [updateStatus]);
 
     const productsDisplay = () => {
         if (!order.products || order.products.length === 0) return 'No products';
@@ -159,16 +174,34 @@ const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps)
                         <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-slate-600">Status:</label>
                             <select
+                                aria-label={`Status for order ${order._id.slice(-8)}`}
                                 className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
                                 value={order.status}
                                 onChange={handleStatusChange}
+                                disabled={updatingStatus || allowedOrderTransitions(order.status).length === 0}
                             >
-                                <option value="pending fulfillment">Pending Fulfillment</option>
-                                <option value="partially fulfilled">Partially Fulfilled</option>
-                                <option value="fulfilled">Fulfilled</option>
+                                <option value={order.status}>{order.status}</option>
+                                {allowedOrderTransitions(order.status).map(status => (
+                                    <option key={status} value={status}>{status}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
+                    {cancelRequested && (
+                        <form className="mt-3 space-y-2" onSubmit={event => {
+                            event.preventDefault();
+                            updateStatus('canceled', cancelReason.trim());
+                        }}>
+                            <label htmlFor={`cancel-${order._id}`} className="text-sm font-medium">Cancellation reason</label>
+                            <input id={`cancel-${order._id}`} required maxLength={500} value={cancelReason}
+                                onChange={event => setCancelReason(event.target.value)}
+                                className="w-full rounded border p-2" />
+                            <button type="submit" disabled={updatingStatus || !cancelReason.trim()}
+                                className="rounded bg-red-700 px-3 py-2 text-sm text-white">Confirm cancellation</button>
+                            <button type="button" onClick={() => setCancelRequested(false)}
+                                className="ml-2 text-sm">Keep order</button>
+                        </form>
+                    )}
                 </div>
             </CardContent>
         </Card>
@@ -220,6 +253,29 @@ const OrderDetailsModal = memo(({ order, isOpen, onClose }: {
     isOpen: boolean;
     onClose: () => void;
 }) => {
+    const [timeline, setTimeline] = useState<Array<{
+        _id: string; at: string; type: string; fromStatus?: string;
+        toStatus: string; actorId: string; reason?: string;
+    }>>([]);
+    const [timelineError, setTimelineError] = useState('');
+    const [timelineLoading, setTimelineLoading] = useState(false);
+    useEffect(() => {
+        if (!isOpen || !order) return;
+        const controller = new AbortController();
+        setTimeline([]);
+        setTimelineError('');
+        setTimelineLoading(true);
+        const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '/api';
+        axios.get(`${apiBase}/orders/${order._id}/timeline`, { signal: controller.signal })
+            .then(response => setTimeline(response.data.data || []))
+            .catch(() => {
+                if (!controller.signal.aborted) setTimelineError('Order timeline is unavailable.');
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setTimelineLoading(false);
+            });
+        return () => controller.abort();
+    }, [isOpen, order]);
     if (!isOpen || !order) return null;
 
     const productsDisplay = () => {
@@ -415,6 +471,25 @@ const OrderDetailsModal = memo(({ order, isOpen, onClose }: {
                             </Card>
                         )}
 
+                        <Card className="border border-slate-200 lg:col-span-2">
+                            <CardHeader><CardTitle>Order timeline</CardTitle></CardHeader>
+                            <CardContent>
+                                {timelineLoading && <p role="status">Loading timeline…</p>}
+                                {timelineError && <p role="alert">{timelineError}</p>}
+                                {!timelineLoading && !timelineError && timeline.length === 0 && (
+                                    <p>No recorded events. Older orders may predate timeline recording.</p>
+                                )}
+                                <ol className="space-y-3">
+                                    {timeline.map(event => (
+                                        <li key={event._id} className="border-l-2 border-blue-300 pl-3 text-sm">
+                                            <p className="font-medium">{event.fromStatus ? `${event.fromStatus} → ` : 'Created: '}{event.toStatus}</p>
+                                            <p>{new Date(event.at).toLocaleString()} · {event.actorId}</p>
+                                            {event.reason && <p>{event.reason}</p>}
+                                        </li>
+                                    ))}
+                                </ol>
+                            </CardContent>
+                        </Card>
                         <Card className="border border-slate-200 lg:col-span-2">
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-slate-900">

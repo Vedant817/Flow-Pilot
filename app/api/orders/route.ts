@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongodb';
-import { Order } from '@/models/Order';
+import { Order, type IOrder } from '@/models/Order';
 import { PromotionScheme } from '@/models/PromotionScheme';
 import { Coupon } from '@/models/Coupon';
 import { PromotionAudit } from '@/models/PromotionAudit';
-import { applyOrderDelta } from '@/lib/analytics/rollup';
-import { ingestDocument } from '@/lib/ai/memory';
+import { OutboxEvent } from '@/models/OutboxEvent';
+import { OrderEvent } from '@/models/OrderEvent';
+import { assertOrderTransition, OrderTransitionError } from '@/lib/orders/lifecycle';
 import { rateLimitAsync } from '@/lib/rate-limit';
 import { AuthorizationError, requirePermission, requireWorkspace } from '@/lib/auth';
 import { addWorkspaceScope } from '@/lib/authorization';
 import { createTrackingCredential } from '@/lib/order-tracking';
+import {
+  hashOrderRequest,
+  resolveIdempotencyKey,
+} from '@/lib/orders/idempotency';
 import { priceOrder, computeDiscount, parseOrderDateToIST } from '@/lib/promotions/pricing';
-import { refreshCustomerSignalForEmail } from '@/lib/promotions/signals';
 import { matchesSignals } from '@/lib/promotions/engine';
 
 const MAX_PAGE_SIZE = 100;
@@ -83,13 +87,23 @@ export async function POST(req: NextRequest) {
   }
 
   let idempotencyKey: string | undefined;
+  let requestHash: string | undefined;
   try {
     const body = await req.json();
     const { name, phone, email, products, date, time, couponCode, idempotencyKey: bodyKey } = body ?? {};
 
-    if (!name || !email || !Array.isArray(products) || products.length === 0) {
+    if (
+      typeof name !== 'string' || !name.trim() || name.length > 120 ||
+      typeof email !== 'string' || email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      (phone != null && (typeof phone !== 'string' || phone.length > 40)) ||
+      !Array.isArray(products) || products.length === 0 ||
+      (date != null && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))) ||
+      (time != null && (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))) ||
+      Boolean(date) !== Boolean(time)
+    ) {
       return NextResponse.json(
-        { error: 'name, email and at least one product are required' },
+        { error: 'Invalid order fields; name, email and at least one product are required, with date and time supplied together' },
         { status: 400 }
       );
     }
@@ -99,34 +113,34 @@ export async function POST(req: NextRequest) {
     const emailNormalized = effectiveEmail;
     const orgId = authCtx.orgId;
     const headerKey = req.headers.get('idempotency-key') || req.headers.get('x-idempotency-key');
-    idempotencyKey = (bodyKey || headerKey || undefined) as string | undefined;
-    const tracking = createTrackingCredential();
-
-    // pricing snapshot before txn (cached inventory map)
-    const { orderValueMinor, priceSource, productsWithSnapshot } = await priceOrder(products).catch(() => ({
-      orderValueMinor: products.reduce((s: number, p: any) => s + (Number(p.quantity) || 1) * 5000, 0),
-      priceSource: 'estimated' as const,
-      productsWithSnapshot: products.slice(0, 50).map((p: any) => ({
-        name: String(p.name).slice(0, 120),
-        quantity: Math.max(1, Math.min(100_000, Number(p.quantity) || 1)),
-        unitPrice: 50,
-        lineValueMinor: Math.round(50 * 100 * (Number(p.quantity) || 1)),
-        nameKey: String(p.name).toLowerCase().trim(),
-      })),
-    }));
+    idempotencyKey = resolveIdempotencyKey(headerKey, bodyKey);
+    requestHash = hashOrderRequest({
+      name,
+      phone,
+      email,
+      products,
+      date,
+      time,
+      couponCode,
+    });
 
     const normalizedCouponCode = couponCode ? String(couponCode).toUpperCase().trim() : undefined;
 
     await dbConnect();
 
-    // Idempotency: if key provided, return existing if found
-    if (idempotencyKey) {
-      const existing = await Order.findOne({ orgId, idempotencyKey }).lean();
-      if (existing) {
-        return NextResponse.json({ order: { ...existing, _id: String((existing as any)._id) }, dedup: true }, { status: 200 });
+    const existing = await Order.findOne({ orgId, idempotencyKey }).select('+requestHash').lean();
+    if (existing) {
+      if ((existing as any).requestHash !== requestHash) {
+        return NextResponse.json(
+          { error: 'Idempotency-Key was already used for a different order' },
+          { status: 409 }
+        );
       }
+      return NextResponse.json({ order: { ...existing, _id: String((existing as any)._id) }, dedup: true }, { status: 200 });
     }
 
+    const { orderValueMinor, priceSource, productsWithSnapshot } = await priceOrder(orgId, products);
+    const tracking = createTrackingCredential();
     const orderedAtDate = date && time ? parseOrderDateToIST(date, time) : new Date();
     const dateStr = orderedAtDate.toISOString().slice(0, 10);
     const timeStr = orderedAtDate.toTimeString().slice(0, 5);
@@ -134,7 +148,7 @@ export async function POST(req: NextRequest) {
     // Attempt transactional path
     let createdOrder: any = null;
 
-    const doCreate = async (session?: mongoose.ClientSession) => {
+    const doCreate = async (session: mongoose.ClientSession) => {
       let discountMinor = 0;
       let appliedCoupon: any = undefined;
       let couponDoc: any = null;
@@ -255,19 +269,20 @@ export async function POST(req: NextRequest) {
           })
             .sort({ priority: -1, 'limits.validFrom': 1, code: 1 })
             .limit(10)
+            .session(session)
             .lean();
 
           if (candidates.length) {
             // fetch customer signal for matching
-            const signal = await db2.collection('customer_signals').findOne({ orgId, emailNormalized });
+            const signal = await db2.collection('customer_signals').findOne({ orgId, emailNormalized }, { session });
             // If no signal, skip auto
             if (signal) {
               for (const cand of candidates as any[]) {
                 // holdout check: if this customer is holdout for this scheme, skip
-                const holdoutExists = await (Coupon as any).findOne({ orgId, emailNormalized, schemeId: cand._id, status: 'holdout' }).lean();
+                const holdoutExists = await (Coupon as any).findOne({ orgId, emailNormalized, schemeId: cand._id, status: 'holdout' }).session(session).lean();
                 if (holdoutExists) continue;
                 // per-customer cap check
-                const existingCount = await (Coupon as any).countDocuments({ orgId, emailNormalized, schemeId: cand._id, status: { $in: ['issued', 'redeemed', 'holdout'] } });
+                const existingCount = await (Coupon as any).countDocuments({ orgId, emailNormalized, schemeId: cand._id, status: { $in: ['issued', 'redeemed', 'holdout'] } }).session(session);
                 if (existingCount >= (cand.limits?.maxRedemptionsPerCustomer ?? 1)) continue;
                 // cap check
                 if (cand.limits?.maxRedemptionsGlobal != null && (cand.counters?.redeemed ?? 0) >= cand.limits.maxRedemptionsGlobal) continue;
@@ -276,7 +291,10 @@ export async function POST(req: NextRequest) {
                 const tol = cand.eligibility?.cadence?.toleranceMultiplier;
                 if (!matchesSignals(signal as any, cand.eligibility, { toleranceOverride: tol })) continue;
 
-                // claim global cap
+                const disc = computeDiscount(cand, orderValueMinor);
+                if (disc <= 0) continue;
+
+                // Claim global cap only after confirming a nonzero benefit.
                 let claimed = true;
                 if (cand.limits?.maxRedemptionsGlobal != null) {
                   const updated = await PromotionScheme.findOneAndUpdate(
@@ -294,17 +312,6 @@ export async function POST(req: NextRequest) {
                 }
                 if (!claimed) continue;
 
-                const disc = computeDiscount(
-                  {
-                    benefitType: cand.benefitType,
-                    benefitValueMinor: cand.benefitValueMinor,
-                    maxDiscountMinor: cand.maxDiscountMinor,
-                    setupFeeMinor: cand.setupFeeMinor,
-                    minimumOrderValueMinor: cand.minimumOrderValueMinor,
-                  },
-                  orderValueMinor
-                );
-                if (disc <= 0) continue;
                 discountMinor = Math.min(disc, orderValueMinor);
                 appliedCoupon = { code: `AUTO:${cand.code}`, schemeId: cand._id, benefitType: cand.benefitType, discountMinor };
                 schemeDoc = cand;
@@ -313,7 +320,8 @@ export async function POST(req: NextRequest) {
             }
           }
         } catch (e) {
-          console.warn('auto apply failed', e);
+          // Never hide a transactional failure after mutating scheme counters.
+          throw e;
         }
       }
 
@@ -326,20 +334,21 @@ export async function POST(req: NextRequest) {
       } as any;
 
       const orderDoc = {
-        name,
-        phone: phone ?? '',
+        name: name.trim(),
+        phone: phone?.trim() ?? '',
         email: effectiveEmail,
         emailNormalized,
         orgId,
         date: dateStr,
         time: timeStr,
         orderedAt: orderedAtDate,
-        products: productsWithSnapshot.map((p) => ({ name: p.name, quantity: p.quantity, unitPrice: p.unitPrice, lineValueMinor: p.lineValueMinor, nameKey: p.nameKey })),
+        products: productsWithSnapshot,
         status: 'pending fulfillment',
         orderLink: '',
         pricing,
         appliedCoupon,
-        idempotencyKey: idempotencyKey || undefined,
+        idempotencyKey,
+        requestHash,
         trackingTokenHash: tracking.tokenHash,
       };
 
@@ -383,10 +392,38 @@ export async function POST(req: NextRequest) {
         else await PromotionAudit.create(audit);
       }
 
+      if (!session) {
+        throw Object.assign(
+          new Error('Transactional order creation is required'),
+          { status: 503 }
+        );
+      }
+      await OutboxEvent.create(
+        [
+          {
+            orgId,
+            type: 'order.created',
+            aggregateId: String(created._id),
+            eventKey: `order.created:${created._id}`,
+          },
+        ],
+        { session }
+      );
+      await OrderEvent.create(
+        [{
+          orgId,
+          orderId: String(created._id),
+          actorId: authCtx.userId,
+          type: 'created',
+          toStatus: 'pending fulfillment',
+        }],
+        { session }
+      );
+
       return created;
     };
 
-    // Try transactional, fallback to non-transactional if replica set missing
+    // Order, coupon redemption, audit, and outbox event commit atomically.
     let session: mongoose.ClientSession | null = null;
     try {
       session = await mongoose.startSession();
@@ -396,44 +433,10 @@ export async function POST(req: NextRequest) {
       });
       createdOrder = result;
     } catch (txnErr: any) {
-      const msg = txnErr?.message || '';
-      if (
-        msg.includes('Transaction numbers are only allowed on a replica set') ||
-        msg.includes('not a replica set') ||
-        msg.includes('Sessions not supported') ||
-        msg.includes('code 20')
-      ) {
-        console.warn('Transaction fallback to non-txn create (no replica set)');
-        createdOrder = await doCreate(undefined);
-      } else if (txnErr?.status || txnErr?.code === 11000) {
-        // known business error (coupon mismatch, etc.) — propagate directly
-        throw txnErr;
-      } else {
-        console.warn('Transaction failed, fallback', msg);
-        try {
-          createdOrder = await doCreate(undefined);
-        } catch (fallbackErr) {
-          throw fallbackErr;
-        }
-      }
+      throw txnErr;
     } finally {
       if (session) await session.endSession().catch(() => {});
     }
-
-    // Non-blocking post-create: rollup + signals + memory
-    const orderDate = (createdOrder as any).date;
-    await applyOrderDelta(orgId, orderDate, (createdOrder as any).products, 1).catch((e) => console.error('Rollup delta failed:', e));
-    // refresh customer signals for this email (bounded)
-    refreshCustomerSignalForEmail(emailNormalized, orgId).catch((e) => console.warn('signal refresh failed', e));
-    void ingestDocument(
-      'order',
-      String((createdOrder as any)._id),
-      `Order ${(createdOrder as any)._id}`,
-      `Order ${(createdOrder as any)._id} contains ${(createdOrder as any).products
-        .map((p: any) => `${p.quantity}x ${p.name}`)
-        .join(', ')} on ${(createdOrder as any).date}. Status pending.`,
-      { orgId }
-    ).catch(() => undefined);
 
     return NextResponse.json({
       order: { ...(createdOrder as any).toObject(), _id: String((createdOrder as any)._id) },
@@ -441,20 +444,29 @@ export async function POST(req: NextRequest) {
       trackingUrl: `/track-order/${tracking.token}`,
     }, { status: 201 });
   } catch (error: any) {
-    // Idempotency duplicate key — return existing order as 200 dedup
+    // A concurrent request may win the unique-key race.
     if (error?.code === 11000 && idempotencyKey) {
       try {
         await dbConnect();
-        const existing = await Order.findOne(addWorkspaceScope(authCtx.orgId, { idempotencyKey })).lean();
+        const existing = await Order.findOne(addWorkspaceScope(authCtx.orgId, { idempotencyKey })).select('+requestHash').lean();
         if (existing) {
+          if ((existing as any).requestHash !== requestHash) {
+            return NextResponse.json(
+              { error: 'Idempotency-Key was already used for a different order' },
+              { status: 409 }
+            );
+          }
           return NextResponse.json({ order: { ...existing, _id: String((existing as any)._id) }, dedup: true }, { status: 200 });
         }
       } catch {}
     }
-    // Transaction/session error string broadening
     const msg = error?.message || '';
     if (msg.includes('Transaction numbers') || msg.includes('not a replica set') || msg.includes('Sessions not supported') || msg.includes('code 20')) {
-      console.warn('Transaction not supported, request failed post-fallback', msg);
+      console.error('MongoDB transactions are required for order creation', msg);
+      return NextResponse.json(
+        { error: 'Order creation is temporarily unavailable' },
+        { status: 503 }
+      );
     }
     console.error('Error creating order:', error);
     const status = error?.status || 500;
@@ -465,32 +477,60 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const authCtx = await requirePermission('orders:write');
-    const { orderId, status } = await req.json();
-    if (!orderId || !status) {
+    const { orderId, status, expectedStatus, reason } = await req.json();
+    if (
+      typeof orderId !== 'string' || !mongoose.isValidObjectId(orderId) ||
+      typeof status !== 'string' || typeof expectedStatus !== 'string' ||
+      (reason != null && typeof reason !== 'string')
+    ) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
-    if (!['pending', 'pending fulfillment', 'partially fulfilled', 'fulfilled', 'canceled'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
-    }
+    assertOrderTransition(expectedStatus, status, reason);
 
     await dbConnect();
-
-    const updatedOrder = await Order.findOneAndUpdate(
-      { _id: orderId, orgId: authCtx.orgId },
-      { status },
-      { new: true }
-    );
-
-    if (!updatedOrder) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    const session = await mongoose.startSession();
+    const result: { order: mongoose.HydratedDocument<IOrder> | null } = { order: null };
+    try {
+      await session.withTransaction(async () => {
+        result.order = await Order.findOneAndUpdate(
+          { _id: orderId, orgId: authCtx.orgId, status: expectedStatus },
+          { $set: { status }, $inc: { __v: 1 } },
+          { new: true, session, runValidators: true }
+        );
+        if (!result.order) {
+          const exists = await Order.exists({ _id: orderId, orgId: authCtx.orgId }).session(session);
+          throw new OrderTransitionError(
+            exists ? 'Order changed since you loaded it; refresh before retrying' : 'Order not found',
+            exists ? 409 : 404
+          );
+        }
+        await OrderEvent.create(
+          [{
+            orgId: authCtx.orgId,
+            orderId,
+            actorId: authCtx.userId,
+            type: 'status.changed',
+            fromStatus: expectedStatus,
+            toStatus: status,
+            reason: reason?.trim(),
+          }],
+          { session }
+        );
+      });
+    } finally {
+      await session.endSession();
     }
+    if (!result.order) throw new Error('Order transition did not commit');
 
     return NextResponse.json({
       message: 'Order status updated successfully',
-      order: { ...updatedOrder.toObject(), _id: updatedOrder._id!.toString() },
+      order: { ...result.order.toObject(), _id: result.order._id!.toString() },
     });
   } catch (error) {
     if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof OrderTransitionError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     console.error('Error updating order status:', error);

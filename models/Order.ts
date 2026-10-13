@@ -1,14 +1,16 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 interface Product {
+    productId?: string;
     name: string;
     quantity: number;
     unitPrice?: number;
+    unitPriceMinor?: number;
     lineValueMinor?: number;
     nameKey?: string;
 }
 
-interface IOrder extends Document {
+export interface IOrder extends Document {
     name: string;
     phone: string;
     email: string;
@@ -35,20 +37,23 @@ interface IOrder extends Document {
         discountMinor: number;
     };
     idempotencyKey?: string;
+    requestHash?: string;
     trackingTokenHash?: string;
 }
 
 const ProductSchema = new Schema<Product>({
+    productId: { type: String },
     name: { type: String, required: true },
     quantity: { type: Number, required: true },
     unitPrice: { type: Number, min: 0 },
+    unitPriceMinor: { type: Number, min: 0 },
     lineValueMinor: { type: Number, min: 0 },
     nameKey: { type: String },
 }, { _id: false });
 
 const OrderSchema = new Schema<IOrder>({
     name: { type: String, required: true },
-    phone: { type: String, required: true },
+    phone: { type: String, default: '' },
     email: { type: String, required: true, trim: true },
     emailNormalized: { type: String, trim: true, lowercase: true, index: true },
     orgId: { type: String, required: true, index: true },
@@ -57,7 +62,7 @@ const OrderSchema = new Schema<IOrder>({
     orderedAt: { type: Date, sparse: true } as any,
     products: { type: [ProductSchema], required: true },
     status: { type: String, required: true },
-    orderLink: { type: String, required: true },
+    orderLink: { type: String, default: '' },
     pricing: {
         originalMinor: { type: Number, min: 0 },
         discountMinor: { type: Number, min: 0 },
@@ -73,6 +78,7 @@ const OrderSchema = new Schema<IOrder>({
         discountMinor: { type: Number, min: 0 },
     },
     idempotencyKey: { type: String, sparse: true } as any,
+    requestHash: { type: String, select: false },
     trackingTokenHash: { type: String, sparse: true, select: false } as any,
 }, {
     collection: 'orders',

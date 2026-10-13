@@ -2,9 +2,11 @@ import { dbConnect } from '@/lib/mongodb';
 import { normalizeNameKey as nkey } from '@/lib/auth';
 
 export interface PricedProduct {
+  productId: string;
   name: string;
   quantity: number;
   unitPrice?: number;
+  unitPriceMinor: number;
   lineValueMinor?: number;
   nameKey: string;
 }
@@ -16,58 +18,70 @@ export interface OrderPricing {
   productsWithSnapshot: PricedProduct[];
 }
 
-// Cached inventory price map
-let cachedPriceMap: Map<string, number> | null = null;
-let cachedAt = 0;
-const CACHE_MS = 60_000;
-
-async function getPriceMap(): Promise<Map<string, number>> {
-  const now = Date.now();
-  if (cachedPriceMap && now - cachedAt < CACHE_MS) return cachedPriceMap;
-  const conn = await dbConnect();
-  const rows = await conn.connection.db!.collection('inventory').find({}, { projection: { name: 1, nameKey: 1, price: 1 } }).toArray();
-  const map = new Map<string, number>();
-  for (const r of rows) {
-    const key = (r as any).nameKey ? String((r as any).nameKey) : nkey(String((r as any).name));
-    map.set(key, Number((r as any).price) || 50);
+export async function priceOrder(
+  orgId: string,
+  products: Array<{ name?: unknown; quantity?: unknown }>
+): Promise<OrderPricing> {
+  if (!orgId) throw new Error('Workspace is required for pricing');
+  if (!Array.isArray(products) || products.length < 1 || products.length > 50) {
+    throw Object.assign(new Error('An order must contain 1-50 product lines'), { status: 400 });
   }
-  cachedPriceMap = map;
-  cachedAt = now;
-  return map;
-}
-
-export async function priceOrder(products: Array<{ name?: unknown; quantity?: unknown }>): Promise<OrderPricing> {
-  const priceMap = await getPriceMap().catch(() => new Map<string, number>());
-  let priceSource: OrderPricing['priceSource'] = 'inventory';
-  let hasEstimated = false;
+  const normalized = products.map((product) => {
+    if (typeof product?.name !== 'string' || !product.name.trim() || product.name.length > 120) {
+      throw Object.assign(new Error('Product name must contain 1-120 characters'), { status: 400 });
+    }
+    if (!Number.isSafeInteger(product.quantity) || Number(product.quantity) < 1 || Number(product.quantity) > 100_000) {
+      throw Object.assign(new Error('Product quantity must be a positive integer up to 100000'), { status: 400 });
+    }
+    return { name: product.name.trim(), nameKey: nkey(product.name), quantity: Number(product.quantity) };
+  });
+  const conn = await dbConnect();
+  const rows = await conn.connection.db!.collection('inventory').find(
+    { orgId, $or: [
+      { nameKey: { $in: normalized.map((product) => product.nameKey) } },
+      { name: { $in: normalized.map((product) => product.name) } },
+    ] },
+    { projection: { name: 1, nameKey: 1, price: 1 } }
+  ).toArray();
+  const priceMap = new Map<string, { productId: string; unitPriceMinor: number }>();
+  for (const row of rows) {
+    const key = row.nameKey ? String(row.nameKey) : nkey(String(row.name));
+    const price = row.price;
+    const unitPriceMinor = Math.round(price * 100);
+    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0 ||
+      !Number.isSafeInteger(unitPriceMinor) || unitPriceMinor <= 0) {
+      throw Object.assign(new Error('Catalog price unavailable'), { status: 409 });
+    }
+    if (priceMap.has(key)) {
+      throw Object.assign(new Error('Catalog product name is ambiguous'), { status: 409 });
+    }
+    priceMap.set(key, { productId: String(row._id), unitPriceMinor });
+  }
   const productsWithSnapshot: PricedProduct[] = [];
   let orderValueMinor = 0;
 
-  for (const p of products.slice(0, 50)) {
-    const name = String(p.name).slice(0, 120);
-    const quantity = Math.max(1, Math.min(100_000, Number(p.quantity) || 1));
-    const nameKey = nkey(name);
-    const price = priceMap.get(nameKey) ?? 50;
-    if (!priceMap.has(nameKey)) hasEstimated = true;
-    const lineValueMinor = Math.round(price * 100 * quantity);
+  for (const { name, quantity, nameKey } of normalized) {
+    const catalog = priceMap.get(nameKey);
+    if (!catalog) {
+      throw Object.assign(new Error(`Catalog price unavailable for ${name}`), { status: 409 });
+    }
+    const lineValueMinor = catalog.unitPriceMinor * quantity;
     orderValueMinor += lineValueMinor;
+    if (!Number.isSafeInteger(orderValueMinor)) {
+      throw Object.assign(new Error('Order value exceeds supported money range'), { status: 400 });
+    }
     productsWithSnapshot.push({
+      productId: catalog.productId,
       name,
       quantity,
-      unitPrice: price,
+      unitPrice: catalog.unitPriceMinor / 100,
+      unitPriceMinor: catalog.unitPriceMinor,
       lineValueMinor,
       nameKey,
     });
   }
 
-  if (hasEstimated && priceMap.size === 0) priceSource = 'estimated';
-  else if (hasEstimated) priceSource = 'estimated';
-  else priceSource = 'inventory';
-
-  // For demo with no inventory, still return estimated source
-  if (productsWithSnapshot.length === 0) priceSource = 'estimated';
-
-  return { orderValueMinor, priceSource, productsWithSnapshot };
+  return { orderValueMinor, priceSource: 'inventory', productsWithSnapshot };
 }
 
 export function computeDiscount(

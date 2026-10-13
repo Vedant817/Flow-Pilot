@@ -94,7 +94,7 @@ test.each([undefined, 'https://example.test/api/'])('order status uses the confi
   fireEvent.change(statusSelect!, { target: { value: 'fulfilled' } });
   await waitFor(() => expect(put).toHaveBeenCalledWith(
     `${base ? base.replace(/\/$/, '') : '/api'}/orders`,
-    { orderId: 'order12345678', status: 'fulfilled' },
+    { orderId: 'order12345678', status: 'fulfilled', expectedStatus: 'pending fulfillment' },
   ));
   expect(await screen.findByRole('alert')).toHaveTextContent('Failed to update order status');
   expect(statusSelect).toHaveValue('pending fulfillment');

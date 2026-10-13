@@ -42,13 +42,13 @@ async function dbConnect(): Promise<Mongoose> {
 
             const db = mongooseInstance.connection.db!;
             // Share global promise for index bootstrapping (awaited, not fire-and-forget)
-            const globalKey = '__flowpilotIndexPromise' as any;
-            if (!(global as any)[globalKey]) {
-                (global as any)[globalKey] = ensureQueryIndexes(db).catch((e) => {
-                    console.warn('Index ensure failed:', e instanceof Error ? e.message : e);
+            if (!global.__flowpilotIndexPromise) {
+                global.__flowpilotIndexPromise = ensureQueryIndexes(db).catch((error) => {
+                    global.__flowpilotIndexPromise = undefined;
+                    throw error;
                 });
             }
-            await (global as any)[globalKey];
+            await global.__flowpilotIndexPromise;
 
             return mongooseInstance;
         }).catch(error => {
