@@ -84,6 +84,9 @@ Implemented:
   accessible command palette, and reduced-motion support.
 - Compatible Next.js 16.4.0 / Axios 1.20.0 upgrades remove the reported critical
   Next.js advisory. Fifty dependency findings remain (40 high, 10 moderate).
+- Root-level application layout, ignored local/generated artifacts, secret-free
+  environment template, contributor/release guidance and GitHub verification
+  workflow. Lint is explicitly advisory while its debt remains.
 
 Still required:
 
@@ -108,6 +111,17 @@ working test Clerk organizations/users. Never claim browser/live-service checks
 when only source review or mocks were used. Four pre-existing skipped test
 placeholders are not acceptance evidence.
 
-Latest local gate: 20 suites, 111 tests passing; TypeScript, production build and
+Latest local gate: 20 suites, 112 tests passing; TypeScript, production build and
 `git diff --check` passing. The build used a synthetic publishable Clerk key,
 not live service credentials.
+Repository-wide lint reports 237 problems (218 errors, 19 warnings). GitHub CI
+has not been run for these unpublished changes.
+
+## Integration status
+
+The primary checkout's `main` and this thread's `main` diverged independently.
+The primary includes trained email classification and draft/review workflows;
+this thread includes transactional/security and accessibility work. A merge
+attempt encountered widespread conflicts and was aborted, preserving both
+histories. No primary-checkout update, remote publication or managed-checkout
+deletion has been performed. Reconcile the features before landing and cleanup.

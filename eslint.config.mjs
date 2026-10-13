@@ -28,6 +28,9 @@ export default defineConfig([
   },
   globalIgnores([
     '.next/**',
+    '.delta/**',
+    '.swc/**',
+    'checkpoints/**',
     'coverage/**',
     'next-env.d.ts',
   ]),

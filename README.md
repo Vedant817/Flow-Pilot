@@ -2,14 +2,23 @@
 
 Flow Pilot is a distribution management and sales-intelligence console for order operations, inventory planning, customer risk, and grounded operational analysis. It is designed around bounded queries and materialized read models rather than browser-side CRUD over entire collections.
 
-## Product Advantages
+## Readiness
 
-- **Operations Copilot without paid inference APIs:** SmolLM2-360M-Instruct and MiniLM run locally through ONNX and Transformers.js inside the Vercel Node runtime.
-- **Tool-grounded RAG:** semantic routing chooses deterministic MongoDB tools before generation. The model writes an answer over verified facts instead of inventing calculations.
-- **Hybrid retrieval:** MongoDB Atlas Vector Search is preferred; bounded lexical plus cosine retrieval remains available for local MongoDB.
+This is an actively developed application, not a production-certified release.
+The eight-week implementation roadmap is incomplete. See
+[delivery status](docs/DELIVERY_STATUS.md), [release gates](docs/RELEASE_CHECKLIST.md)
+and [order processing prerequisites](docs/ORDER_PROCESSING.md) before deployment.
+Unit tests and a successful build do not certify live authentication, database
+transactions, Gmail, model-runtime limits, load behavior or backup recovery.
+
+## Current Capabilities
+
+- **Local Operations Copilot:** SmolLM2-360M-Instruct and MiniLM execute through ONNX and Transformers.js. Production hosting/resource limits still need certification.
+- **Tool-assisted RAG:** semantic routing chooses deterministic MongoDB tools before generation. Citations and tools assist grounding; they do not guarantee factual answers.
+- **Semantic retrieval:** MongoDB Atlas Vector Search is preferred; bounded lexical plus cosine fallback remains available for local MongoDB. This is not simultaneous hybrid fusion in every path.
 - **Incremental analytics:** a `daily_sales_rollup` read model reduces forecasting and trend reads from `O(raw orders)` to `O(days × active SKUs)`.
 - **Sales intelligence:** Holt-Winters demand forecasting, EWMA anomaly detection, RFM account segmentation, ABC/XYZ concepts, EOQ, reorder-point and deadstock analysis.
-- **Enterprise operations UI:** grouped navigation, dense order workflows, command palette, source-cited copilot, and a consistent dark operations-console theme.
+- **Operations UI:** grouped navigation, order workflows, accessible mobile navigation/command palette and a source-cited copilot.
 
 ## Architecture
 
@@ -42,11 +51,11 @@ Gmail / Web / Operator
 
 | Concern | Implementation |
 |---|---|
-| Million-order feeds | Index-backed server pagination; max 100 rows/request |
+| Order feeds | Server pagination; max 100 rows/request. Million-order performance is not load-certified |
 | Analytics fan-out | Materialized daily product rollups and bounded aggregation pipelines |
 | Forecasting | Reads dense rollup series, never raw order documents |
 | Semantic search | Persisted 384-dimensional memory collection with Atlas vector index |
-| AI reliability | Typed tools compute facts; the small model only composes the response |
+| AI grounding | Typed tools compute facts; model output still requires release-gating evaluation |
 | Cold starts | Global model/embedding singleton and `/tmp` Hugging Face weight cache |
 | Abuse protection | Clerk proxy protection plus token buckets on generation and writes |
 | Maintenance | Idempotent, secret-protected rollup and knowledge backfill |
@@ -75,10 +84,11 @@ AI_EMBED_MODEL=Xenova/all-MiniLM-L6-v2
 ```bash
 git clone https://github.com/Vedant817/Flow-Pilot.git
 cd Flow-Pilot
-npm install --force
+npm ci
 ```
 
-Create `.env.local`:
+Copy `.env.example` to `.env.local` and supply credentials locally. The following
+shows the required configuration names, not usable credentials:
 
 ```env
 MONGO_URI=mongodb+srv://...
@@ -198,10 +208,14 @@ For MongoDB Atlas, allow the app to create the `vec_idx` Vector Search index or 
 ## Verification
 
 ```bash
-npx tsc --noEmit
-npm test
-npm run build
+npm run verify
+npm run lint
 ```
+
+GitHub Actions runs typechecking, tests and the production build. Its build key
+is synthetic and does not authenticate real users. Lint remains advisory while
+repository-wide debt is unresolved; passing CI is not production certification.
+See [contributing](CONTRIBUTING.md) for the full verification procedure.
 
 ## Vercel Notes
 
