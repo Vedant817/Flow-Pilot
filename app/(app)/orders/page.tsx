@@ -25,10 +25,12 @@ interface ActionButtonProps {
 }
 
 const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps) => {
+    const [statusError, setStatusError] = useState('');
     const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         const newStatus = e.target.value;
-
-        axios.put(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+        setStatusError('');
+        const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '/api';
+        axios.put(`${apiBase}/orders`, {
             orderId: order._id,
             status: newStatus
         })
@@ -38,6 +40,7 @@ const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps)
             })
             .catch(error => {
                 console.error('Error updating order status:', error);
+                setStatusError('Failed to update order status. Please try again.');
             })
     }, [order, onStatusChange]);
 
@@ -97,6 +100,7 @@ const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps)
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+                {statusError && <p role="alert" className="text-sm text-red-600">{statusError}</p>}
                 <div className="space-y-3">
                     <div className="flex items-start gap-3">
                         <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -475,7 +479,7 @@ export default function OrdersPage() {
                 if (statusFilter !== 'all') params.set('status', statusFilter);
                 if (deferredFilter.trim()) params.set('q', deferredFilter.trim());
 
-                const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+                const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '/api';
                 const response = await axios.get(`${apiBase}/orders?${params}`);
                 setOrders(response.data.data ?? response.data);
                 setTotalOrders(response.data.pagination?.total ?? response.data.length);
@@ -566,28 +570,28 @@ export default function OrdersPage() {
                     <StatsCard
                         title="Total Orders"
                         value={stats.total}
-                        subtitle="All time"
+                        subtitle="All matching orders"
                         icon={<Package className="w-6 h-6 text-blue-600" />}
                         color="bg-blue-50"
                     />
                     <StatsCard
                         title="Fulfilled"
                         value={stats.fulfilled}
-                        subtitle="Completed orders"
+                        subtitle="Completed on current page"
                         icon={<CheckCircle2 className="w-6 h-6 text-emerald-600" />}
                         color="bg-emerald-50"
                     />
                     <StatsCard
                         title="Pending"
                         value={stats.pending}
-                        subtitle="Awaiting fulfillment"
+                        subtitle="Pending on current page"
                         icon={<Clock className="w-6 h-6 text-amber-600" />}
                         color="bg-amber-50"
                     />
                     <StatsCard
                         title="Partial"
                         value={stats.partial}
-                        subtitle="Partially fulfilled"
+                        subtitle="Partial on current page"
                         icon={<Truck className="w-6 h-6 text-purple-600" />}
                         color="bg-purple-50"
                     />

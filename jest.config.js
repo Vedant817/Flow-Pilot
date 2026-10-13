@@ -12,6 +12,7 @@ const customJestConfig = {
   testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^lucide-react$': '<rootDir>/node_modules/lucide-react/dist/cjs/lucide-react.js',
     '^@huggingface/transformers$': '<rootDir>/__mocks__/transformers.js',
     '^@/lib/analytics/rollup$': '<rootDir>/__mocks__/rollup.js',
     '^@/lib/ai/memory$': '<rootDir>/__mocks__/memory.js',

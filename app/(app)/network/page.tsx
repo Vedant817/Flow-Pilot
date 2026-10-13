@@ -54,6 +54,10 @@ export default function DealerNetworkPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [dealers, setDealers] = useState<DealerResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState('');
+  const [dealerError, setDealerError] = useState('');
+  const [dealersLoading, setDealersLoading] = useState(true);
+  const [dealerRetry, setDealerRetry] = useState(0);
   const [query, setQuery] = useState('');
   const [risk, setRisk] = useState('all');
   const [country, setCountry] = useState('');
@@ -64,10 +68,13 @@ export default function DealerNetworkPage() {
 
   async function loadOverview() {
     setLoading(true);
+    setOverviewError('');
     try {
       const response = await fetch('/api/network/overview');
       if (!response.ok) throw new Error('Failed to load network overview');
       setOverview(await response.json());
+    } catch {
+      setOverviewError('Failed to load network overview. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -81,17 +88,29 @@ export default function DealerNetworkPage() {
     if (risk !== 'all') params.set('risk', risk);
     if (country) params.set('country', country);
     const controller = new AbortController();
+    setDealerError('');
+    setDealersLoading(true);
     fetch(`/api/network/dealers?${params}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Dealer query failed')))
       .then(setDealers)
       .catch((error) => {
-        if (error instanceof Error && error.name !== 'AbortError') console.error(error);
+        if (!controller.signal.aborted) {
+          console.error(error);
+          setDealerError('Failed to load dealer accounts. Please try again.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDealersLoading(false);
       });
     return () => controller.abort();
-  }, [country, deferredQuery, page, risk, sort]);
+  }, [country, deferredQuery, page, risk, sort, dealerRetry]);
 
   if (loading && !overview) {
     return <div className="flex min-h-[70vh] items-center justify-center text-muted-foreground"><LoaderCircle className="mr-2 animate-spin" size={18} /> Loading dealer network…</div>;
+  }
+
+  if (overviewError) {
+    return <div className="mx-auto max-w-xl px-6 py-20 text-center"><p role="alert" className="mb-4 text-rose-400">{overviewError}</p><button onClick={() => void loadOverview()} className="rounded border border-border px-4 py-2">Retry</button></div>;
   }
 
   if (!overview?.available) {
@@ -144,8 +163,18 @@ export default function DealerNetworkPage() {
               <select value={country} onChange={(event) => { setCountry(event.target.value); setPage(1); }} className="h-9 max-w-52 rounded-md border border-border bg-background px-3 text-xs"><option value="">All territories</option>{dealers?.filters.countries.map((item) => <option key={item}>{item}</option>)}</select>
               <select value={sort} onChange={(event) => setSort(event.target.value)} className="h-9 rounded-md border border-border bg-background px-3 text-xs"><option value="revenue">Revenue</option><option value="riskScore">Risk score</option><option value="outstanding">Outstanding</option><option value="lastOrder">Last order</option></select>
             </div>
-            <DealerTable dealers={dealers?.data ?? []} />
+            {dealerError ? (
+              <div className="p-5"><p role="alert" className="mb-3 text-rose-400">{dealerError}</p><button onClick={() => setDealerRetry((value) => value + 1)} className="rounded border border-border px-3 py-2">Retry dealer accounts</button></div>
+            ) : dealersLoading ? (
+              <p role="status" className="p-5 text-muted-foreground">Loading dealer accounts…</p>
+            ) : dealers?.data.length ? (
+              <DealerTable dealers={dealers.data} />
+            ) : (
+              <p className="p-5 text-muted-foreground">No dealer accounts match these filters.</p>
+            )}
+            {!dealerError && !dealersLoading && (
             <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground"><span>{dealers?.pagination.total.toLocaleString() ?? 0} accounts</span><div className="flex items-center gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border border-border px-3 py-1.5 disabled:opacity-40">Previous</button><span>Page {page} of {dealers?.pagination.totalPages ?? 1}</span><button disabled={page >= (dealers?.pagination.totalPages ?? 1)} onClick={() => setPage((value) => value + 1)} className="rounded border border-border px-3 py-1.5 disabled:opacity-40">Next</button></div></div>
+            )}
           </section>
         )}
 

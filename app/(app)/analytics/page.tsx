@@ -406,13 +406,13 @@ export default function AnalyticsPage() {
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <Package className="w-5 h-5 text-green-600" />
-                                        Product Performance
+                                        On-hand Stock by Category
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <SimpleChart 
                                         data={data?.chartData.productPerformance.sales || []}
-                                        title="Sales by Category"
+                                        title="On-hand Stock by Category (units)"
                                         loading={loading}
                                     />
                                 </CardContent>

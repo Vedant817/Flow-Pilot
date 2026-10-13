@@ -404,6 +404,15 @@ export default function InventoryPage() {
     router.push('/inventory/deadstock');
   }, [router]);
 
+  if (error && !loading) {
+    return (
+      <div className="mx-auto max-w-xl p-8 text-center">
+        <p role="alert" className="mb-4 text-red-600">{error}</p>
+        <ActionButton label="Retry" icon={<RefreshCw />} onClick={() => void fetchInventoryData()} />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
