@@ -21,12 +21,14 @@ Implemented:
 - Database-index readiness fails closed.
 - Recursive Gmail MIME/attachment body extraction, retryable body-fetch failures,
   and fail-closed ingestion lock acquisition.
+- Atomic bounded workspace migration with empty-target preflight, reserved-global
+  protection, outbox-drain checks and projection invalidation.
 
 Still required:
 
 - Exhaustive route and AI tool permission matrix, schema validation everywhere,
   and adversarial integration tests against real MongoDB.
-- Safe workspace migration preflight/atomicity, Google OAuth state binding,
+- Large-tenant resumable migration rehearsal, Google OAuth state binding,
   Gmail history expiry recovery, issuance checkpoint/reconciliation.
 - Existing deployment index migration and removal of all unsupported claims.
 
@@ -38,6 +40,8 @@ Implemented:
 - Controlled forward status transitions, cancellation reasons, stale-write
   detection, and transactional append-only order-event records.
 - Order detail timeline and visible workflow errors.
+- Validated IST business dates/times with UTC instants; impossible dates fail
+  rather than silently becoming the current time.
 - Durable order-created outbox, leased workers, bounded retries, and transactional
   rollup consumer receipts.
 
@@ -74,6 +78,13 @@ Still required:
 
 ## Phase 3 — Production operations and integrations
 
+Implemented:
+
+- Responsive mobile navigation drawer, keyboard focus containment/restoration,
+  accessible command palette, and reduced-motion support.
+- Compatible Next.js 16.4.0 / Axios 1.20.0 upgrades remove the reported critical
+  Next.js advisory. Fifty dependency findings remain (40 high, 10 moderate).
+
 Still required:
 
 - Cursor pagination/search indexes throughout the application.
@@ -81,7 +92,8 @@ Still required:
 - Structured observability/OpenTelemetry, error capture, SLOs and alerting.
 - Backup/restore drill, retention enforcement, realistic load tests.
 - ERP/WMS adapter framework and reconciliation.
-- Responsive mobile navigation and accessible overlays.
+- Physical-device/browser layout checks and accessibility fixes for remaining
+  page-specific overlays.
 - Dependency vulnerability remediation with compatibility checks.
 
 ## Verification boundaries
@@ -96,6 +108,6 @@ working test Clerk organizations/users. Never claim browser/live-service checks
 when only source review or mocks were used. Four pre-existing skipped test
 placeholders are not acceptance evidence.
 
-Latest local gate: 17 suites, 91 tests passing; TypeScript, production build and
+Latest local gate: 20 suites, 111 tests passing; TypeScript, production build and
 `git diff --check` passing. The build used a synthetic publishable Clerk key,
 not live service credentials.
