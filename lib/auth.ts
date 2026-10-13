@@ -37,10 +37,9 @@ export async function getAuthContext(): Promise<AuthContext> {
       : {};
     const roleClaim = publicMeta.role ?? claims.orgRole ?? claims.org_role ?? authState.orgRole;
     const role = normalizeRole(typeof roleClaim === 'string' ? roleClaim : undefined);
-    const configuredOrg = process.env.DEFAULT_ORG_ID?.trim();
-    const devOrg = process.env.NODE_ENV === 'development' ? 'default' : undefined;
-    const claimOrg = claims.orgId ?? claims.org_id;
-    const orgId = (typeof claimOrg === 'string' ? claimOrg : authState.orgId) ?? configuredOrg ?? devOrg;
+    // Interactive access requires Clerk's verified active organization.
+    // DEFAULT_ORG_ID is reserved for authenticated maintenance service access.
+    const orgId = authState.orgId ?? undefined;
     return { userId, email, role, orgId };
   } catch {
     return { userId: null, role: 'viewer' };

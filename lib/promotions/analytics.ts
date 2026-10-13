@@ -36,7 +36,7 @@ export async function getSchemeAnalytics(orgId: string): Promise<SchemeAnalytics
     const couponAgg = await db
       .collection('coupons')
       .aggregate([
-        { $match: { schemeId } },
+        { $match: { orgId, schemeId } },
         {
           $group: {
             _id: '$status',
@@ -64,7 +64,7 @@ export async function getSchemeAnalytics(orgId: string): Promise<SchemeAnalytics
     // Use SchemeDailyStat if available for pre-aggregated, else live calc for last 30d window
     const redeemedCoupons = await db
       .collection('coupons')
-      .find({ schemeId, status: 'redeemed', redeemedOrderId: { $exists: true } }, { projection: { redeemedOrderId: 1, benefitSnapshot: 1, issuedAt: 1 } })
+      .find({ orgId, schemeId, status: 'redeemed', redeemedOrderId: { $exists: true } }, { projection: { redeemedOrderId: 1, benefitSnapshot: 1, issuedAt: 1 } })
       .limit(5000)
       .toArray();
 
@@ -83,7 +83,7 @@ export async function getSchemeAnalytics(orgId: string): Promise<SchemeAnalytics
     const orderIds = redeemedCoupons.map((c: any) => c.redeemedOrderId).filter(Boolean);
     let orders: any[] = [];
     if (orderIds.length) {
-      orders = await db.collection('orders').find({ _id: { $in: orderIds } }, { projection: { pricing: 1 } }).toArray();
+      orders = await db.collection('orders').find({ orgId, _id: { $in: orderIds } }, { projection: { pricing: 1 } }).toArray();
       for (const o of orders) {
         const pricing = (o as any).pricing;
         if (pricing) {
@@ -99,7 +99,7 @@ export async function getSchemeAnalytics(orgId: string): Promise<SchemeAnalytics
     const windowEnd = new Date(schemeCreated.getTime() + 30 * 86400000);
     const holdoutCoupons = await db
       .collection('coupons')
-      .find({ schemeId, status: 'holdout' }, { projection: { emailNormalized: 1, issuedAt: 1 } })
+      .find({ orgId, schemeId, status: 'holdout' }, { projection: { emailNormalized: 1, issuedAt: 1 } })
       .limit(5000)
       .toArray();
     let holdoutOrders = 0;
@@ -110,7 +110,7 @@ export async function getSchemeAnalytics(orgId: string): Promise<SchemeAnalytics
       const wEnd = new Date(issuedAt.getTime() + 30 * 86400000);
       const docs = await db
         .collection('orders')
-        .find({ emailNormalized: email, orderedAt: { $gte: issuedAt, $lte: wEnd } }, { projection: { pricing: 1 } })
+        .find({ orgId, emailNormalized: email, orderedAt: { $gte: issuedAt, $lte: wEnd } }, { projection: { pricing: 1 } })
         .limit(10)
         .toArray();
       if (docs.length > 0) holdoutOrders++;
@@ -149,7 +149,7 @@ export async function getSchemeAnalytics(orgId: string): Promise<SchemeAnalytics
     // Try to override with pre-aggregated stats if available
     const dailyStats = await db
       .collection('scheme_daily_stats')
-      .find({ schemeId })
+      .find({ orgId, schemeId })
       .sort({ date: -1 })
       .limit(30)
       .toArray();
