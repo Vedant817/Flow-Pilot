@@ -1,7 +1,9 @@
 import { createHash } from 'crypto';
+import mongoose from 'mongoose';
 import { dbConnect } from '@/lib/mongodb';
 import { embedBatch } from './embeddings';
 import { KNOWLEDGE_CORPUS } from './knowledge';
+import { redactSensitiveText } from './governance';
 
 export type MemoryKind = 'knowledge' | 'order' | 'inventory' | 'feedback' | 'error';
 
@@ -14,6 +16,10 @@ export interface MemoryDoc {
   text: string;
   embedding: number[];
   createdAt: Date;
+  expiresAt?: Date;
+  contentHash?: string;
+  sourceVersion?: string;
+  sourceUri?: string;
 }
 
 interface IndexBootstrap {
@@ -59,22 +65,19 @@ async function ensureVectorIndex(): Promise<void> {
   boot.vectorIndexChecked = true;
   try {
     const col = await getCollection();
-    const indexes = await (col as unknown as { searchIndexes: { list(): AsyncIterable<{ name: string }> } }).searchIndexes.list();
+    const indexes = col.listSearchIndexes();
     for await (const idx of indexes) {
-      if (idx.name === 'vec_idx_v2') return;
+      if (idx.name === 'vec_idx_v3') return;
     }
-    await (col as unknown as {
-      searchIndexes: {
-        create(def: unknown): Promise<string>;
-      };
-    }).searchIndexes.create({
-      name: 'vec_idx_v2',
+    await col.createSearchIndex({
+      name: 'vec_idx_v3',
       type: 'vectorSearch',
       definition: {
         fields: [
           { type: 'vector', path: 'embedding', numDimensions: 384, similarity: 'cosine' },
           { type: 'filter', path: 'kind' },
           { type: 'filter', path: 'orgId' },
+          { type: 'filter', path: 'expiresAt' },
         ],
       },
     });
@@ -90,7 +93,8 @@ export async function ingestDocument(
   text: string,
   options: { orgId: string }
 ): Promise<void> {
-  const chunks = chunkText(text);
+  if (options.orgId !== 'global' && process.env.AI_PRIVATE_MEMORY_ENABLED !== 'true') return;
+  const chunks = chunkText(redactSensitiveText(text));
   if (chunks.length === 0) return;
   const embeddings = await embedBatch(chunks);
   const col = await getCollection();
@@ -102,15 +106,30 @@ export async function ingestDocument(
         orgId: options.orgId,
         kind,
         refId,
-        title,
+        title: redactSensitiveText(title),
         text: chunk,
         embedding: embeddings[i],
         createdAt: new Date(),
+        ...(options.orgId !== 'global' ? { expiresAt: new Date(Date.now() + 90 * 86_400_000) } : {}),
+        contentHash: createHash('sha256').update(chunk).digest('hex'),
+        sourceVersion: createHash('sha256').update(text).digest('hex'),
+        sourceUri: kind === 'order' ? `/orders/${refId}/operations` : kind === 'inventory' ? `/inventory/${refId}/stock` : undefined,
       } satisfies Omit<MemoryDoc, 'createdAt'> & { createdAt: Date },
       upsert: true,
     },
   }));
-  await col.bulkWrite(ops, { ordered: false });
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const conn = await dbConnect();
+      const sources = conn.connection.db!.collection<{ orgId: string; kind: MemoryKind; refId: string; erasedAt?: Date; version: number }>('ai_source_controls');
+      const scope = { orgId: options.orgId, kind, refId: refId ?? '' };
+      const control = await sources.findOne(scope, { session });
+      if (control?.erasedAt) return;
+      await sources.updateOne(scope, { $inc: { version: 1 } }, { upsert: true, session });
+      await col.bulkWrite(ops, { ordered: false, session });
+    });
+  } finally { await session.endSession(); }
 }
 
 /** Seeds the curated domain corpus once per process. */

@@ -31,7 +31,10 @@ export async function executeStockCommand(command: StockCommand, existingSession
     !/^[A-Za-z0-9._:-]{8,128}$/.test(command.eventKey) || command.eventKey.startsWith('opening:')) {
     throw new StockConflict('Invalid inventory command identity, reason or idempotency key', 400);
   }
-  const linked = ['reserve', 'release', 'fulfill', 'return'].includes(command.kind);
+  const linked = ['reserve', 'release', 'fulfill', 'return', 'return_damaged'].includes(command.kind);
+  if (['fulfill', 'return', 'return_damaged'].includes(command.kind) && !existingSession) {
+    throw new StockConflict('Dispatch and returns require their authorized operational transaction');
+  }
   if (linked && (!command.orderId || !mongoose.isValidObjectId(command.orderId))) {
     throw new StockConflict('A valid order ID is required for this movement', 400);
   }
@@ -54,6 +57,11 @@ export async function executeStockCommand(command: StockCommand, existingSession
       if (!stock) throw new StockConflict('Inventory item not found', 404);
       const before = { quantity: stock.quantity, reservedQuantity: stock.reservedQuantity ?? 0 };
       const next = planStockMovement(before, command.kind, command.units);
+      const quarantined = stock.quarantinedQuantity ?? 0;
+      if (!Number.isSafeInteger(quarantined) || quarantined < 0 ||
+        !Number.isSafeInteger(quarantined + (command.kind === 'return_damaged' ? command.units : 0))) {
+        throw new StockConflict('Invalid quarantined stock balance');
+      }
       const db = mongoose.connection.db!;
       if (linked) {
         const order = await Order.findOne({ _id: command.orderId, orgId: command.orgId }).session(session);
@@ -66,7 +74,7 @@ export async function executeStockCommand(command: StockCommand, existingSession
           !['pending fulfillment', 'partially fulfilled', 'canceled'].includes(order.status)) {
           throw new StockConflict('Reservations cannot be released in this order state');
         }
-        if (command.kind === 'return' && !['partially fulfilled', 'fulfilled'].includes(order.status)) {
+        if (['return', 'return_damaged'].includes(command.kind) && !['partially fulfilled', 'fulfilled'].includes(order.status)) {
           throw new StockConflict('Only orders with recorded fulfillment can receive returns');
         }
         const orderedUnits = order.products
@@ -135,7 +143,8 @@ export async function executeStockCommand(command: StockCommand, existingSession
       const updated = await Inventory.updateOne(
         { _id: command.productId, orgId: command.orgId, quantity: before.quantity,
           $expr: { $eq: [{ $ifNull: ['$reservedQuantity', 0] }, before.reservedQuantity] } },
-        { $set: { quantity: next.quantity, reservedQuantity: next.reservedQuantity }, $inc: { __v: 1 } },
+        { $set: { quantity: next.quantity, reservedQuantity: next.reservedQuantity },
+          $inc: { __v: 1, ...(command.kind === 'return_damaged' ? { quarantinedQuantity: command.units } : {}) } },
         { session, runValidators: true }
       );
       if (updated.modifiedCount !== 1) throw new StockConflict('Stock changed; reload and retry the command');
@@ -144,6 +153,7 @@ export async function executeStockCommand(command: StockCommand, existingSession
         kind: command.kind, quantityDelta: next.quantityDelta, reservedDelta: next.reservedDelta,
         balanceAfter: { quantity: next.quantity, reservedQuantity: next.reservedQuantity },
         actorId: command.actorId, reason: command.reason.trim(),
+        units: command.units, quarantinedDelta: command.kind === 'return_damaged' ? command.units : 0,
         eventKey: command.eventKey, requestHash,
       }], { session });
       result.movement = movement.toObject();

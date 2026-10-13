@@ -6,6 +6,7 @@ Flow Pilot is a distribution management and sales-intelligence console for order
 
 This is an actively developed application, not a production-certified release.
 The eight-week implementation roadmap is incomplete. See
+[technical backlog](todo.md),
 [delivery status](docs/DELIVERY_STATUS.md), [release gates](docs/RELEASE_CHECKLIST.md)
 and [order processing prerequisites](docs/ORDER_PROCESSING.md) before deployment.
 Unit tests and a successful build do not certify live authentication, database

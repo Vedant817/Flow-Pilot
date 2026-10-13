@@ -4,9 +4,12 @@ import { bootstrapKnowledge, type MemoryDoc, type MemoryKind } from './memory';
 
 export interface RetrievedDoc extends Pick<MemoryDoc, '_id' | 'kind' | 'title' | 'text'> {
   score: number;
+  sourceVersion?: string;
+  sourceUri?: string;
+  generatedAt?: string;
 }
 
-const VECTOR_INDEX_NAME = 'vec_idx_v2';
+const VECTOR_INDEX_NAME = 'vec_idx_v3';
 
 /**
  * Hybrid retrieval over the semantic memory collection.
@@ -26,7 +29,8 @@ export async function hybridRetrieve(
   const conn = await dbConnect();
   const col = conn.connection.db!.collection<MemoryDoc>('semantic_memory');
   const queryVec = await embedText(query);
-  const allowedWorkspaces = [opts.orgId, 'global'];
+  const allowedWorkspaces = process.env.AI_PRIVATE_MEMORY_ENABLED === 'true' ? [opts.orgId, 'global'] : ['global'];
+  const lifetime = { $or: [{ orgId: 'global' }, { expiresAt: { $gt: new Date() } }] };
 
   let tier1: RetrievedDoc[] = [];
   let usedVectorSearch = false;
@@ -41,11 +45,12 @@ export async function hybridRetrieve(
           limit: limit * 2,
           filter: {
             orgId: { $in: allowedWorkspaces },
+            ...lifetime,
             ...(opts.kinds ? { kind: { $in: opts.kinds } } : {}),
           },
         },
       },
-      { $project: { kind: 1, title: 1, text: 1, orgId: 1, score: { $meta: 'vectorSearchScore' } } },
+      { $project: { kind: 1, title: 1, text: 1, orgId: 1, expiresAt: 1, sourceVersion: 1, sourceUri: 1, createdAt: 1, score: { $meta: 'vectorSearchScore' } } },
     ];
     interface VectorRow {
       _id: unknown;
@@ -54,11 +59,17 @@ export async function hybridRetrieve(
       text: string;
       orgId?: unknown;
       score?: unknown;
+      expiresAt?: Date;
+      sourceVersion?: string;
+      sourceUri?: string;
+      createdAt?: Date;
     }
     const raw = (await col.aggregate(pipeline, { maxTimeMS: 3000 }).toArray()) as unknown as VectorRow[];
     tier1 = raw
       .filter((d) => {
-        return typeof d.orgId === 'string' && allowedWorkspaces.includes(d.orgId);
+        return typeof d.orgId === 'string' && allowedWorkspaces.includes(d.orgId) &&
+          (!opts.kinds || opts.kinds.includes(d.kind)) &&
+          (d.orgId === 'global' || d.expiresAt instanceof Date && d.expiresAt > new Date());
       })
       .map((d) => ({
       _id: String(d._id),
@@ -66,6 +77,7 @@ export async function hybridRetrieve(
       title: d.title,
       text: d.text,
       score: typeof d.score === 'number' ? d.score : 0,
+      sourceVersion: d.sourceVersion, sourceUri: d.sourceUri, generatedAt: d.createdAt?.toISOString(),
     }));
     usedVectorSearch = tier1.length > 0;
   } catch {
@@ -85,11 +97,12 @@ export async function hybridRetrieve(
     const candidates = await col
       .find({
         orgId: { $in: allowedWorkspaces },
+        ...lifetime,
         ...(opts.kinds ? { kind: { $in: opts.kinds } } : {}),
       }, {
         limit: 500,
         sort: { createdAt: -1 },
-        projection: { kind: 1, title: 1, text: 1, embedding: 1 },
+        projection: { kind: 1, title: 1, text: 1, embedding: 1, sourceVersion: 1, sourceUri: 1, createdAt: 1 },
       })
       .toArray();
 
@@ -99,7 +112,8 @@ export async function hybridRetrieve(
         const overlap = tokens.reduce((acc, t) => acc + (haystack.includes(t) ? 1 : 0), 0) / tokens.length;
         const emb = Array.isArray(d.embedding) && d.embedding.length === EMBEDDING_DIM ? cosineSimilarity(queryVec, d.embedding) : 0;
         const score = 0.45 * overlap + 0.55 * emb;
-        return { _id: String(d._id), kind: d.kind, title: d.title, text: d.text, score };
+        return { _id: String(d._id), kind: d.kind, title: d.title, text: d.text, score,
+          sourceVersion: d.sourceVersion, sourceUri: d.sourceUri, generatedAt: d.createdAt?.toISOString() };
       })
       .filter((d) => d.score > 0.15 || haystackIncludesAll(d.text, tokens))
       .sort((a, b) => b.score - a.score)

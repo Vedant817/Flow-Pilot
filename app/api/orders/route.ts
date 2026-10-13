@@ -5,12 +5,12 @@ import { Order, type IOrder } from '@/models/Order';
 import { PromotionScheme } from '@/models/PromotionScheme';
 import { Coupon } from '@/models/Coupon';
 import { PromotionAudit } from '@/models/PromotionAudit';
-import { OutboxEvent } from '@/models/OutboxEvent';
 import { OrderEvent } from '@/models/OrderEvent';
 import { assertOrderTransition, OrderTransitionError } from '@/lib/orders/lifecycle';
 import { businessDateTime } from '@/lib/orders/time';
 import { releaseOrderReservations } from '@/lib/inventory/commands';
 import { StockConflict } from '@/lib/inventory/ledger';
+import { persistCanonicalOrder } from '@/lib/orders/create';
 import { rateLimitAsync } from '@/lib/rate-limit';
 import { AuthorizationError, requirePermission, requireWorkspace } from '@/lib/auth';
 import { addWorkspaceScope } from '@/lib/authorization';
@@ -349,18 +349,12 @@ export async function POST(req: NextRequest) {
         orderLink: '',
         pricing,
         appliedCoupon,
-        idempotencyKey,
-        requestHash,
+        idempotencyKey: idempotencyKey!,
+        requestHash: requestHash!,
         trackingTokenHash: tracking.tokenHash,
       };
 
-      let created: any;
-      if (session) {
-        const arr = await Order.create([orderDoc], { session } as any);
-        created = arr[0];
-      } else {
-        created = await Order.create(orderDoc);
-      }
+      const created = await persistCanonicalOrder(orderDoc, authCtx.userId, session);
 
       if (couponDoc) {
         // set redeemedOrderId
@@ -393,34 +387,6 @@ export async function POST(req: NextRequest) {
         if (session) await PromotionAudit.create([audit], { session } as any);
         else await PromotionAudit.create(audit);
       }
-
-      if (!session) {
-        throw Object.assign(
-          new Error('Transactional order creation is required'),
-          { status: 503 }
-        );
-      }
-      await OutboxEvent.create(
-        [
-          {
-            orgId,
-            type: 'order.created',
-            aggregateId: String(created._id),
-            eventKey: `order.created:${created._id}`,
-          },
-        ],
-        { session }
-      );
-      await OrderEvent.create(
-        [{
-          orgId,
-          orderId: String(created._id),
-          actorId: authCtx.userId,
-          type: 'created',
-          toStatus: 'pending fulfillment',
-        }],
-        { session }
-      );
 
       return created;
     };

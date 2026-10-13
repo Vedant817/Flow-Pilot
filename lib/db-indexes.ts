@@ -83,6 +83,16 @@ export async function ensureQueryIndexes(db: Db): Promise<void> {
     db.collection('inventory_movements').createIndex({ orgId: 1, eventKey: 1 }, { unique: true }),
     db.collection('inventory_movements').createIndex({ orgId: 1, productId: 1, at: -1, _id: -1 }),
     db.collection('inventory_reservations').createIndex({ orgId: 1, orderId: 1, productId: 1 }, { unique: true }),
+    db.collection('shipments').createIndex({ orgId: 1, requestKey: 1 }, { unique: true }),
+    db.collection('shipments').createIndex({ orgId: 1, orderId: 1, shippedAt: -1 }),
+    db.collection('return_authorizations').createIndex({ orgId: 1, requestKey: 1 }, { unique: true }),
+    db.collection('return_authorizations').createIndex({ orgId: 1, orderId: 1, status: 1 }),
+    db.collection('financial_credits').createIndex({ orgId: 1, requestKey: 1 }, { unique: true }),
+    db.collection('financial_credits').createIndex({ orgId: 1, orderId: 1, createdAt: -1 }),
+    db.collection('semantic_memory').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection('ai_source_controls').createIndex({ orgId: 1, kind: 1, refId: 1 }, { unique: true }),
+    db.collection('conversations').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection('orders').createIndex({ orgId: 1, 'products.productId': 1, date: 1 }),
   ];
 
   const results = await Promise.allSettled(ops);

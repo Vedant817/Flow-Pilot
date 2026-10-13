@@ -1,4 +1,5 @@
 import { pipeline, env } from '@huggingface/transformers';
+import { MODEL_MANIFEST, pinnedRevision } from './model-manifest';
 
 export const EMBEDDING_DIM = 384;
 const MODEL_ID = process.env.AI_EMBED_MODEL || 'Xenova/all-MiniLM-L6-v2';
@@ -31,7 +32,8 @@ const cache: EmbedderCache =
 
 async function getEmbedder() {
   if (!cache.promise) {
-    cache.promise = (pipeline('feature-extraction', MODEL_ID, { dtype: 'q8' }) as unknown as Promise<Embedder>)
+    const revision = pinnedRevision(MODEL_ID, process.env.AI_EMBED_REVISION, MODEL_MANIFEST.embeddings);
+    cache.promise = (pipeline('feature-extraction', MODEL_ID, { dtype: 'q8', revision }) as unknown as Promise<Embedder>)
       .catch((error: unknown) => {
         // A failed initialization must not poison the process-wide cache.
         cache.promise = null;

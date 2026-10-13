@@ -87,7 +87,7 @@ test('does not retry an uncertain transaction through a non-transactional path',
 
 test('fulfillment must own reserved units on the same order, not another order’s stock', async () => {
   reservationFind.mockResolvedValue({ reservedUnits: 1, fulfilledUnits: 0, returnedUnits: 0 });
-  await expect(executeStockCommand({ ...command, kind: 'fulfill', units: 2, orderId: 'order-a' }))
+  await expect(executeStockCommand({ ...command, kind: 'fulfill', units: 2, orderId: 'order-a' }, session as never))
     .rejects.toThrow('does not own enough');
   expect(Inventory.updateOne).not.toHaveBeenCalled();
   expect(reservationFind).toHaveBeenCalledWith({
@@ -109,13 +109,13 @@ test('returns cannot exceed actually fulfilled units', async () => {
     products: [{ productId: 'sku-a', quantity: 6 }],
   }) });
   reservationFind.mockResolvedValue({ reservedUnits: 0, fulfilledUnits: 2, returnedUnits: 1 });
-  await expect(executeStockCommand({ ...command, kind: 'return', units: 2, orderId: 'order-a' }))
+  await expect(executeStockCommand({ ...command, kind: 'return', units: 2, orderId: 'order-a' }, session as never))
     .rejects.toThrow('Return exceeds');
   expect(Inventory.updateOne).not.toHaveBeenCalled();
 });
 
 test('partial fulfillment advances the order and appends its timeline atomically', async () => {
-  await executeStockCommand({ ...command, kind: 'fulfill', units: 2, orderId: 'order-a' });
+  await executeStockCommand({ ...command, kind: 'fulfill', units: 2, orderId: 'order-a' }, session as never);
   expect(Order.updateOne).toHaveBeenCalledWith(
     expect.objectContaining({ orgId: 'org_a', status: 'pending fulfillment' }),
     { $set: { status: 'partially fulfilled' } }, { session }
@@ -128,7 +128,7 @@ test('partial fulfillment advances the order and appends its timeline atomically
 test('complete fulfillment derives terminal status from all canonical line quantities', async () => {
   reservationFind.mockResolvedValue({ reservedUnits: 4, fulfilledUnits: 2, returnedUnits: 0 });
   reservationRows.mockResolvedValue([{ productId: 'sku-a', fulfilledUnits: 6 }]);
-  await executeStockCommand({ ...command, kind: 'fulfill', units: 4, orderId: 'order-a' });
+  await executeStockCommand({ ...command, kind: 'fulfill', units: 4, orderId: 'order-a' }, session as never);
   expect(OrderEvent.create).toHaveBeenCalledWith(
     [expect.objectContaining({ toStatus: 'fulfilled' })], { session }
   );

@@ -6,4 +6,6 @@ module.exports = {
   AutoTokenizer: { from_pretrained: jest.fn() },
   AutoModelForCausalLM: { from_pretrained: jest.fn() },
   TextStreamer: jest.fn(),
+  StoppingCriteriaList: class { push() {} },
+  InterruptableStoppingCriteria: class { interrupt() {} },
 };

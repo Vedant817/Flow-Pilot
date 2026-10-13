@@ -189,7 +189,10 @@ const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps)
                             </select>
                         </div>
                     </div>
-                    <p className="mt-2 text-xs text-slate-600">Fulfillment is recorded per product in the <a href="/inventory" className="underline">stock ledger</a>.</p>
+                    <p className="mt-2 text-xs text-slate-600">
+                        <a href={`/orders/${order._id}/operations`} className="underline">Dispatch / authorized returns</a>
+                        {' · '}<a href="/inventory" className="underline">Stock reservations</a>
+                    </p>
                     {cancelRequested && (
                         <form className="mt-3 space-y-2" onSubmit={event => {
                             event.preventDefault();

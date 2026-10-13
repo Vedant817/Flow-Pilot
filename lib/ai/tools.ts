@@ -1,14 +1,20 @@
 import { dbConnect } from '@/lib/mongodb';
-import { getDailySeries } from '@/lib/analytics/rollup';
+import type { AppRole } from '@/lib/authorization';
+import { buildOverview, overviewWindow } from '@/lib/analytics/overview';
 
 export interface ToolResult {
   tool: string;
   summary: string;
   facts: Record<string, unknown>;
+  status?: 'available' | 'denied' | 'unavailable';
+  generatedAt?: string;
 }
 
 export interface ToolContext {
   orgId: string;
+  userId?: string;
+  role?: AppRole;
+  signal?: AbortSignal;
 }
 
 const DAY_MS = 86_400_000;
@@ -46,27 +52,25 @@ export async function toolOrdersOverview(context: ToolContext, days = 30): Promi
 }
 
 export async function toolRevenueSeries(context: ToolContext, days = 30): Promise<ToolResult> {
-  const series = await getDailySeries(context.orgId, days);
-  const totalUnits = series.reduce((s, p) => s + p.units, 0);
-  const totalOrders = series.reduce((s, p) => s + p.orders, 0);
-  const last7 = series.slice(-7).reduce((s, p) => s + p.units, 0);
-  const prev7 = series.slice(-14, -7).reduce((s, p) => s + p.units, 0);
-  const wowDelta = prev7 > 0 ? ((last7 - prev7) / prev7) * 100 : null;
+  const conn = await dbConnect();
+  const overview = await buildOverview(conn.connection.db!, context.orgId, days, false);
 
   return {
     tool: 'revenue_series',
-    summary: `Last ${days} days from daily rollups: ${totalOrders} orders, ${totalUnits} units sold. Week-over-week unit delta: ${
-      wowDelta === null ? 'n/a' : `${wowDelta > 0 ? '+' : ''}${wowDelta.toFixed(1)}%`
-    }.`,
-    facts: { totalUnits, totalOrders, weekOverWeekPct: wowDelta, seriesTail: series.slice(-14) },
+    summary: `Verified net booked order value over ${days} days: INR ${overview.summary.totalRevenue}. Unpriced orders: ${overview.monetaryCoverage.unpricedOrders}. This is not recognized revenue or cash.`,
+    facts: { bookedValue: overview.summary.totalRevenue, coverage: overview.monetaryCoverage, daily: overview.chartData.orderTrends },
   };
 }
 
 export async function toolTopProducts(context: ToolContext, days = 30, limit = 8): Promise<ToolResult> {
-  const series = await getDailySeries(context.orgId, days);
-  const byProduct = new Map<string, number>();
-  for (const p of series) byProduct.set(p.product, (byProduct.get(p.product) ?? 0) + p.units);
-  const top = [...byProduct.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
+  const conn = await dbConnect();
+  const window = overviewWindow(days);
+  const rows = await conn.connection.db!.collection('orders').aggregate<{ _id: string; name: string; units: number }>([
+    { $match: { orgId: context.orgId, date: { $gte: window.currentStart, $lte: window.today }, status: { $ne: 'canceled' } } },
+    { $unwind: '$products' }, { $group: { _id: { $ifNull: ['$products.productId', '$products.name'] }, name: { $first: '$products.name' }, units: { $sum: '$products.quantity' } } },
+    { $sort: { units: -1, _id: 1 } }, { $limit: limit },
+  ], { maxTimeMS: 8000 }).toArray();
+  const top = rows.map(row => [row.name, row.units] as const);
 
   return {
     tool: 'top_products',
@@ -276,6 +280,6 @@ export async function toolSchemeAnalytics(context: ToolContext): Promise<ToolRes
       facts: { totalIssued, totalRedeemed, schemes: data.slice(0, 5) },
     };
   } catch {
-    return { tool: 'scheme_analytics', summary: 'No scheme analytics available.', facts: {} };
+    return { tool: 'scheme_analytics', status: 'unavailable', summary: 'Scheme analytics could not be verified because the data tool failed.', facts: {} };
   }
 }

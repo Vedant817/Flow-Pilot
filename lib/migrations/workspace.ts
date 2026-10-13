@@ -8,6 +8,8 @@ export const TENANT_COLLECTIONS = [
   'email_reviews', 'inbound_order_drafts',
   'integration_credentials',
   'inventory_movements', 'inventory_reservations',
+  'shipments', 'return_authorizations', 'financial_credits',
+  'ai_source_controls',
 ] as const;
 
 export const MAX_ATOMIC_MIGRATION_RECORDS = 10_000;

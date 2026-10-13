@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                 return NextResponse.json({ error: `Invalid ${field}` }, { status: 400 });
             }
         }
-        if (data.quantity !== undefined || data.reservedQuantity !== undefined) {
+        if (data.quantity !== undefined || data.reservedQuantity !== undefined || data.quarantinedQuantity !== undefined) {
             return NextResponse.json({ error: 'Use an audited stock movement to change balances' }, { status: 400 });
         }
         if (!Number.isSafeInteger(data.expectedVersion) || data.expectedVersion < 0) {
@@ -111,7 +111,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         await dbConnect();
         const item = await Inventory.findOne({ _id: id, orgId: authCtx.orgId }).lean();
         if (!item) return NextResponse.json({ error: 'Inventory item not found' }, { status: 404 });
-        if (item.quantity !== 0 || (item.reservedQuantity ?? 0) !== 0 ||
+        if (item.quantity !== 0 || (item.reservedQuantity ?? 0) !== 0 || (item.quarantinedQuantity ?? 0) !== 0 ||
             await InventoryMovement.exists({ orgId: authCtx.orgId, productId: id })) {
             return NextResponse.json({ error: 'Stock or audit history exists; inventory items cannot be destructively deleted' }, { status: 409 });
         }

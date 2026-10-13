@@ -27,7 +27,7 @@ test('embedding initialization shares failures, retries, then caches success', a
 
 test('generator initialization shares failures and retries successfully', async () => {
   const tokenizer = Object.assign(jest.fn(() => ({})), {
-    applyChatTemplate: jest.fn(() => 'prompt'),
+    apply_chat_template: jest.fn(() => 'prompt'),
   });
   const loadTokenizer = AutoTokenizer.from_pretrained as jest.Mock;
   const loadModel = AutoModelForCausalLM.from_pretrained as jest.Mock;

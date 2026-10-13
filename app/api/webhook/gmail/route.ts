@@ -6,7 +6,6 @@ import { extractFeedbackDetails } from '@/lib/nlp/extract';
 import { hasExplicitNewOrderRequest, hasUsableOrderLines, hasExistingOrderChangeLanguage } from '@/lib/nlp/order-intent';
 import { parseNewOrder, parseOrderChanges } from '@/lib/nlp/email-orders';
 import { prepareConfirmedEmailOrder } from '@/lib/nlp/order-placement';
-import { applyOrderDelta } from '@/lib/analytics/rollup';
 import { ingestDocument } from '@/lib/ai/memory';
 import { Order } from '@/models/Order';
 import { Feedback } from '@/models/Feedback';
@@ -16,6 +15,7 @@ import { InboundOrderDraft } from '@/models/InboundOrderDraft';
 import connectToDatabase from '@/lib/mongodb';
 import { acquireLock, releaseLock } from '@/lib/distributed-lock';
 import { createGmailClient } from '@/lib/integrations/google-credentials';
+import { createInboundOrder } from '@/lib/orders/inbound';
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -327,42 +327,26 @@ export async function POST(req: NextRequest) {
                     console.log('Order already created from Gmail message:', gmailMessageId);
                     break;
                   }
-                  const newOrder = new Order({
-                    name: emailDetails.senderName || emailDetails.senderEmail,
-                    phone: '',
-                    email: emailDetails.senderEmail,
-                    orgId,
-                    products: prepared.products,
-                    date: prepared.date,
-                    time: prepared.time,
-                    placedAt: prepared.placedAt,
-                    orderedAt: prepared.placedAt,
-                    requestedDeliveryDate: prepared.requestedDeliveryDate,
-                    requestedDeliveryTime: prepared.requestedDeliveryTime,
-                    idempotencyKey,
-                    status: 'pending fulfillment',
-                    orderLink: '',
-                  });
                   try {
-                    await newOrder.save();
+                    await createInboundOrder({
+                      orgId, actorId: 'integration:gmail', messageId: gmailMessageId,
+                      name: emailDetails.senderName || emailDetails.senderEmail, email: emailDetails.senderEmail,
+                      products: prepared.products, placedAt: prepared.placedAt,
+                      requestedDeliveryDate: prepared.requestedDeliveryDate, requestedDeliveryTime: prepared.requestedDeliveryTime,
+                    });
                   } catch (error) {
-                    // Unique idempotencyKey index handles overlapping webhook deliveries.
                     if ((error as { code?: number }).code === 11000 && await Order.exists({ orgId, idempotencyKey })) break;
+                    if ((error as { status?: number }).status === 409) {
+                      await draft({
+                        ready: false, intent: true, evidence: [],
+                        products: orderDetails.products, date: orderDetails.date, time: orderDetails.time,
+                        reason: 'Catalog identity/pricing must be reconciled before confirmation',
+                      });
+                      break;
+                    }
                     throw error;
                   }
-                  await applyOrderDelta(orgId, newOrder.date, newOrder.products, 1).catch((e) =>
-                    console.error('Rollup delta failed:', e)
-                  );
-                  void ingestDocument(
-                    'order',
-                    String(newOrder._id),
-                    'Inbound email order',
-                    `Inbound email order for ${newOrder.products
-                      .map((p) => `${p.quantity}x ${p.name}`)
-                      .join(', ')} for ${newOrder.date}. Source: inbound email.`,
-                    { orgId }
-                  ).catch(() => undefined);
-                  console.log('New order saved:', newOrder._id);
+                  console.log('Canonical inbound order committed');
                 } else {
                   if (!orderDetails.ready && orderDetails.intent) await draft(orderDetails);
                   else await review(orderDetails.ready ? 'Invalid product lines' : orderDetails.reason);

@@ -19,9 +19,9 @@ export function hasExistingOrderChangeLanguage(subject: string, body: string): b
 
 /** Reject parser artefacts such as name='50' from a `50 x Rice` line. */
 export function hasUsableOrderLines(products: Array<{ name: string; quantity: number }>): boolean {
-  return products.length > 0 && products.every(
+  return products.length > 0 && products.length <= 50 && products.every(
     ({ name, quantity }) => /[A-Za-z\p{L}]{2}/u.test(name) &&
       !/^\s*\d+(?:\s*(?:x|pcs|bags|cartons?))?\s*$/i.test(name) &&
-      Number.isInteger(quantity) && quantity > 0
+      Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 100_000
   );
 }

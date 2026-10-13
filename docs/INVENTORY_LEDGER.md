@@ -31,10 +31,14 @@ prevents destructive item deletion.
 
 ## Remaining operational scope
 
-This is not a complete shipping/accounting system. Shipping documents, carriers,
-return authorization/inspection, financial credits, partial cancellation,
-automatic allocation, coupon reversal, scheduler certification and all ingestion
-channels on shared canonical order commands remain separate work.
+Manual shipment/tracking/delivery records and authorized partial return receipts
+are implemented. Damaged receipts enter quarantine; exact discounted credit
+memos are accounting records, not payment refunds. Use the order operations page
+for dispatch and returns; raw stock movements cannot bypass these transactions.
+
+Carrier API labels/webhooks, quarantine release/scrap, actual refund settlement,
+partial cancellation, automatic allocation, coupon reversal and scheduler
+certification remain separate work, detailed in the root `todo.md`.
 
 Older/email orders without canonical product IDs must be mapped/reconciled
 before allocation; the service rejects ambiguous name-only fulfillment.

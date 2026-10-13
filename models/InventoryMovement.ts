@@ -4,9 +4,11 @@ export interface IInventoryMovement extends Document {
   orgId: string;
   productId: string;
   orderId?: string;
-  kind: 'opening' | 'receipt' | 'adjustment' | 'reserve' | 'release' | 'fulfill' | 'return';
+  kind: 'opening' | 'receipt' | 'adjustment' | 'reserve' | 'release' | 'fulfill' | 'return' | 'return_damaged';
   quantityDelta: number;
   reservedDelta: number;
+  quarantinedDelta?: number;
+  units?: number;
   balanceAfter: { quantity: number; reservedQuantity: number };
   actorId: string;
   reason: string;
@@ -20,9 +22,11 @@ const MovementSchema = new Schema<IInventoryMovement>({
   orgId: { type: String, required: true, immutable: true },
   productId: { type: String, required: true, immutable: true },
   orderId: { type: String, immutable: true },
-  kind: { type: String, required: true, immutable: true, enum: ['opening', 'receipt', 'adjustment', 'reserve', 'release', 'fulfill', 'return'] },
+  kind: { type: String, required: true, immutable: true, enum: ['opening', 'receipt', 'adjustment', 'reserve', 'release', 'fulfill', 'return', 'return_damaged'] },
   quantityDelta: { type: Number, required: true, immutable: true, validate: Number.isSafeInteger },
   reservedDelta: { type: Number, required: true, immutable: true, validate: Number.isSafeInteger },
+  quarantinedDelta: { type: Number, default: 0, immutable: true, validate: Number.isSafeInteger },
+  units: { type: Number, immutable: true, validate: Number.isSafeInteger },
   balanceAfter: {
     quantity: { type: Number, required: true, min: 0, validate: Number.isSafeInteger },
     reservedQuantity: { type: Number, required: true, min: 0, validate: Number.isSafeInteger },

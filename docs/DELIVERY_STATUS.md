@@ -54,12 +54,16 @@ Implemented:
 - Audited stock movements, per-order reservations, derived quantity-aware
   fulfillment, atomic cancellation releases, guarded returns and stock-ledger UI.
   Metadata updates are version-fenced and cannot mutate stock balances.
+- Canonical order persistence is shared by web/Gmail/reviewed drafts; SKU
+  references, money snapshots, creation timeline and outbox commit together.
+- Manual shipments/delivery proof and two-person authorized partial return
+  receipts, damaged quarantine and exact discounted credit memos are implemented.
 
 Still required:
 
-- Automatic allocation, shipment documents/carriers, return authorization and
-  inspection, partial cancellation, financial credits and coupon reconciliation.
-- All creation channels and mutations on shared transactional commands/events.
+- Automatic allocation, carrier labels/webhooks, settlement/refunds, quarantine
+  disposition, partial cancellation and coupon reconciliation.
+- All amendments/cancellation/integration mutations on reconciled durable events.
 - Scheduler provisioning, queue monitoring/recovery UI, rebuild coordination.
 - Role-specific exception dashboard and onboarding.
 
@@ -74,6 +78,12 @@ Implemented:
 - Model initialization recovers from transient rejection while preserving
   single-flight loading. EWMA anomaly limits use prior observations, with
   prefix-invariance tests preventing look-ahead leakage.
+- Overview money uses original verified snapshots and posted credit memos with
+  explicit completeness/basis. Forecasts use chronological model selection,
+  calibration/held-out validation, empirical intervals and known-history bounds.
+- AI tools are policy-gated, operational facts are deterministic, model answers
+  have citation/redaction guards, revisions are pinned, generation is bounded
+  and cancelable, and private vector memory is opt-in with expiry/provenance.
 
 Still required:
 
@@ -120,7 +130,7 @@ working test Clerk organizations/users. Never claim browser/live-service checks
 when only source review or mocks were used. Four pre-existing skipped test
 placeholders are not acceptance evidence.
 
-Latest local gate: 36 suites, 213 tests passing; the real ONNX classifier passes
+Latest local gate before final landing: 45 suites, 246 tests passing; the real ONNX classifier passes
 8/8 smoke cases. TypeScript, production build and
 `git diff --check` passing. The build used a synthetic publishable Clerk key,
 not live service credentials.
@@ -154,3 +164,7 @@ Docker's client is installed, but the Docker Desktop Linux engine is unavailable
 (the named pipe does not exist). A disposable local replica set is needed for
 rollback/concurrency validation without touching the existing remote dataset.
 No authenticated browser or live Google certification is claimed.
+
+The detailed remaining implementation and acceptance requirements now live in
+the root [`todo.md`](../todo.md). The latest user instruction is to finish the
+current feature, land it on main and retain the rest as a technical backlog.

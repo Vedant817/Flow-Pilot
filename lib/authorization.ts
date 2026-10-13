@@ -13,6 +13,7 @@ export type Permission =
   | 'pricing:write'
   | 'promotions:write'
   | 'promotions:approve'
+  | 'returns:approve'
   | 'admin:operate';
 
 const ROLE_PERMISSIONS: Record<AppRole, ReadonlySet<Permission>> = {
@@ -22,12 +23,14 @@ const ROLE_PERMISSIONS: Record<AppRole, ReadonlySet<Permission>> = {
     'pricing:write',
     'promotions:write',
     'promotions:approve',
+    'returns:approve',
     'admin:operate',
   ]),
   finance: new Set([
     'pricing:write',
     'promotions:write',
     'promotions:approve',
+    'returns:approve',
   ]),
   commercial: new Set(['promotions:write']),
   inventory: new Set(['inventory:write']),

@@ -7,6 +7,8 @@ export interface IInventory extends Document {
     category: string;
     quantity: number;
     reservedQuantity?: number;
+    quarantinedQuantity?: number;
+    createdAt?: Date;
     price: number;
     stock_alert_level: number;
     warehouse_location: string;
@@ -19,6 +21,8 @@ const InventorySchema = new Schema<IInventory>({
     category: { type: String, required: true },
     quantity: { type: Number, required: true, min: 0, validate: Number.isSafeInteger },
     reservedQuantity: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
+    quarantinedQuantity: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
+    createdAt: { type: Date, default: Date.now, immutable: true },
     price: { type: Number, required: true },
     stock_alert_level: { type: Number, required: true },
     warehouse_location: { type: String, required: true },

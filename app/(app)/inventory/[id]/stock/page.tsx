@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import type { StockMovementKind } from '@/lib/inventory/ledger';
 
-type Stock = { name: string; quantity: number; reservedQuantity?: number };
+type Stock = { name: string; quantity: number; reservedQuantity?: number; quarantinedQuantity?: number };
 type Movement = {
   _id: string; kind: string; at: string; reason: string;
   quantityDelta: number; reservedDelta: number;
@@ -86,6 +86,7 @@ function StockLedger({ id }: { id: string }) {
     <a href="/inventory" className="text-sm underline">Back to inventory</a>
     <header><h1 className="text-2xl font-semibold">{stock.name} — stock ledger</h1>
       <p className="mt-2 text-sm">On hand: {stock.quantity} · Reserved: {reserved} · Available: {stock.quantity - reserved}</p>
+      <p className="text-sm">Quarantined: {stock.quarantinedQuantity ?? 0}. Receive returns through the order’s authorization workflow.</p>
     </header>
     <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-card p-5">
       <h2 className="font-semibold">Record a stock movement</h2>
@@ -93,7 +94,7 @@ function StockLedger({ id }: { id: string }) {
         <label className="space-y-1 text-sm">Movement
           <select value={kind} onChange={event => setKind(event.target.value as StockMovementKind)}
             className="block w-full rounded border border-border bg-background p-2">
-            {['receipt', 'adjustment', 'reserve', 'release', 'fulfill', 'return'].map(value =>
+            {['receipt', 'adjustment', 'reserve', 'release'].map(value =>
               <option key={value} value={value}>{value}</option>)}
           </select>
         </label>

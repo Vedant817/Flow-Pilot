@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { requirePermission, AuthorizationError } from '@/lib/auth';
 import { InboundOrderDraft } from '@/models/InboundOrderDraft';
-import { Order } from '@/models/Order';
-import { applyOrderDelta } from '@/lib/analytics/rollup';
+import { createInboundOrder } from '@/lib/orders/inbound';
 import { prepareConfirmedEmailOrder } from '@/lib/nlp/order-placement';
 
 class DraftConflict extends Error {}
@@ -58,17 +57,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const prepared = prepareConfirmedEmailOrder({ products, placedAt: draft.placedAt,
           requestedDeliveryDate: deliveryDate, requestedDeliveryTime: deliveryTime });
         if (!prepared.ok) throw new DraftConflict(prepared.reason);
-        const [order] = await Order.create([{
-          name: draft.senderName || draft.senderEmail, phone: '', email: draft.senderEmail,
-          orgId: ctx.orgId, products: prepared.products,
-          date: prepared.date, time: prepared.time, placedAt: prepared.placedAt,
-          orderedAt: prepared.placedAt,
-          requestedDeliveryDate: prepared.requestedDeliveryDate,
-          requestedDeliveryTime: prepared.requestedDeliveryTime,
-          status: 'pending fulfillment', orderLink: '',
-          idempotencyKey: `gmail:${draft.gmailMessageId}`,
-        }], { session });
-        await applyOrderDelta(ctx.orgId, order.date, order.products, 1, session);
+        const order = await createInboundOrder({
+          orgId: ctx.orgId, actorId: ctx.userId, messageId: draft.gmailMessageId,
+          name: draft.senderName || draft.senderEmail, email: draft.senderEmail,
+          products: prepared.products, placedAt: prepared.placedAt,
+          requestedDeliveryDate: prepared.requestedDeliveryDate, requestedDeliveryTime: prepared.requestedDeliveryTime,
+        }, session);
         const claimed = await InboundOrderDraft.updateOne(
           { _id: id, orgId: ctx.orgId, status: 'draft' },
           { $set: { status: 'confirmed', confirmedOrderId: String(order._id),
@@ -84,6 +78,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof DraftConflict) return NextResponse.json({ error: error.message }, { status: 409 });
+    if ((error as { status?: number })?.status === 409) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Catalog reconciliation required' }, { status: 409 });
+    }
     console.error('Could not handle inbound order draft:', error);
     return NextResponse.json({ error: 'Could not handle draft' }, { status: 500 });
   }

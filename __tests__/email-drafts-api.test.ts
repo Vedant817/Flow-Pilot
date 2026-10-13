@@ -4,7 +4,7 @@ import { PATCH } from '../app/api/email-drafts/[id]/route';
 import { requireWorkspace, requirePermission, AuthorizationError } from '../lib/auth';
 import { InboundOrderDraft } from '../models/InboundOrderDraft';
 import { Order } from '../models/Order';
-import { applyOrderDelta } from '../lib/analytics/rollup';
+import { createInboundOrder } from '../lib/orders/inbound';
 
 jest.mock('next/server', () => ({ NextResponse: {
   json: (body: unknown, init?: { status?: number }) => ({ status: init?.status ?? 200, body }),
@@ -19,6 +19,9 @@ jest.mock('../lib/auth', () => ({
 }));
 jest.mock('../lib/mongodb', () => ({ __esModule: true, default: jest.fn(async () => ({})) }));
 jest.mock('../lib/analytics/rollup', () => ({ applyOrderDelta: jest.fn(async () => undefined) }));
+jest.mock('../lib/orders/inbound', () => ({
+  createInboundOrder: jest.fn(async () => ({ _id: 'order-id' })),
+}));
 jest.mock('../models/InboundOrderDraft', () => ({ InboundOrderDraft: {
   find: jest.fn(() => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) })),
   findOne: jest.fn(() => ({ session: async () => ({
@@ -35,7 +38,6 @@ const auth = requireWorkspace as jest.Mock;
 const editAuth = requirePermission as jest.Mock;
 const draft = InboundOrderDraft as jest.Mocked<typeof InboundOrderDraft>;
 const order = Order as jest.Mocked<typeof Order>;
-const rollup = applyOrderDelta as jest.Mock;
 const id = '507f1f77bcf86cd799439011';
 
 describe('inbound draft API', () => {
@@ -74,11 +76,10 @@ describe('inbound draft API', () => {
       requestedDeliveryDate: '2026-10-05', requestedDeliveryTime: '10:00' }) } as NextRequest,
     { params: Promise.resolve({ id }) });
     expect(response.status).toBe(200);
-    expect(order.create).toHaveBeenCalledWith([expect.objectContaining({
-      date: '2026-09-26', time: '14:35', requestedDeliveryDate: '2026-10-05', requestedDeliveryTime: '10:00',
-      idempotencyKey: 'gmail:gmail-one',
-    })], expect.objectContaining({ session: expect.anything() }));
-    expect(rollup).toHaveBeenCalledTimes(1);
+    expect(createInboundOrder).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: 'default', actorId: 'clerk-1', messageId: 'gmail-one',
+      requestedDeliveryDate: '2026-10-05', requestedDeliveryTime: '10:00',
+    }), expect.anything());
     expect(draft.updateOne).toHaveBeenCalledWith(expect.objectContaining({ status: 'draft' }),
       expect.objectContaining({ $set: expect.objectContaining({ status: 'confirmed', confirmedOrderId: 'order-id' }) }),
       expect.objectContaining({ session: expect.anything() }));

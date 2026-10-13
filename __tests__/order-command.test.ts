@@ -25,11 +25,12 @@ jest.mock('../models/Coupon', () => ({ Coupon: {} }));
 jest.mock('../models/PromotionAudit', () => ({ PromotionAudit: {} }));
 jest.mock('../models/OutboxEvent', () => ({ OutboxEvent: { create: jest.fn() } }));
 jest.mock('../models/OrderEvent', () => ({ OrderEvent: { create: jest.fn() } }));
+jest.mock('../models/Inventory', () => ({ Inventory: { updateMany: jest.fn(async () => ({ matchedCount: 1 })) } }));
 jest.mock('../lib/inventory/commands', () => ({ releaseOrderReservations: jest.fn(async () => undefined) }));
 jest.mock('../lib/promotions/pricing', () => ({
   priceOrder: jest.fn(async () => ({
     orderValueMinor: 1000, priceSource: 'inventory',
-    productsWithSnapshot: [{ name: 'Widget', quantity: 1, unitPriceMinor: 1000 }],
+    productsWithSnapshot: [{ productId: '507f1f77bcf86cd799439011', name: 'Widget', quantity: 1, unitPriceMinor: 1000, lineValueMinor: 1000 }],
   })),
   computeDiscount: jest.fn(),
   parseOrderDateToIST: jest.fn(),

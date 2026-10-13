@@ -22,11 +22,11 @@ interface AnalyticsData {
     summary: {
         totalOrders: number;
         totalRevenue: number;
-        averageOrderValue: number;
+        averageOrderValue: number | null;
         totalProducts: number;
         totalCustomers: number;
-        revenueGrowth: number;
-        orderGrowth: number;
+        revenueGrowth: number | null;
+        orderGrowth: number | null;
         topSellingProduct: string;
     };
     recentActivity: {
@@ -36,11 +36,13 @@ interface AnalyticsData {
         lowStockItems: number;
     };
     performanceMetrics: {
-        conversionRate: number;
-        fulfillmentRate: number;
-        averageProcessingTime: string;
-        customerSatisfaction: number;
+        conversionRate: number | null;
+        fulfillmentRate: number | null;
+        averageProcessingTime: string | null;
+        customerSatisfaction: number | null;
     };
+    monetaryCoverage?: { complete: boolean; pricedOrders: number; unpricedOrders: number; basis: string; invalidCreditRecords: number };
+    freshness?: { generatedAt: string; timeZone: string };
     chartData: {
         orderTrends: {
             dates: string[];
@@ -72,7 +74,7 @@ const StatCard = memo(({
     value: string | number;
     subtitle?: string;
     icon: React.ReactNode;
-    growth?: number;
+    growth?: number | null;
     color?: string;
     loading?: boolean;
 }) => (
@@ -91,7 +93,7 @@ const StatCard = memo(({
                             <p className="text-3xl font-bold text-slate-900">{typeof value === 'number' ? value.toLocaleString() : value}</p>
                             {(subtitle || growth !== undefined) && (
                                 <div className="flex items-center gap-2 mt-1">
-                                    {growth !== undefined && (
+                                    {typeof growth === 'number' && (
                                         <span className={`inline-flex items-center gap-1 text-xs font-medium ${
                                             growth >= 0 ? 'text-green-600' : 'text-red-600'
                                         }`}>
@@ -251,6 +253,14 @@ export default function AnalyticsPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             <div className="p-6">
+                {data?.monetaryCoverage && <div role={data.monetaryCoverage.complete ? 'note' : 'alert'}
+                    className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-slate-800">
+                    <p>{data.monetaryCoverage.basis}.</p>
+                    <p>Verified priced orders: {data.monetaryCoverage.pricedOrders}; unpriced orders excluded: {data.monetaryCoverage.unpricedOrders};
+                        invalid credits excluded: {data.monetaryCoverage.invalidCreditRecords}.</p>
+                    {!data.monetaryCoverage.complete && <p>These monetary totals are incomplete verified subtotals, not full company revenue.</p>}
+                    {data.freshness && <p>Generated {new Date(data.freshness.generatedAt).toLocaleString()} · {data.freshness.timeZone}</p>}
+                </div>}
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -313,7 +323,7 @@ export default function AnalyticsPage() {
                         {/* Key Metrics */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <StatCard
-                                title="Total Revenue"
+                                title="Net Booked Value"
                                 value={data?.summary.totalRevenue ? `₹${data.summary.totalRevenue.toLocaleString()}` : '₹0'}
                                 growth={data?.summary.revenueGrowth}
                                 subtitle="vs last period"
@@ -340,7 +350,7 @@ export default function AnalyticsPage() {
                             />
                             <StatCard
                                 title="Avg Order Value"
-                                value={data?.summary.averageOrderValue ? `₹${data.summary.averageOrderValue}` : '₹0'}
+                                value={data?.summary.averageOrderValue != null ? `₹${data.summary.averageOrderValue.toFixed(2)}` : 'Unavailable'}
                                 subtitle="per order"
                                 icon={<TrendingUp className="w-6 h-6" />}
                                 color="bg-orange-50 text-orange-600"
@@ -427,7 +437,7 @@ export default function AnalyticsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <StatCard
                                 title="Conversion Rate"
-                                value={`${data?.performanceMetrics.conversionRate || 0}%`}
+                                value={data?.performanceMetrics.conversionRate == null ? 'Unavailable' : `${data.performanceMetrics.conversionRate}%`}
                                 subtitle="visitor to customer"
                                 icon={<TrendingUp className="w-6 h-6" />}
                                 color="bg-blue-50 text-blue-600"
@@ -435,7 +445,7 @@ export default function AnalyticsPage() {
                             />
                             <StatCard
                                 title="Fulfillment Rate"
-                                value={`${data?.performanceMetrics.fulfillmentRate || 0}%`}
+                                value={data?.performanceMetrics.fulfillmentRate == null ? 'Unavailable' : `${data.performanceMetrics.fulfillmentRate.toFixed(1)}%`}
                                 subtitle="orders completed"
                                 icon={<CheckCircle2 className="w-6 h-6" />}
                                 color="bg-green-50 text-green-600"
@@ -451,7 +461,7 @@ export default function AnalyticsPage() {
                             />
                             <StatCard
                                 title="Customer Rating"
-                                value={data?.performanceMetrics.customerSatisfaction || 0}
+                                value={data?.performanceMetrics.customerSatisfaction ?? 'Unavailable'}
                                 subtitle="satisfaction score"
                                 icon={<Star className="w-6 h-6" />}
                                 color="bg-yellow-50 text-yellow-600"
@@ -463,13 +473,13 @@ export default function AnalyticsPage() {
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <DollarSign className="w-5 h-5 text-green-600" />
-                                    Revenue Trends
+                                    Booked Value Trends
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <SimpleChart 
                                     data={data?.chartData.orderTrends.revenue || []}
-                                    title="Daily Revenue (₹)"
+                                    title="Daily Net Booked Value (₹)"
                                     loading={loading}
                                 />
                             </CardContent>
@@ -511,7 +521,7 @@ export default function AnalyticsPage() {
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Star className="w-5 h-5 text-yellow-600" />
-                                    Top Spenders
+                                    Top Booked Customers
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>

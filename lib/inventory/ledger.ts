@@ -1,4 +1,4 @@
-export type StockMovementKind = 'receipt' | 'adjustment' | 'reserve' | 'release' | 'fulfill' | 'return';
+export type StockMovementKind = 'receipt' | 'adjustment' | 'reserve' | 'release' | 'fulfill' | 'return' | 'return_damaged';
 export type StockBalance = { quantity: number; reservedQuantity: number };
 export type StockPlan = StockBalance & { quantityDelta: number; reservedDelta: number };
 
@@ -17,6 +17,7 @@ export function planStockMovement(balance: StockBalance, kind: StockMovementKind
   let reservedDelta = 0;
   switch (kind) {
     case 'receipt': case 'return': quantityDelta = units; break;
+    case 'return_damaged': break;
     case 'adjustment': quantityDelta = units; break;
     case 'reserve':
       if (quantity - reservedQuantity < units) throw new StockConflict('Insufficient available stock');

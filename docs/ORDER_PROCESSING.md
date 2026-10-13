@@ -66,7 +66,8 @@ leases, and retry behavior. They do not prove real MongoDB transaction rollback
 or scheduler execution. Run fault-injection tests on a disposable replica set
 before production, especially crashes between projection and event completion.
 
-This outbox currently covers the authenticated order-creation API. Gmail order
-ingestion, updates/deletions, rollup rebuild coordination, and inventory
-reservation events still require migration to the same command/event model.
+Canonical creation now covers the authenticated API, Gmail ingestion and
+reviewed email drafts. Each uses SKU/money snapshots, initial timeline and
+outbox persistence in the same transaction. Updates, rollup rebuild coordination,
+and inventory/integration event propagation still need reconciliation work.
 Do not treat the whole order lifecycle or the eight-week roadmap as complete.

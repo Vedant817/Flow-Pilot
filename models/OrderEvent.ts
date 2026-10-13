@@ -4,7 +4,7 @@ interface IOrderEvent extends Document {
   orgId: string;
   orderId: string;
   actorId: string;
-  type: 'created' | 'status.changed';
+  type: 'created' | 'status.changed' | 'shipment.created' | 'shipment.delivered' | 'return.requested' | 'return.authorized' | 'return.rejected' | 'return.received';
   fromStatus?: string;
   toStatus: string;
   reason?: string;
@@ -16,7 +16,7 @@ const OrderEventSchema = new Schema<IOrderEvent>(
     orgId: { type: String, required: true, immutable: true },
     orderId: { type: String, required: true, immutable: true },
     actorId: { type: String, required: true, immutable: true },
-    type: { type: String, enum: ['created', 'status.changed'], required: true, immutable: true },
+    type: { type: String, enum: ['created', 'status.changed', 'shipment.created', 'shipment.delivered', 'return.requested', 'return.authorized', 'return.rejected', 'return.received'], required: true, immutable: true },
     fromStatus: { type: String, immutable: true },
     toStatus: { type: String, required: true, immutable: true },
     reason: { type: String, maxlength: 500, immutable: true },

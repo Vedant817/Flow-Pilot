@@ -247,7 +247,10 @@ export default function CopilotPage() {
                         <LoaderCircle size={14} className="animate-spin" /> Loading local model and retrieving context…
                       </span>
                     ) : (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                        img: () => null,
+                        a: ({ children }) => <span>{children}</span>,
+                      }}>{message.content}</ReactMarkdown>
                     )}
                   </div>
                   {message.sources && message.sources.length > 0 && (

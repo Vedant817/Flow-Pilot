@@ -3,12 +3,16 @@
 import { POST } from '../app/api/webhook/gmail/route';
 import { NextRequest } from 'next/server';
 import { google } from 'googleapis';
-import { applyOrderDelta } from '../lib/analytics/rollup';
+import { createInboundOrder } from '../lib/orders/inbound';
 import { classifyEmailWithScores as classifyEmail } from '../lib/nlp/classify';
 import { Order } from '../models/Order';
 import { EmailReview } from '../models/EmailReview';
 import { InboundOrderDraft } from '../models/InboundOrderDraft';
 import connectToDatabase from '../lib/mongodb';
+
+jest.mock('../lib/orders/inbound', () => ({
+  createInboundOrder: jest.fn(async () => ({ _id: 'mock-id' })),
+}));
 
 jest.mock('../lib/integrations/google-credentials', () => ({
   createGmailClient: jest.fn(async () => google.gmail({ version: 'v1' })),
@@ -218,12 +222,9 @@ describe('Gmail Webhook API', () => {
     expect(classifyEmail).toHaveBeenCalledWith(
       'Please process our purchase order:\nBasmati Rice 5kg x 50\nDelivery: 2026-10-05 at 10:00', 'Purchase Order PO-2214'
     );
-    expect(applyOrderDelta).toHaveBeenCalledWith(
-      'org_test',
-      expect.any(String),
-      expect.any(Array),
-      1
-    );
+    expect(createInboundOrder).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: 'org_test', actorId: 'integration:gmail', products: expect.any(Array),
+    }));
     expect(mockedGmail.users.history.list).toHaveBeenCalledWith(
       expect.objectContaining({
         startHistoryId: '100',
@@ -302,7 +303,7 @@ describe('Gmail Webhook API', () => {
     expect(response.status).toBe(500);
     expect(updateOne).not.toHaveBeenCalled();
     expect(classifyEmail).not.toHaveBeenCalled();
-    expect(applyOrderDelta).not.toHaveBeenCalled();
+    expect(createInboundOrder).not.toHaveBeenCalled();
   });
 
   it('rejects webhook requests without valid authentication', async () => {
