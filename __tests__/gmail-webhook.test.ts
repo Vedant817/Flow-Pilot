@@ -10,6 +10,10 @@ import { EmailReview } from '../models/EmailReview';
 import { InboundOrderDraft } from '../models/InboundOrderDraft';
 import connectToDatabase from '../lib/mongodb';
 
+jest.mock('../lib/integrations/google-credentials', () => ({
+  createGmailClient: jest.fn(async () => google.gmail({ version: 'v1' })),
+}));
+
 jest.mock('../lib/nlp/classify', () => ({
   classifyEmailWithScores: jest.fn(),
 }));
@@ -461,7 +465,7 @@ describe('Gmail Webhook API', () => {
 
     // Assert
     expect(response.status).toBe(500);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error processing webhook:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error processing Gmail webhook', 'Error');
     // Ensure the failed message is not classified or persisted.
     expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('Email classified as:'));
   });

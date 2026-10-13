@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
 import { AuthorizationError, requireMaintenanceAccess } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
-
-const oAuth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
-oAuth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
-
-const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
+import { createGmailClient } from '@/lib/integrations/google-credentials';
 
 export async function POST(req: NextRequest) {
+  let auth: Awaited<ReturnType<typeof requireMaintenanceAccess>>;
   try {
-    await requireMaintenanceAccess(req);
+    auth = await requireMaintenanceAccess(req);
   } catch (error) {
     const status = error instanceof AuthorizationError ? error.status : 401;
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unauthorized' }, { status });
@@ -30,7 +19,11 @@ export async function POST(req: NextRequest) {
   if (!orgId) {
     return NextResponse.json({ error: 'GMAIL_ORG_ID is not configured' }, { status: 503 });
   }
+  if (auth.orgId !== orgId) {
+    return NextResponse.json({ error: 'This workspace does not own the configured Gmail ingestion channel' }, { status: 403 });
+  }
   try {
+    const gmail = await createGmailClient(orgId);
     const response = await gmail.users.watch({
       userId: 'me',
       requestBody: {
@@ -61,10 +54,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('Gmail watch response:', response.data);
     return NextResponse.json({ success: true, data: response.data });
   } catch (error) {
-    console.error('Error setting up Gmail watch:', error);
-    return NextResponse.json({ success: false, error: error as string }, { status: 500 });
+    console.error('Error setting up Gmail watch', error instanceof Error ? error.name : 'UnknownError');
+    return NextResponse.json({ success: false, error: 'Could not configure Gmail watch' }, { status: 500 });
   }
 }

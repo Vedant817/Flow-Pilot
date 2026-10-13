@@ -15,18 +15,13 @@ import { EmailReview } from '@/models/EmailReview';
 import { InboundOrderDraft } from '@/models/InboundOrderDraft';
 import connectToDatabase from '@/lib/mongodb';
 import { acquireLock, releaseLock } from '@/lib/distributed-lock';
+import { createGmailClient } from '@/lib/integrations/google-credentials';
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI
 );
-
-oAuth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
-
-const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
 interface GmailCursor {
   _id: string;
@@ -94,7 +89,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-async function getEmailDetails(messageId: string) {
+async function getEmailDetails(messageId: string, gmail: gmail_v1.Gmail) {
   const emailResponse = await gmail.users.messages.get({
     userId: 'me',
     id: messageId,
@@ -234,6 +229,7 @@ export async function POST(req: NextRequest) {
       return jsonResponse({ ok: true, duplicate: true });
     }
 
+    const gmail = await createGmailClient(orgId);
     const historyItems = [];
     let pageToken: string | undefined;
     do {
@@ -256,7 +252,7 @@ export async function POST(req: NextRequest) {
               processedMessageIds.add(sourceMessageId);
               const processedId = `gmail:${orgId}:${sourceMessageId}`;
               if (await processedCol.findOne({ _id: processedId })) continue;
-              const emailDetails = await getEmailDetails(sourceMessageId);
+              const emailDetails = await getEmailDetails(sourceMessageId, gmail);
               if (emailDetails && emailDetails.body) {
                 if (!emailDetails.senderEmail.includes('@')) {
                   try {
@@ -391,7 +387,7 @@ export async function POST(req: NextRequest) {
                   });
                   try { await newFeedback.save(); }
                   catch (error) { if (!isDuplicateKeyError(error)) throw error; }
-                  console.log('New feedback saved:', newFeedback);
+                  console.log('New feedback saved');
                 }
                 break;
               }
@@ -442,7 +438,8 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (e) {
-    console.error('Error processing webhook:', e);
+    // Google client errors can carry bearer/refresh credentials in request config.
+    console.error('Error processing Gmail webhook', e instanceof Error ? e.name : 'UnknownError');
     return jsonResponse({ error: 'Webhook processing failed' }, 500);
   } finally {
     if (lockAcquired) {

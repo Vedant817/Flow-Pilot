@@ -6,6 +6,7 @@ export const TENANT_COLLECTIONS = [
   'scheme_daily_stats', 'scheme_issue_jobs', 'order_events', 'outbox_events',
   'semantic_memory', 'projection_receipts', 'daily_sales_rollup',
   'email_reviews', 'inbound_order_drafts',
+  'integration_credentials',
 ] as const;
 
 export const MAX_ATOMIC_MIGRATION_RECORDS = 10_000;
@@ -33,6 +34,9 @@ export async function planWorkspaceMigration(
 ): Promise<{ total: number; counts: Record<string, number> }> {
   validateWorkspaceMove(targetOrgId, sourceOrgId);
   const filter = sourceWorkspaceFilter(sourceOrgId);
+  if (await db.collection('integration_credentials').findOne(filter)) {
+    throw new Error('Disconnect and reconnect encrypted integrations separately before workspace migration');
+  }
   if (await db.collection('outbox_events').findOne({
     ...filter, status: { $ne: 'completed' },
   })) {
@@ -77,6 +81,9 @@ export async function applyWorkspaceMigration(
   await session.withTransaction(async () => {
     // Reset on transaction retries; no progress is reported before commit.
     migrated = 0;
+    if (await db.collection('integration_credentials').findOne(filter, { session })) {
+      throw new Error('Encrypted integration credentials cannot be relabeled to another workspace');
+    }
     if (await db.collection('outbox_events').findOne({
       ...filter, status: { $ne: 'completed' },
     }, { session })) {

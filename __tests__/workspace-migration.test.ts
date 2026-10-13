@@ -13,7 +13,9 @@ describe('workspace migration safety', () => {
   });
 
   it('requires unfinished outbox work to be reconciled before moving a tenant', async () => {
-    const db = { collection: () => ({ findOne: async () => ({ status: 'pending' }) }) };
+    const db = { collection: (name: string) => ({
+      findOne: async () => name === 'outbox_events' ? { status: 'pending' } : null,
+    }) };
     await expect(planWorkspaceMigration(db as never, 'target', 'source'))
       .rejects.toThrow('Drain and reconcile');
   });
