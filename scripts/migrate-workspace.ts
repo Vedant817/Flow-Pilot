@@ -1,18 +1,8 @@
 import mongoose from 'mongoose';
-
-const TENANT_COLLECTIONS = [
-  'orders',
-  'inventory',
-  'feedback',
-  'errors',
-  'conversations',
-  'promotion_schemes',
-  'coupons',
-  'customer_signals',
-  'promotion_audits',
-  'scheme_daily_stats',
-  'scheme_issue_jobs',
-] as const;
+import {
+  applyWorkspaceMigration,
+  planWorkspaceMigration,
+} from '../lib/migrations/workspace';
 
 function argumentValue(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -44,40 +34,29 @@ async function main(): Promise<void> {
     const db = mongoose.connection.db;
     if (!db) throw new Error('MongoDB connection is unavailable');
 
-    const filter = sourceOrgId
-      ? { orgId: sourceOrgId }
-      : {
-          $or: [
-            { orgId: { $exists: false } },
-            { orgId: null },
-            { orgId: '' },
-          ],
-        };
-
     console.log(
       `${apply ? 'Applying' : 'Dry run for'} workspace migration to "${targetOrgId}"` +
         (sourceOrgId ? ` from "${sourceOrgId}"` : ' for records without a workspace')
     );
 
-    let total = 0;
-    for (const collectionName of TENANT_COLLECTIONS) {
-      const collection = db.collection(collectionName);
-      const count = await collection.countDocuments(filter);
-      total += count;
-      if (apply && count > 0) {
-        const result = await collection.updateMany(filter, {
-          $set: { orgId: targetOrgId },
-        });
-        console.log(`${collectionName}: ${result.modifiedCount}/${count} migrated`);
-      } else {
-        console.log(`${collectionName}: ${count} ${apply ? 'migrated' : 'would migrate'}`);
+    const plan = await planWorkspaceMigration(db, targetOrgId, sourceOrgId);
+    for (const [collectionName, count] of Object.entries(plan.counts)) {
+      console.log(`${collectionName}: ${count} would migrate`);
+    }
+    let migrated = 0;
+    if (apply && plan.total > 0) {
+      const session = await mongoose.startSession();
+      try {
+        migrated = await applyWorkspaceMigration(db, session, targetOrgId, sourceOrgId);
+      } finally {
+        await session.endSession();
       }
     }
 
     console.log(
       apply
-        ? `Migration complete: ${total} matching records processed.`
-        : `Dry run complete: ${total} records would migrate. Re-run with --apply after review.`
+        ? `Migration committed atomically: ${migrated} records processed. Rebuild projections for the target workspace before use.`
+        : `Dry run complete: ${plan.total} records would migrate. Take a backup and pause tenant writes before --apply.`
     );
   } finally {
     await mongoose.disconnect();

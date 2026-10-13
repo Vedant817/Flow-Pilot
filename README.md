@@ -128,6 +128,18 @@ npm run data:migrate-workspace -- --from=default --apply
 ```
 
 Both forms migrate into `DEFAULT_ORG_ID`; use `--to=org_...` to override it.
+The migration now requires an empty target workspace and transaction-capable
+MongoDB. All ownership changes commit together or abort; occupied targets are
+rejected rather than silently merging tenants. The atomic tool is limited to
+10,000 source records including projections; larger tenants require a rehearsed
+resumable migration.
+Back up the database, pause tenant writes, and drain/reconcile all source outbox
+events during migration. Rebuild rollups
+and semantic memory for the target afterward; cached projections and integration
+configuration are not automatically reassigned. Source semantic-memory and
+rollup projections are removed in the same transaction rather than relabeled
+with invalid deterministic IDs. The shared `global` knowledge corpus is reserved
+and cannot be a migration source or target.
 
 ## Public Demo Warehouse
 
