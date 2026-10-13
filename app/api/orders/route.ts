@@ -9,6 +9,8 @@ import { OutboxEvent } from '@/models/OutboxEvent';
 import { OrderEvent } from '@/models/OrderEvent';
 import { assertOrderTransition, OrderTransitionError } from '@/lib/orders/lifecycle';
 import { businessDateTime } from '@/lib/orders/time';
+import { releaseOrderReservations } from '@/lib/inventory/commands';
+import { StockConflict } from '@/lib/inventory/ledger';
 import { rateLimitAsync } from '@/lib/rate-limit';
 import { AuthorizationError, requirePermission, requireWorkspace } from '@/lib/auth';
 import { addWorkspaceScope } from '@/lib/authorization';
@@ -487,6 +489,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
     assertOrderTransition(expectedStatus, status, reason);
+    if (status === 'fulfilled' || status === 'partially fulfilled') {
+      return NextResponse.json({ error: 'Fulfillment status is derived from audited per-line stock fulfillment' }, { status: 409 });
+    }
 
     await dbConnect();
     const session = await mongoose.startSession();
@@ -504,6 +509,9 @@ export async function PUT(req: NextRequest) {
             exists ? 'Order changed since you loaded it; refresh before retrying' : 'Order not found',
             exists ? 409 : 404
           );
+        }
+        if (status === 'canceled') {
+          await releaseOrderReservations(authCtx.orgId, orderId, authCtx.userId, reason.trim(), session);
         }
         await OrderEvent.create(
           [{
@@ -532,6 +540,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     if (error instanceof OrderTransitionError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof StockConflict) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     console.error('Error updating order status:', error);

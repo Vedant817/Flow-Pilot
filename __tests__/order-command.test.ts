@@ -25,6 +25,7 @@ jest.mock('../models/Coupon', () => ({ Coupon: {} }));
 jest.mock('../models/PromotionAudit', () => ({ PromotionAudit: {} }));
 jest.mock('../models/OutboxEvent', () => ({ OutboxEvent: { create: jest.fn() } }));
 jest.mock('../models/OrderEvent', () => ({ OrderEvent: { create: jest.fn() } }));
+jest.mock('../lib/inventory/commands', () => ({ releaseOrderReservations: jest.fn(async () => undefined) }));
 jest.mock('../lib/promotions/pricing', () => ({
   priceOrder: jest.fn(async () => ({
     orderValueMinor: 1000, priceSource: 'inventory',
@@ -135,7 +136,7 @@ describe('transactional order command', () => {
     (Order.findOneAndUpdate as jest.Mock).mockResolvedValue(null);
     (Order.exists as jest.Mock).mockReturnValue({ session: async () => ({ _id: 'order-1' }) });
     expect((await PUT(request({
-      orderId: 'order-1', expectedStatus: 'pending fulfillment', status: 'fulfilled',
+      orderId: 'order-1', expectedStatus: 'pending', status: 'pending fulfillment',
     }))).status).toBe(409);
     expect(timelineCreate).not.toHaveBeenCalled();
   });

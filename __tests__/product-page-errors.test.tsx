@@ -78,7 +78,7 @@ test.each([undefined, 'https://example.test/api/'])('order status uses the confi
   if (base) process.env.NEXT_PUBLIC_API_URL = base;
   get.mockResolvedValue({ data: {
     data: [{
-      _id: 'order12345678', status: 'pending fulfillment', products: [],
+      _id: 'order12345678', status: 'pending', products: [],
       name: 'Test customer', email: 'test@example.test', date: '2026-01-01', time: '12:00',
     }],
     pagination: { total: 100, totalPages: 12 },
@@ -89,15 +89,15 @@ test.each([undefined, 'https://example.test/api/'])('order status uses the confi
   expect(screen.getByText('Completed on current page')).toBeInTheDocument();
   expect(screen.getByText('Pending on current page')).toBeInTheDocument();
   expect(screen.getByText('Partial on current page')).toBeInTheDocument();
-  const statusSelect = screen.getAllByRole('combobox').find((element) => (element as HTMLSelectElement).value === 'pending fulfillment');
+  const statusSelect = screen.getAllByRole('combobox').find((element) => (element as HTMLSelectElement).value === 'pending');
   expect(statusSelect).toBeDefined();
-  fireEvent.change(statusSelect!, { target: { value: 'fulfilled' } });
+  fireEvent.change(statusSelect!, { target: { value: 'pending fulfillment' } });
   await waitFor(() => expect(put).toHaveBeenCalledWith(
     `${base ? base.replace(/\/$/, '') : '/api'}/orders`,
-    { orderId: 'order12345678', status: 'fulfilled', expectedStatus: 'pending fulfillment' },
+    { orderId: 'order12345678', status: 'pending fulfillment', expectedStatus: 'pending' },
   ));
   expect(await screen.findByRole('alert')).toHaveTextContent('Failed to update order status');
-  expect(statusSelect).toHaveValue('pending fulfillment');
+  expect(statusSelect).toHaveValue('pending');
 });
 
 test('cancellation requires an explicit reason and confirmation', async () => {

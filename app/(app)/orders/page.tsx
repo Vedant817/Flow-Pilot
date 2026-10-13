@@ -182,12 +182,14 @@ const OrderCard = memo(({ order, onStatusChange, onShowDetails }: OrderRowProps)
                                 disabled={updatingStatus || allowedOrderTransitions(order.status).length === 0}
                             >
                                 <option value={order.status}>{order.status}</option>
-                                {allowedOrderTransitions(order.status).map(status => (
+                                {allowedOrderTransitions(order.status)
+                                    .filter(status => !['fulfilled', 'partially fulfilled'].includes(status)).map(status => (
                                     <option key={status} value={status}>{status}</option>
                                 ))}
                             </select>
                         </div>
                     </div>
+                    <p className="mt-2 text-xs text-slate-600">Fulfillment is recorded per product in the <a href="/inventory" className="underline">stock ledger</a>.</p>
                     {cancelRequested && (
                         <form className="mt-3 space-y-2" onSubmit={event => {
                             event.preventDefault();

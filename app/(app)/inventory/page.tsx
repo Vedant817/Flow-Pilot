@@ -177,6 +177,10 @@ const InventoryRow = memo(({ item, onEdit, onDelete }: InventoryRowProps) => {
             </div>
 
             <div className="flex items-center gap-2 justify-end">
+              <a href={`/inventory/${item._id}/stock`}
+                className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                Stock ledger
+              </a>
               <button
                 onClick={handleEdit}
                 className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center"

@@ -80,6 +80,9 @@ export async function ensureQueryIndexes(db: Db): Promise<void> {
     db.collection('inbound_order_drafts').createIndex({ orgId: 1, status: 1, createdAt: -1 }),
     db.collection('integration_credentials').createIndex({ orgId: 1, provider: 1 }, { unique: true }),
     db.collection('oauth_states').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection('inventory_movements').createIndex({ orgId: 1, eventKey: 1 }, { unique: true }),
+    db.collection('inventory_movements').createIndex({ orgId: 1, productId: 1, at: -1, _id: -1 }),
+    db.collection('inventory_reservations').createIndex({ orgId: 1, orderId: 1, productId: 1 }, { unique: true }),
   ];
 
   const results = await Promise.allSettled(ops);

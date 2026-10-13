@@ -9,6 +9,7 @@ interface ProductFormData {
     quantity: number;
     warehouse_location: string;
     stock_alert_level: number;
+    __v?: number;
 }
 
 interface EditProductPopupProps {
@@ -131,8 +132,12 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
         try {
             const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
             const url = apiBase ? `${apiBase}/inventory/${productId}` : `/api/inventory/${productId}`;
-            await axios.put(url, formData);
-            onProductUpdated(productId, formData);
+            const response = await axios.put<ProductFormData>(url, {
+                name: formData.name, category: formData.category, price: formData.price,
+                warehouse_location: formData.warehouse_location, stock_alert_level: formData.stock_alert_level,
+                expectedVersion: formData.__v ?? 0,
+            });
+            onProductUpdated(productId, response.data);
             onClose();
         } catch (err) {
             console.error('Error updating product:', err);
@@ -292,13 +297,18 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({ isOpen, onClose, pr
                                         type="number"
                                         name="quantity"
                                         value={formData.quantity}
-                                        onChange={handleChange}
+                                        readOnly
+                                        aria-label="Current on-hand quantity"
                                         className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
                                             errors.quantity ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'
                                         }`}
                                         min="0"
                                         placeholder="0"
                                     />
+                                    <p className="text-sm text-slate-600">
+                                        Stock is read-only here. <a href={`/inventory/${productId}/stock`}
+                                            className="font-medium text-blue-700 underline">Record an audited stock movement</a>.
+                                    </p>
                                     {errors.quantity && (
                                         <p className="text-sm text-red-600 flex items-center gap-1">
                                             <AlertTriangle className="w-3 h-3" />

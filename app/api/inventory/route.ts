@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Inventory } from "@/models/Inventory";
 import dbConnect from "@/lib/mongodb";
 import { AuthorizationError, requirePermission, requireWorkspace } from "@/lib/auth";
+import mongoose from 'mongoose';
+import { InventoryMovement } from '@/models/InventoryMovement';
 
 const MAX_PAGE_SIZE = 100;
 const ESCAPE_RX = /[.*+?^${}()|[\]\\]/g;
@@ -81,14 +83,14 @@ export async function POST(request: NextRequest) {
         if (!Number.isFinite(price) || price <= 0) {
             return NextResponse.json({ error: "Price must be a positive number" }, { status: 400 });
         }
-        if (!Number.isFinite(quantity) || quantity < 0) {
-            return NextResponse.json({ error: "Quantity must be a non-negative number" }, { status: 400 });
+        if (!Number.isSafeInteger(quantity) || quantity < 0) {
+            return NextResponse.json({ error: "Quantity must be a non-negative integer" }, { status: 400 });
         }
         if (!Number.isFinite(alertLevel) || alertLevel < 0) {
             return NextResponse.json({ error: "stock_alert_level must be a non-negative number" }, { status: 400 });
         }
         await dbConnect();
-        const created = await Inventory.create({
+        const item = {
             orgId: authCtx.orgId,
             name: String(data.name).trim().slice(0, 120),
             category: String(data.category).trim().slice(0, 80),
@@ -96,7 +98,25 @@ export async function POST(request: NextRequest) {
             quantity,
             warehouse_location: String(data.warehouse_location).trim().slice(0, 120),
             stock_alert_level: alertLevel,
-        });
+        };
+        const session = await mongoose.startSession();
+        const result: { item?: mongoose.HydratedDocument<import('@/models/Inventory').IInventory> } = {};
+        try {
+            await session.withTransaction(async () => {
+                const [created] = await Inventory.create([item], { session });
+                await InventoryMovement.create([{
+                    orgId: authCtx.orgId, productId: String(created._id), kind: 'opening',
+                    quantityDelta: quantity, reservedDelta: 0,
+                    balanceAfter: { quantity, reservedQuantity: 0 },
+                    actorId: authCtx.userId, reason: 'Catalog item opening balance',
+                    eventKey: `opening:${created._id}`, requestHash: 'opening-v1',
+                    provenance: 'catalog_opening',
+                }], { session });
+                result.item = created;
+            });
+        } finally { await session.endSession(); }
+        const created = result.item;
+        if (!created) throw new Error('Inventory creation did not commit');
         return NextResponse.json(created, { status: 201 });
     } catch (error) {
         if (error instanceof AuthorizationError) {

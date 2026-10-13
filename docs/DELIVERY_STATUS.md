@@ -25,13 +25,16 @@ Implemented:
   protection, outbox-drain checks and projection invalidation.
 - Primary-branch trained email classifier and draft/review workflows reconciled
   with strict workspace/permission checks and authenticated Gmail ingestion.
+- Administrator-only Google OAuth with expiring browser/user/workspace-bound,
+  single-use state and workspace-bound encrypted refresh credentials; watch and
+  ingestion use the configured workspace's credential.
 
 Still required:
 
 - Exhaustive route and AI tool permission matrix, schema validation everywhere,
   and adversarial integration tests against real MongoDB.
-- Large-tenant resumable migration rehearsal, Google OAuth state binding,
-  Gmail history expiry recovery, issuance checkpoint/reconciliation.
+- Large-tenant resumable migration rehearsal, Gmail history expiry recovery,
+  issuance checkpoint/reconciliation and live Google integration certification.
 - Existing deployment index migration and removal of all unsupported claims.
 
 ## Phase 1 — Operational source of truth
@@ -46,12 +49,14 @@ Implemented:
   rather than silently becoming the current time.
 - Durable order-created outbox, leased workers, bounded retries, and transactional
   rollup consumer receipts.
+- Audited stock movements, per-order reservations, derived quantity-aware
+  fulfillment, atomic cancellation releases, guarded returns and stock-ledger UI.
+  Metadata updates are version-fenced and cannot mutate stock balances.
 
 Still required:
 
-- Inventory movement/reservation ledger and allocation.
-- Quantity-aware fulfillment, shipment, returns, partial cancellation, and
-  inventory/coupon reconciliation.
+- Automatic allocation, shipment documents/carriers, return authorization and
+  inspection, partial cancellation, financial credits and coupon reconciliation.
 - All creation channels and mutations on shared transactional commands/events.
 - Scheduler provisioning, queue monitoring/recovery UI, rebuild coordination.
 - Role-specific exception dashboard and onboarding.
@@ -113,7 +118,7 @@ working test Clerk organizations/users. Never claim browser/live-service checks
 when only source review or mocks were used. Four pre-existing skipped test
 placeholders are not acceptance evidence.
 
-Latest local gate: 29 suites, 169 tests passing; the real ONNX classifier passes
+Latest local gate: 36 suites, 212 tests passing; the real ONNX classifier passes
 8/8 smoke cases. TypeScript, production build and
 `git diff --check` passing. The build used a synthetic publishable Clerk key,
 not live service credentials.
@@ -132,3 +137,12 @@ and CI results are reported in the thread, not inferred from this document.
 The independent final review was unavailable due to provider usage limits.
 Manual integration review and the execution gates above were performed; that
 does not certify live-service behavior or all eight-week implementation phases.
+
+Subsequent Google and inventory slices received read-only QA in the existing
+shared checkout (no new branches/worktrees). The primary local checkout was
+fast-forwarded to the reconciled main; its untracked documents were preserved.
+
+Current real-service blocker: no MongoDB/Clerk/Google credentials are configured.
+Docker's client is installed, but the Docker Desktop Linux engine is unavailable
+(the named pipe does not exist). No disposable replica-set rollback/concurrency
+or authenticated browser certification is claimed.
