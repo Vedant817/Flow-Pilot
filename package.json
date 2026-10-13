@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test -- --runInBand && npm run build",
+    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:classifier && npm run build",
     "test": "jest",
+    "test:classifier": "tsx scripts/verify-email-classifier.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "data:import:uci": "tsx scripts/import-uci-retail.ts",
+    "data:import:daily": "tsx scripts/import-daily-public.ts",
     "data:migrate-workspace": "tsx scripts/migrate-workspace.ts"
   },
   "dependencies": {

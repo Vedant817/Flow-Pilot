@@ -28,16 +28,17 @@ export default function CustomerFeedback({ data }: CustomerFeedbackProps) {
         let feedbackData = data;
         
         if (!feedbackData) {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/get-feedback`);
+          const response = await fetch(`/api/feedback`);
           
           if (!response.ok) {
             throw new Error('Failed to fetch feedback data');
           }
           
-          const apiData = await response.json();
+          const apiData = await response.json() as { success?: boolean; data?: { email?: string; review?: string; type: string }[]; feedbacks?: { email?: string; review?: string; type: string }[] };
+          const list = apiData.data ?? apiData.feedbacks ?? [];
           
           // Transform API data to match our component's expected format
-          feedbackData = apiData.feedbacks.map((item: { email?: string; review?: string; type: string }) => ({
+          feedbackData = list.map((item: { email?: string; review?: string; type: string }) => ({
             name: item.email || 'Anonymous',
             feedback: item.review || '',
             sentiment: item.type === 'good' ? 'positive' : 

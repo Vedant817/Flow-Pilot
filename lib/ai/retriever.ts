@@ -18,7 +18,9 @@ export async function hybridRetrieve(
   query: string,
   opts: { orgId: string; limit?: number; kinds?: MemoryKind[] }
 ): Promise<RetrievedDoc[]> {
-  const limit = opts.limit ?? 6;
+  const limit = Math.max(1, Math.min(50, Math.floor(opts.limit ?? 6)));
+  const orgId = opts.orgId;
+  if (!orgId) throw new Error('Workspace is required for retrieval');
   await bootstrapKnowledge();
 
   const conn = await dbConnect();
@@ -43,14 +45,27 @@ export async function hybridRetrieve(
           },
         },
       },
-      { $project: { kind: 1, title: 1, text: 1, score: { $meta: 'vectorSearchScore' } } },
+      { $project: { kind: 1, title: 1, text: 1, orgId: 1, score: { $meta: 'vectorSearchScore' } } },
     ];
-    tier1 = (await col.aggregate(pipeline, { maxTimeMS: 3000 }).toArray()).map((d) => ({
+    interface VectorRow {
+      _id: unknown;
+      kind: MemoryKind;
+      title: string;
+      text: string;
+      orgId?: unknown;
+      score?: unknown;
+    }
+    const raw = (await col.aggregate(pipeline, { maxTimeMS: 3000 }).toArray()) as unknown as VectorRow[];
+    tier1 = raw
+      .filter((d) => {
+        return typeof d.orgId === 'string' && allowedWorkspaces.includes(d.orgId);
+      })
+      .map((d) => ({
       _id: String(d._id),
       kind: d.kind,
       title: d.title,
       text: d.text,
-      score: d.score ?? 0,
+      score: typeof d.score === 'number' ? d.score : 0,
     }));
     usedVectorSearch = tier1.length > 0;
   } catch {

@@ -124,7 +124,7 @@ interface EnhancedDeadstockItem extends DeadstockItem {
 export const deadstockAnalysisExamples = {
     fetchDeadstockAnalysis: async () => {
         try {
-            const response = await fetch('/api/analytics/deadstacks');
+            const response = await fetch('/api/analytics/deadstocks');
             const data: DeadstockAnalysisResponse = await response.json();
             return data;
         } catch (error) {
@@ -140,7 +140,7 @@ export const deadstockAnalysisExamples = {
         if (minValue) params.append('minValue', minValue.toString());
 
         try {
-            const response = await fetch(`/api/analytics/deadstacks?${params.toString()}`);
+            const response = await fetch(`/api/analytics/deadstocks?${params.toString()}`);
             const data: DeadstockAnalysisResponse = await response.json();
             return data;
         } catch (error) {
@@ -166,7 +166,7 @@ export const deadstockAnalysisExamples = {
 
     applyDeadstockActions: async (request: DeadstockActionRequest) => {
         try {
-            const response = await fetch('/api/analytics/deadstacks', {
+            const response = await fetch('/api/analytics/deadstocks', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -266,6 +266,6 @@ export const integrationPatterns = {
 
 console.log('Deadstock Analysis API documentation and examples loaded successfully!');
 console.log('Available endpoints:');
-console.log('1. GET /api/analytics/deadstacks - Basic deadstock analysis');
+console.log('1. GET /api/analytics/deadstocks - Basic deadstock analysis');
 console.log('2. GET /api/analytics/deadstock-report - Comprehensive deadstock report');
-console.log('3. POST /api/analytics/deadstacks - Apply deadstock actions');
+console.log('3. POST /api/analytics/deadstocks - Apply deadstock actions');

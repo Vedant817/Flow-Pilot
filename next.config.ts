@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
     'onnxruntime-node',
     'onnxruntime-common',
   ],
+  // Bundle the local classifier weights with the Gmail webhook function.
+  outputFileTracingIncludes: {
+    '/api/webhook/gmail': ['./lib/nlp/model/**/*'],
+  },
   turbopack: {
     root: process.cwd(),
   },

@@ -1,13 +1,18 @@
 import { NextRequest } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { google, gmail_v1 } from 'googleapis';
-import { classifyEmail } from '@/lib/nlp/classify';
-import { extractOrderDetails, extractFeedbackDetails } from '@/lib/nlp/extract';
+import { classifyEmailWithScores } from '@/lib/nlp/classify';
+import { extractFeedbackDetails } from '@/lib/nlp/extract';
+import { hasExplicitNewOrderRequest, hasUsableOrderLines, hasExistingOrderChangeLanguage } from '@/lib/nlp/order-intent';
+import { parseNewOrder, parseOrderChanges } from '@/lib/nlp/email-orders';
+import { prepareConfirmedEmailOrder } from '@/lib/nlp/order-placement';
 import { applyOrderDelta } from '@/lib/analytics/rollup';
 import { ingestDocument } from '@/lib/ai/memory';
 import { Order } from '@/models/Order';
 import { Feedback } from '@/models/Feedback';
 import { Error as ErrorModel } from '@/models/Error';
+import { EmailReview } from '@/models/EmailReview';
+import { InboundOrderDraft } from '@/models/InboundOrderDraft';
 import connectToDatabase from '@/lib/mongodb';
 import { acquireLock, releaseLock } from '@/lib/distributed-lock';
 
@@ -99,8 +104,8 @@ async function getEmailDetails(messageId: string) {
     const fromHeader = headers?.find((h) => h.name === 'From');
     const subjectHeader = headers?.find((h) => h.name === 'Subject');
 
-    const fromRaw = fromHeader ? fromHeader.value : 'Unknown Sender';
-    const subject = subjectHeader ? subjectHeader.value : 'No Subject';
+    const fromRaw = fromHeader?.value ?? '';
+    const subject = subjectHeader?.value ?? '';
 
     let senderName = '';
     let senderEmail = '';
@@ -155,7 +160,9 @@ async function getEmailDetails(messageId: string) {
         : decodedBody;
     }
 
-  return { from: fromRaw, senderName, senderEmail, subject, body };
+  const receivedAt = Number(emailResponse.data.internalDate);
+  return { from: fromRaw, senderName, senderEmail, subject, body,
+    placedAt: Number.isFinite(receivedAt) && receivedAt > 0 ? new Date(receivedAt) : new Date() };
 }
 
 
@@ -195,7 +202,7 @@ export async function POST(req: NextRequest) {
     const conn = await connectToDatabase();
     const decoded = Buffer.from(message.data, 'base64').toString('utf-8');
     const decodedMessage = JSON.parse(decoded);
-    if (typeof decodedMessage?.historyId !== 'string') {
+    if (typeof decodedMessage?.historyId !== 'string' || !/^\d+$/.test(decodedMessage.historyId)) {
       return jsonResponse({ error: 'Invalid Gmail notification' }, 400);
     }
 
@@ -205,6 +212,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cursorCollection = conn.connection.db!.collection<GmailCursor>('integration_cursors');
+    const processedCol = conn.connection.db!.collection<{ _id: string; at?: Date }>('processed_gmail_messages');
     const cursorId = `gmail:${orgId}`;
     const cursor = await cursorCollection.findOne({ _id: cursorId });
     if (!cursor?.historyId) {
@@ -221,6 +229,9 @@ export async function POST(req: NextRequest) {
         { upsert: true }
       );
       return jsonResponse({ ok: true, initialized: true });
+    }
+    if (BigInt(decodedMessage.historyId) <= BigInt(cursor.historyId)) {
+      return jsonResponse({ ok: true, duplicate: true });
     }
 
     const historyItems = [];
@@ -243,6 +254,8 @@ export async function POST(req: NextRequest) {
             const sourceMessageId = messageAdded.message?.id;
             if (sourceMessageId && !processedMessageIds.has(sourceMessageId)) {
               processedMessageIds.add(sourceMessageId);
+              const processedId = `gmail:${orgId}:${sourceMessageId}`;
+              if (await processedCol.findOne({ _id: processedId })) continue;
               const emailDetails = await getEmailDetails(sourceMessageId);
               if (emailDetails && emailDetails.body) {
                 if (!emailDetails.senderEmail.includes('@')) {
@@ -260,102 +273,163 @@ export async function POST(req: NextRequest) {
                   }
                   continue;
                 }
-                const classification = await classifyEmail(emailDetails.body);
+                const gmailMessageId = sourceMessageId;
+                const { label: classification, confidence, scores } = await classifyEmailWithScores(
+                  emailDetails.body, emailDetails.subject
+                );
                 console.log(`Email classified as: ${classification}`);
+                console.log(`Classification detail: confidence=${confidence.toFixed(3)} scores=${JSON.stringify(scores)}`);
+                const review = async (reason: string) => {
+                  await EmailReview.updateOne(
+                    { orgId, gmailMessageId },
+                    { $setOnInsert: {
+                      orgId, gmailMessageId, senderEmail: emailDetails.senderEmail,
+                      subject: emailDetails.subject, body: emailDetails.body.slice(0, 6000),
+                      classification, reason,
+                      proposedChanges: classification === 'update_order' ? parseOrderChanges(emailDetails.body) : [],
+                      status: 'open', createdAt: new Date(),
+                    } }, { upsert: true }
+                  );
+                };
+                const draft = async (parsed: ReturnType<typeof parseNewOrder> & { ready: false }) => {
+                  if (await Order.exists({ orgId, idempotencyKey: `gmail:${gmailMessageId}` })) return;
+                  await InboundOrderDraft.updateOne(
+                    { orgId, gmailMessageId },
+                    { $setOnInsert: {
+                      orgId, gmailMessageId, senderEmail: emailDetails.senderEmail,
+                      senderName: emailDetails.senderName || emailDetails.senderEmail,
+                      subject: emailDetails.subject, body: emailDetails.body.slice(0, 6000),
+                      placedAt: emailDetails.placedAt, products: parsed.products,
+                      ...(parsed.date ? { requestedDeliveryDate: parsed.date.value } : {}),
+                      ...(parsed.time ? { requestedDeliveryTime: parsed.time.value } : {}),
+                      reason: parsed.reason, status: 'draft', createdAt: new Date(),
+                    } }, { upsert: true }
+                  );
+                };
 
                 switch (classification) {
                   case 'new_order': {
-                    const orderDetails = await extractOrderDetails(emailDetails.body);
-                    if (orderDetails) {
-                      const newOrder = new Order({
-                        ...orderDetails,
-                        name: orderDetails.name || emailDetails.senderName || 'Email customer',
-                        orgId,
-                        email: emailDetails.senderEmail,
-                        status: 'pending',
-                        orderLink: '',
-                        idempotencyKey: `gmail:${sourceMessageId}`,
-                      });
-                      try {
-                        await newOrder.save();
-                        await applyOrderDelta(orgId, newOrder.date, newOrder.products, 1).catch((e) =>
-                          console.error('Rollup delta failed:', e)
-                        );
-                        void ingestDocument(
-                          'order',
-                          String(newOrder._id),
-                          'Inbound email order',
-                          `Inbound email order for ${newOrder.products
-                            .map((p) => `${p.quantity}x ${p.name}`)
-                            .join(', ')} for ${newOrder.date}. Source: inbound email.`,
-                          { orgId }
-                        ).catch(() => undefined);
-                        console.log('New order saved:', newOrder._id);
-                      } catch (error) {
-                        if (!isDuplicateKeyError(error)) throw error;
-                      }
+                    if (hasExistingOrderChangeLanguage(emailDetails.subject, emailDetails.body)) {
+                      await review('Possible existing-order change classified as new');
+                      break;
                     }
+                const orderDetails = parseNewOrder(emailDetails.subject ?? '', emailDetails.body);
+                if (orderDetails.ready && hasUsableOrderLines(orderDetails.products) &&
+                    hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
+                  const prepared = prepareConfirmedEmailOrder({
+                    products: orderDetails.products, placedAt: emailDetails.placedAt,
+                    requestedDeliveryDate: orderDetails.date.value,
+                    requestedDeliveryTime: orderDetails.time.value,
+                  });
+                  if (!prepared.ok) { await review(prepared.reason); break; }
+                  const idempotencyKey = `gmail:${gmailMessageId}`;
+                  if (await InboundOrderDraft.exists({ orgId, gmailMessageId })) {
+                    console.log('Existing draft must be confirmed by a reviewer:', gmailMessageId);
                     break;
                   }
-                  case 'update_order': {
-                    const updatedOrderDetails = await extractOrderDetails(emailDetails.body);
-                    if (updatedOrderDetails) {
-                      const existingOrder = await Order.findOne({
-                        orgId,
-                        email: emailDetails.senderEmail,
-                        status: 'pending',
-                      }).sort({ date: -1, time: -1 });
-                      if (existingOrder) {
-                        existingOrder.set(updatedOrderDetails);
-                        await existingOrder.save();
-                        console.log('Order updated:', existingOrder);
-                      } else {
-                        console.log('No pending order found to update for:', emailDetails.senderEmail);
-                      }
-                    }
+                  if (await Order.exists({ orgId, idempotencyKey })) {
+                    console.log('Order already created from Gmail message:', gmailMessageId);
                     break;
                   }
-                  case 'feedback': {
-                    const feedbackDetails = await extractFeedbackDetails(emailDetails.body);
-                    if (feedbackDetails) {
-                      const newFeedback = new Feedback({
-                        ...feedbackDetails,
-                        orgId,
-                        sourceMessageId,
-                        email: emailDetails.senderEmail,
-                      });
-                      try {
-                        await newFeedback.save();
-                        console.log('New feedback saved:', newFeedback);
-                      } catch (error) {
-                        if (!isDuplicateKeyError(error)) throw error;
-                      }
-                    }
-                    break;
+                  const newOrder = new Order({
+                    name: emailDetails.senderName || emailDetails.senderEmail,
+                    phone: '',
+                    email: emailDetails.senderEmail,
+                    orgId,
+                    products: prepared.products,
+                    date: prepared.date,
+                    time: prepared.time,
+                    placedAt: prepared.placedAt,
+                    orderedAt: prepared.placedAt,
+                    requestedDeliveryDate: prepared.requestedDeliveryDate,
+                    requestedDeliveryTime: prepared.requestedDeliveryTime,
+                    idempotencyKey,
+                    status: 'pending fulfillment',
+                    orderLink: '',
+                  });
+                  try {
+                    await newOrder.save();
+                  } catch (error) {
+                    // Unique idempotencyKey index handles overlapping webhook deliveries.
+                    if ((error as { code?: number }).code === 11000 && await Order.exists({ orgId, idempotencyKey })) break;
+                    throw error;
                   }
-                  default: {
-                    const newError = new ErrorModel({
-                      orgId,
-                      sourceMessageId,
-                      errorMessage: 'Unclassified inbound email',
-                      type: 'Customer',
-                      severity: 'low',
-                      timestamp: new Date(),
-                    });
-                    try {
-                      await newError.save();
-                      console.log('Unclassified email logged as error.');
-                    } catch (error) {
-                      if (!isDuplicateKeyError(error)) throw error;
-                    }
-                    break;
-                  }
+                  await applyOrderDelta(orgId, newOrder.date, newOrder.products, 1).catch((e) =>
+                    console.error('Rollup delta failed:', e)
+                  );
+                  void ingestDocument(
+                    'order',
+                    String(newOrder._id),
+                    'Inbound email order',
+                    `Inbound email order for ${newOrder.products
+                      .map((p) => `${p.quantity}x ${p.name}`)
+                      .join(', ')} for ${newOrder.date}. Source: inbound email.`,
+                    { orgId }
+                  ).catch(() => undefined);
+                  console.log('New order saved:', newOrder._id);
+                } else {
+                  if (!orderDetails.ready && orderDetails.intent) await draft(orderDetails);
+                  else await review(orderDetails.ready ? 'Invalid product lines' : orderDetails.reason);
                 }
+                break;
+              }
+              case 'update_order': {
+                // extractOrderDetails produces default dates/times and a *partial* product list.
+                // Applying it with .set() can overwrite the entire original order. Until a
+                // validated change parser exists, route amendments/cancellations for review.
+                await review('order change requires verification');
+                break;
+              }
+              case 'feedback': {
+                const feedbackDetails = await extractFeedbackDetails(emailDetails.body);
+                if (feedbackDetails) {
+                  const newFeedback = new Feedback({
+                    ...feedbackDetails,
+                    email: emailDetails.senderEmail,
+                    orgId,
+                    sourceMessageId,
+                  });
+                  try { await newFeedback.save(); }
+                  catch (error) { if (!isDuplicateKeyError(error)) throw error; }
+                  console.log('New feedback saved:', newFeedback);
+                }
+                break;
+              }
+              default: {
+                if (hasExistingOrderChangeLanguage(emailDetails.subject ?? '', emailDetails.body)) {
+                  await review('Possible existing-order change classified as other');
+                  break;
+                }
+                if (hasExplicitNewOrderRequest(emailDetails.subject ?? '', emailDetails.body)) {
+                  const parsed = parseNewOrder(emailDetails.subject ?? '', emailDetails.body);
+                  if (!parsed.ready && parsed.intent) await draft(parsed);
+                  else await review('Potential order classified as other');
+                  break;
+                }
+                const newError = new ErrorModel({
+                  errorMessage: 'Unclassified inbound email',
+                  type: 'Customer',
+                  severity: 'low',
+                  timestamp: new Date(),
+                  orgId,
+                  sourceMessageId,
+                });
+                try { await newError.save(); }
+                catch (error) { if (!isDuplicateKeyError(error)) throw error; }
+                console.log('Unclassified email logged as error.');
+                break;
               }
             }
-          }
+              }
+              await processedCol.updateOne(
+                { _id: processedId },
+                { $setOnInsert: { at: new Date() } },
+                { upsert: true }
+              );
+            }
         }
       }
+    }
     }
 
     await cursorCollection.updateOne(

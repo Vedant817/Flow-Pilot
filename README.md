@@ -33,6 +33,10 @@ Gmail / Web / Operator
           │                              ├── query-pattern indexes
           │                              └── incremental sales rollup
           │
+          ├── Inbound email path ── classify intent ── parse evidence ──┬── validated order
+          │        (subject + cleaned body)      (typed parser)          ├── confirmable draft
+          │                                                             └── human review queue
+          │
           ├── Intelligence path ── Rollups ── Forecast / EWMA / RFM
           │
           └── Copilot path
@@ -62,14 +66,26 @@ Gmail / Web / Operator
 
 MongoDB remains the operational source of truth because orders are document-shaped and transactional access dominates. The analytical read model avoids introducing ClickHouse operational overhead at the current scale. A future CDC sink can mirror the same rollup events into ClickHouse without changing route contracts.
 
+## Inbound Email Orders
+
+The Gmail webhook (`/api/webhook/gmail`) classifies each message as `new_order`, `update_order`, `feedback`, or `other` using the subject plus quote/signature-stripped body, and logs per-mail scores for drift review. Classification is an intent hint only — **no order is created or changed on a label alone**:
+
+- A new order is created only with explicit purchase wording, parseable product lines with usable names and quantities, and an explicit valid delivery date and time. Each Gmail message maps to one order via a `gmail:<messageId>` idempotency key.
+- Clear purchase intent with missing details becomes an **inbound order draft** (`/email-drafts`) carrying the original message, placement timestamp, and editable product suggestions. A reviewer corrects the lines, enters the delivery slot, and confirms; confirmation validates again and atomically creates the order and resolves the draft.
+- Amendments and cancellations are **never applied from email alone**. They become typed change proposals (`set_quantity`, `remove_product`, `reschedule`, `cancel_order`) in the **review queue** (`/email-reviews`), where a reviewer selects the pending order and applies a verified change. Order, review state, and rollup update together in one MongoDB transaction.
+- New `Order` documents record `placedAt` separately from `requestedDeliveryDate`/`requestedDeliveryTime`, so a missing delivery slot is never silently stored as today at noon. The webhook tenant comes from `GMAIL_ORG_ID` (fails closed when unset); production also requires `GMAIL_WEBHOOK_SECRET`.
+
+See `docs/EMAIL_ORDER_REVIEW.md` for the operating details.
+
 ## Local Models
 
 Default models:
 
 - Generator: `HuggingFaceTB/SmolLM2-360M-Instruct` (`q4`)
 - Embeddings/router: `Xenova/all-MiniLM-L6-v2` (`q8`, 384 dimensions)
+- Email intent classifier: SetFit-tuned MiniLM encoder (`q8` ONNX, committed under `lib/nlp/model/`) plus a logistic-regression head (`lib/nlp/model/head.json`)
 
-No Gemini, OpenAI, or hosted LLM inference API is used. Model weights are downloaded from Hugging Face and inference executes in-process through `onnxruntime-node`.
+No Gemini, OpenAI, or hosted LLM inference API is used. Generator and router weights are downloaded from Hugging Face and inference executes in-process through `onnxruntime-node`. The email classifier encoder is committed to the repo so the webhook does not depend on a weight download; a hosted decision model (Laya) was evaluated locally and rejected — it scored lower on the author-held comparison set and would have added a Python service for no accuracy gain.
 
 Override models with:
 
@@ -98,6 +114,7 @@ DEFAULT_ORG_ID=org_...
 ADMIN_SECRET=replace-with-a-long-random-value
 
 # Optional Gmail ingestion
+GMAIL_ORG_ID=your-clerk-organization-id
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=...

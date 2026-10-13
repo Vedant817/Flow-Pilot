@@ -33,4 +33,6 @@ const InventorySchema = new Schema<IInventory>({
     next();
 });
 
+InventorySchema.index({ orgId: 1, name: 1 });
+
 export const Inventory: Model<IInventory> = mongoose.models.Inventory || mongoose.model<IInventory>('Inventory', InventorySchema);

@@ -6,7 +6,8 @@ const MODEL_ID = process.env.AI_EMBED_MODEL || 'Xenova/all-MiniLM-L6-v2';
 if (process.env.NODE_ENV === 'production') {
   env.cacheDir = '/tmp/flowpilot-hf-cache';
 }
-env.allowLocalModels = false;
+// NOTE: do NOT set env.allowLocalModels = false here — it is process-global
+// and would break lib/nlp/classify, which loads a committed local encoder.
 
 interface EmbedderCache {
   promise: Promise<Embedder> | null;

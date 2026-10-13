@@ -19,6 +19,9 @@ export interface IOrder extends Document {
     date: string;
     time: string;
     orderedAt?: Date;
+    placedAt?: Date;
+    requestedDeliveryDate?: string;
+    requestedDeliveryTime?: string;
     products: Product[];
     status: string;
     orderLink: string;
@@ -60,6 +63,9 @@ const OrderSchema = new Schema<IOrder>({
     date: { type: String, required: true },
     time: { type: String, required: true },
     orderedAt: { type: Date },
+    placedAt: { type: Date },
+    requestedDeliveryDate: { type: String },
+    requestedDeliveryTime: { type: String },
     products: { type: [ProductSchema], required: true },
     status: { type: String, required: true },
     orderLink: { type: String, default: '' },
@@ -90,5 +96,7 @@ OrderSchema.pre('validate', function () {
         this.emailNormalized = this.email.toLowerCase().trim();
     }
 });
+
+OrderSchema.index({ orgId: 1, date: -1 });
 
 export const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);

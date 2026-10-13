@@ -23,6 +23,8 @@ Implemented:
   and fail-closed ingestion lock acquisition.
 - Atomic bounded workspace migration with empty-target preflight, reserved-global
   protection, outbox-drain checks and projection invalidation.
+- Primary-branch trained email classifier and draft/review workflows reconciled
+  with strict workspace/permission checks and authenticated Gmail ingestion.
 
 Still required:
 
@@ -111,17 +113,22 @@ working test Clerk organizations/users. Never claim browser/live-service checks
 when only source review or mocks were used. Four pre-existing skipped test
 placeholders are not acceptance evidence.
 
-Latest local gate: 20 suites, 112 tests passing; TypeScript, production build and
+Latest local gate: 29 suites, 169 tests passing; the real ONNX classifier passes
+8/8 smoke cases. TypeScript, production build and
 `git diff --check` passing. The build used a synthetic publishable Clerk key,
 not live service credentials.
-Repository-wide lint reports 237 problems (218 errors, 19 warnings). GitHub CI
+Repository-wide lint reports 240 problems (217 errors, 23 warnings). GitHub CI
 has not been run for these unpublished changes.
 
 ## Integration status
 
 The primary checkout's `main` and this thread's `main` diverged independently.
-The primary includes trained email classification and draft/review workflows;
-this thread includes transactional/security and accessibility work. A merge
-attempt encountered widespread conflicts and was aborted, preserving both
-histories. No primary-checkout update, remote publication or managed-checkout
-deletion has been performed. Reconcile the features before landing and cleanup.
+Their independent root-directory relocations were reconciled against their
+common application baseline, preserving both histories. The candidate retains
+primary trained email classification, drafts/reviews and visual navigation
+alongside transactional/security and accessibility work. Final remote landing
+and CI results are reported in the thread, not inferred from this document.
+
+The independent final review was unavailable due to provider usage limits.
+Manual integration review and the execution gates above were performed; that
+does not certify live-service behavior or all eight-week implementation phases.

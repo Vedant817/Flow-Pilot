@@ -33,5 +33,8 @@ export default defineConfig([
     'checkpoints/**',
     'coverage/**',
     'next-env.d.ts',
+    '.data/**',
+    '.delta/**',
+    'attachments/**',
   ]),
 ]);

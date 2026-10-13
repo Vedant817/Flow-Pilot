@@ -20,6 +20,9 @@ export interface OrderDetails {
     email: string;
     date: string;
     time: string;
+    placedAt?: string;
+    requestedDeliveryDate?: string;
+    requestedDeliveryTime?: string;
     products: Product[];
     status: string;
     orderLink: string;

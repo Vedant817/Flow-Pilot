@@ -45,6 +45,26 @@ test('navigation link closes the drawer', () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
+test.each([
+  ['Email Drafts', '/email-drafts'],
+  ['Email Reviews', '/email-reviews'],
+])('email navigation %s is available in the drawer and palette', (label, href) => {
+  render(<AppShell><span>Unique page content</span></AppShell>);
+  expect(screen.getAllByText('Unique page content')).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+  const drawer = screen.getByRole('dialog', { name: 'Navigation' });
+  const link = within(drawer).getByRole('link', { name: label });
+  expect(link).toHaveAttribute('href', href);
+  fireEvent.click(link);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+  const input = screen.getByRole('combobox', { name: 'Search commands' });
+  fireEvent.change(input, { target: { value: label } });
+  expect(screen.getByRole('option', { name: label })).toHaveAttribute('aria-selected', 'true');
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(mockPush).toHaveBeenCalledWith(href);
+});
+
 test('palette exposes selected commands, contains focus and restores focus', () => {
   render(<AppShell>Content</AppShell>);
   const opener = screen.getByRole('button', { name: /Jump to/ });

@@ -139,8 +139,8 @@ export async function POST(request: NextRequest) {
             errorMessage: errorMessage.trim(),
             type: type,
             severity: severity.toLowerCase(),
-            timestamp: new Date()
-        });
+            timestamp: new Date(),
+        } as any);
 
         const savedError = await newError.save();
 

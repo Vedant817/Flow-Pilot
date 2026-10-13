@@ -5,6 +5,7 @@ export const TENANT_COLLECTIONS = [
   'promotion_schemes', 'coupons', 'customer_signals', 'promotion_audits',
   'scheme_daily_stats', 'scheme_issue_jobs', 'order_events', 'outbox_events',
   'semantic_memory', 'projection_receipts', 'daily_sales_rollup',
+  'email_reviews', 'inbound_order_drafts',
 ] as const;
 
 export const MAX_ATOMIC_MIGRATION_RECORDS = 10_000;

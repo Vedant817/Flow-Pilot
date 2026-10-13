@@ -200,11 +200,33 @@ export default function OrderTrackingPage() {
             setLoading(true);
             const response = await fetch(`/api/track-order/${encodeURIComponent(String(orderId))}`, { signal });
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch order data');
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                // Most commonly a Clerk sign-in redirect returning HTML.
+                const text = await response.text().catch(() => '');
+                if (text.trimStart().startsWith('<') || response.status === 401 || response.status === 403) {
+                    throw new Error('This tracking link requires no sign-in, but the server returned a sign-in page. Please try again or contact support.');
+                }
+                throw new Error(`Unexpected server response (status ${response.status}). Please try again later.`);
             }
 
-            const data = await response.json();
+            if (!response.ok) {
+                let message = 'Failed to fetch order data';
+                try {
+                    const errBody = await response.json() as { error?: string };
+                    if (errBody?.error) message = errBody.error;
+                } catch {
+                    // keep default message when error body is not JSON
+                }
+                throw new Error(message);
+            }
+
+            let data: Order;
+            try {
+                data = await response.json();
+            } catch {
+                throw new Error('Invalid server response. Please try again later.');
+            }
             setOrder(data);
             setError(null);
         } catch (err) {
@@ -230,7 +252,7 @@ export default function OrderTrackingPage() {
     }, [orderId, fetchOrderData]);
 
     const loadingView = useMemo(() => (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-full">
             <div className="bg-white rounded-2xl p-12 shadow-2xl border border-slate-200 text-center max-w-md w-full mx-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                     <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -242,7 +264,7 @@ export default function OrderTrackingPage() {
     ), []);
 
     const errorView = useMemo(() => error && (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-red-50 to-pink-50 flex items-center justify-center w-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-red-50 to-pink-50 flex items-center justify-center w-full">
             <div className="bg-white rounded-2xl p-12 shadow-2xl border border-red-200 text-center max-w-md w-full mx-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                     <AlertCircle className="w-8 h-8 text-white" />
@@ -260,7 +282,7 @@ export default function OrderTrackingPage() {
     ), [error, router]);
 
     const emptyView = useMemo(() => (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center w-full">
             <div className="bg-white rounded-2xl p-12 shadow-2xl border border-slate-200 text-center max-w-md w-full mx-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-400 to-slate-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                     <Package className="w-8 h-8 text-white" />

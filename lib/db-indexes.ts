@@ -74,6 +74,10 @@ export async function ensureQueryIndexes(db: Db): Promise<void> {
     db.collection('outbox_events').createIndex({ orgId: 1, eventKey: 1 }, { unique: true }),
     db.collection('outbox_events').createIndex({ orgId: 1, status: 1, availableAt: 1, lockedUntil: 1 }),
     db.collection('order_events').createIndex({ orgId: 1, orderId: 1, at: 1 }),
+    db.collection('email_reviews').createIndex({ orgId: 1, gmailMessageId: 1 }, { unique: true }),
+    db.collection('email_reviews').createIndex({ orgId: 1, status: 1, createdAt: -1 }),
+    db.collection('inbound_order_drafts').createIndex({ orgId: 1, gmailMessageId: 1 }, { unique: true }),
+    db.collection('inbound_order_drafts').createIndex({ orgId: 1, status: 1, createdAt: -1 }),
   ];
 
   const results = await Promise.allSettled(ops);

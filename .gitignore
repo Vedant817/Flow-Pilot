@@ -53,6 +53,7 @@ service-account*.json
 # downloaded public datasets and importer checkpoints
 /.data/
 /checkpoints/
+/scripts/eval/
 
 # Delta-managed checkout metadata
 /.delta/

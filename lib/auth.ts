@@ -46,14 +46,20 @@ export async function getAuthContext(): Promise<AuthContext> {
   }
 }
 
-export async function requireRole(req: NextRequest, roles: string[]): Promise<AuthContext> {
-  const ctx = await getAuthContext();
-  if (!ctx.userId) {
-    throw new AuthorizationError('Unauthorized', 401);
+export class HttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
   }
-  if (!ctx.orgId) {
-    throw new AuthorizationError('No workspace is assigned to this session', 403);
-  }
+}
+
+export async function requireAuth(): Promise<AuthContext> {
+  return requireWorkspace();
+}
+
+export async function requireRole(_req: NextRequest, roles: string[]): Promise<AuthContext & { orgId: string; userId: string }> {
+  const ctx = await requireWorkspace();
   const normalizedRoles = roles.map((role) => normalizeRole(role));
   if (normalizedRoles.length > 0 && !normalizedRoles.includes(ctx.role)) {
     throw new AuthorizationError('Forbidden', 403);
@@ -104,8 +110,10 @@ export function isAdminSecretValid(req: NextRequest): boolean {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) return false;
   const provided = req.headers.get('x-admin-secret') || '';
-  if (provided.length !== secret.length) return false;
-  return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
+  const expectedBytes = Buffer.from(secret);
+  const providedBytes = Buffer.from(provided);
+  if (providedBytes.length !== expectedBytes.length) return false;
+  return timingSafeEqual(providedBytes, expectedBytes);
 }
 
 export function deriveEmail(authEmail: string | undefined, bodyEmail: string | undefined): string {

@@ -18,7 +18,8 @@ npm run build
 git diff --check
 ```
 
-`npm run verify` runs typechecking, tests and build. CI uses a synthetic
+`npm run verify` runs typechecking, tests, a real ONNX classifier smoke check and
+the build. CI uses a synthetic
 publishable Clerk key for compilation and does not certify real sign-in,
 MongoDB, Gmail, Atlas or model-runtime behavior. CI results must be checked on
 GitHub after publication; local checks are not remote CI evidence.

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { AlertTriangle, Search, Server, User, Clock, TrendingDown, AlertCircle, CheckCircle2, XCircle, RefreshCw, Filter, Download, ChevronRight, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from 'next/link';
 
 interface ErrorItem {
   id: number;
@@ -293,6 +294,8 @@ export default function ErrorsPage() {
               <p className="text-lg text-slate-600">Monitor and analyze system errors across your operations</p>
             </div>
             <div className="flex items-center gap-3">
+              <Link href="/email-drafts" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">Email order drafts</Link>
+              <Link href="/email-reviews" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">Email order reviews</Link>
               <button
                 onClick={() => fetchErrors(true)}
                 disabled={refreshing}

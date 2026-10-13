@@ -4,6 +4,9 @@ import '@testing-library/jest-dom'
 // Mock fetch globally for all tests
 global.fetch = jest.fn()
 
+// Transformers is mapped to its deterministic stub in jest.config.js.
+// The standalone classifier smoke command runs outside Jest against real ONNX.
+
 // Mock Next.js router
 jest.mock('next/router', () => ({
   useRouter() {

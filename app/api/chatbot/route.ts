@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
               { role: 'user', content: query, timestamp: new Date() },
               { role: 'assistant', content: fullResponse, timestamp: new Date() },
             ],
+            clerkUserId: authCtx.userId,
           });
         }
         send('done', { conversationId: conversation._id.toString() });

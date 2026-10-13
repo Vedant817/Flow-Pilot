@@ -11,6 +11,7 @@ export interface IConversation extends Document {
     orgId: string;
     userId: string;
     messages: IMessage[];
+    clerkUserId?: string;
 }
 
 const MessageSchema = new Schema<IMessage>({
@@ -23,9 +24,12 @@ const ConversationSchema = new Schema<IConversation>({
     orgId: { type: String, required: true, index: true },
     userId: { type: String, required: true, index: true },
     messages: { type: [MessageSchema], required: true },
+    clerkUserId: { type: String, sparse: true },
 }, {
     collection: 'conversations',
     timestamps: true,
 });
+
+ConversationSchema.index({ clerkUserId: 1, updatedAt: -1 });
 
 export const Conversation: Model<IConversation> = mongoose.models.Conversation || mongoose.model<IConversation>('Conversation', ConversationSchema);

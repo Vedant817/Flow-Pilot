@@ -5,6 +5,11 @@ import { AuthorizationError, requireWorkspace } from '@/lib/auth';
 
 const DAY_MS = 86_400_000;
 
+// TODO: full multi-tenancy — backfill orgId on orders/inventory then scope every
+// aggregation below by ORG_ID (currently tolerated as missing for legacy rows).
+const ORG_ID = 'default';
+const ORG_OR_MISSING = { $or: [{ orgId: ORG_ID }, { orgId: { $exists: false } }] };
+
 export async function GET(request: NextRequest) {
   try {
     const authCtx = await requireWorkspace();
@@ -118,10 +123,11 @@ export async function GET(request: NextRequest) {
         lowStockItems: inventory.filter((sku) => Number(sku.quantity) <= Number(sku.stock_alert_level)).length,
       },
       performanceMetrics: {
-        conversionRate: 0,
+        conversionRate: null,
         fulfillmentRate: totalOrders ? Math.round((fulfilled / totalOrders) * 100) : 0,
-        averageProcessingTime: 'Requires fulfillment timestamps',
-        customerSatisfaction: 0,
+        averageProcessingTime: null,
+        customerSatisfaction: null,
+        notes: 'conversionRate, averageProcessingTime and customerSatisfaction are unavailable — no visitor/funnel, fulfillment-timestamp, or survey data is collected yet',
       },
       chartData: {
         orderTrends: {

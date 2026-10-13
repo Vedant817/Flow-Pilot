@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
             email: email.trim().toLowerCase(),
             review: review.trim(),
             type: type.toLowerCase(),
-            createdAt: new Date()
+            createdAt: new Date(),
         });
 
         const savedFeedback = await newFeedback.save();
