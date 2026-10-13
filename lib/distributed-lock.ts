@@ -34,9 +34,9 @@ export async function acquireLock(key: string, ttlMs: number, owner: string): Pr
       return false;
     }
   } catch (e) {
-    // If DB unavailable (e.g., MONGO_URI not set in build), allow as no-op but warn
-    console.warn('acquireLock failed, allowing (no DB):', e instanceof Error ? e.message : e);
-    return true;
+    // Never grant a lock when the database cannot confirm ownership.
+    console.warn('acquireLock failed:', e instanceof Error ? e.message : e);
+    return false;
   }
 }
 

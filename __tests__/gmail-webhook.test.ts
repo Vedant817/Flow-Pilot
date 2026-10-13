@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { google } from 'googleapis';
 import { applyOrderDelta } from '../lib/analytics/rollup';
 import { classifyEmail } from '../lib/nlp/classify';
+import connectToDatabase from '../lib/mongodb';
 
 jest.mock('../lib/nlp/classify', () => ({
   classifyEmail: jest.fn(async () => 'new_order'),
@@ -203,6 +204,80 @@ describe('Gmail Webhook API', () => {
         startHistoryId: '100',
       })
     );
+  });
+
+  it('prefers nested plain text over an earlier HTML alternative', async () => {
+    mockHistoryList('nested-message');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
+      data: { payload: {
+        headers: [{ name: 'From', value: 'buyer@example.com' }],
+        mimeType: 'multipart/mixed',
+        parts: [
+          { mimeType: 'text/html', body: { data: Buffer.from('<p>Wrong body</p>').toString('base64url') } },
+          { mimeType: 'multipart/related', parts: [
+            { mimeType: 'multipart/alternative', parts: [
+              { mimeType: 'text/plain', body: { data: Buffer.from('Nested plain body').toString('base64url') } },
+            ] },
+          ] },
+        ],
+      } },
+    });
+
+    const response = await POST(mockWebhookRequest('12345'));
+
+    expect(response.status).toBe(200);
+    expect(classifyEmail).toHaveBeenCalledWith('Nested plain body');
+    expect(mockedGmail.users.messages.attachments.get).not.toHaveBeenCalled();
+  });
+
+  it('fetches attachment-backed text bodies', async () => {
+    mockHistoryList('attachment-message');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
+      data: { payload: {
+        headers: [{ name: 'From', value: 'buyer@example.com' }],
+        parts: [{ mimeType: 'multipart/alternative', parts: [
+          { mimeType: 'text/plain', body: { attachmentId: 'body-attachment' } },
+        ] }],
+      } },
+    });
+    (mockedGmail.users.messages.attachments.get as jest.Mock).mockResolvedValue({
+      data: { data: Buffer.from('Attachment plain body').toString('base64url') },
+    });
+
+    const response = await POST(mockWebhookRequest('12345'));
+
+    expect(response.status).toBe(200);
+    expect(mockedGmail.users.messages.attachments.get).toHaveBeenCalledWith({
+      userId: 'me', messageId: 'attachment-message', id: 'body-attachment',
+    });
+    expect(classifyEmail).toHaveBeenCalledWith('Attachment plain body');
+  });
+
+  it.each(['rejected', 'missing data'])('keeps the cursor retryable on attachment failure: %s', async (failure) => {
+    const updateOne = jest.fn();
+    (connectToDatabase as jest.Mock).mockResolvedValueOnce({
+      connection: { db: { collection: () => ({
+        findOne: jest.fn(async () => ({ historyId: '100' })), updateOne,
+      }) } },
+    });
+    mockHistoryList('attachment-failure');
+    (mockedGmail.users.messages.get as jest.Mock).mockResolvedValue({
+      data: { payload: {
+        headers: [{ name: 'From', value: 'buyer@example.com' }],
+        mimeType: 'text/plain',
+        body: { attachmentId: 'failed-body' },
+      } },
+    });
+    const attachmentGet = mockedGmail.users.messages.attachments.get as jest.Mock;
+    if (failure === 'rejected') attachmentGet.mockRejectedValueOnce(new Error('Attachment API failed'));
+    else attachmentGet.mockResolvedValueOnce({ data: {} });
+
+    const response = await POST(mockWebhookRequest('12345'));
+
+    expect(response.status).toBe(500);
+    expect(updateOne).not.toHaveBeenCalled();
+    expect(classifyEmail).not.toHaveBeenCalled();
+    expect(applyOrderDelta).not.toHaveBeenCalled();
   });
 
   it('rejects webhook requests without valid authentication', async () => {

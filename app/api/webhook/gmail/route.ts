@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { google } from 'googleapis';
+import { google, gmail_v1 } from 'googleapis';
 import { classifyEmail } from '@/lib/nlp/classify';
 import { extractOrderDetails, extractFeedbackDetails } from '@/lib/nlp/extract';
 import { applyOrderDelta } from '@/lib/analytics/rollup';
@@ -121,21 +121,38 @@ async function getEmailDetails(messageId: string) {
     let body = '';
     const payload = emailResponse.data.payload;
 
-    if (payload?.parts) {
-      let part = payload.parts.find(p => p.mimeType === 'text/plain');
-      if (!part) {
-        part = payload.parts.find(p => p.mimeType === 'text/html');
+    const textParts: gmail_v1.Schema$MessagePart[] = [];
+    function collectTextParts(part: gmail_v1.Schema$MessagePart) {
+      // Named attachments are not the message body, even when they contain text.
+      if (part.filename) return;
+      if (
+        (part.mimeType === 'text/plain' || part.mimeType === 'text/html' ||
+          (part === payload && !part.mimeType)) &&
+        (part.body?.data || part.body?.attachmentId)
+      ) {
+        textParts.push(part);
       }
-      if (part?.body?.data) {
-        const decodedBody = Buffer.from(part.body.data, 'base64').toString('utf-8');
-        if (part.mimeType === 'text/html') {
-          body = decodedBody.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-        } else {
-          body = decodedBody;
+      for (const child of part.parts ?? []) collectTextParts(child);
+    }
+    if (payload) collectTextParts(payload);
+    const part = textParts.find(p => p.mimeType === 'text/plain') ?? textParts[0];
+    if (part) {
+      let data = part.body?.data;
+      if (!data && part.body?.attachmentId) {
+        const attachment = await gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId,
+          id: part.body.attachmentId,
+        });
+        data = attachment.data.data;
+        if (typeof data !== 'string') {
+          throw new Error(`Missing Gmail body attachment data for message ${messageId}`);
         }
       }
-    } else if (payload?.body?.data) {
-      body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+      const decodedBody = Buffer.from(data ?? '', 'base64').toString('utf-8');
+      body = part.mimeType === 'text/html'
+        ? decodedBody.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+        : decodedBody;
     }
 
   return { from: fromRaw, senderName, senderEmail, subject, body };
