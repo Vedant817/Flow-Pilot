@@ -94,6 +94,35 @@
   animation: fp-fade-up 0.18s ease-out both;
 }
 
+.fp-sidebar {
+  display: none;
+}
+@media (max-width: 767px) {
+  .fp-sidebar-open {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(280px, 85vw);
+  }
+}
+@media (min-width: 768px) {
+  .fp-sidebar { display: flex; }
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @keyframes fp-caret {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }

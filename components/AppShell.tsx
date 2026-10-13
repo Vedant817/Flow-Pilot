@@ -6,7 +6,7 @@ import { useUser, UserButton } from '@clerk/nextjs';
 import {
   ShoppingBag, Package, BarChart2, Bot, MessageSquare, AlertTriangle,
   TrendingUp, Skull, IndianRupee, Command as CommandIcon, Search,
-  ChevronLeft, Zap, CircleDot, Network, Ticket,
+  ChevronLeft, Zap, CircleDot, Network, Ticket, Menu, X,
 } from 'lucide-react';
 
 interface NavItem {
@@ -62,6 +62,39 @@ const PALETTE_ACTIONS = [
   { label: 'Ask: is demand growing?', href: '/chatbot?q=Is%20demand%20growing%20or%20shrinking%3F', icon: <Zap size={16} />, group: 'Copilot quick asks' },
 ];
 
+// Both overlays share keyboard containment and return focus to their opener.
+function useModalFocus(open: boolean, ref: React.RefObject<HTMLElement | null>, close: () => void) {
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const root = ref.current;
+    if (!root) return;
+    const focusable = () => Array.from(root.querySelectorAll<HTMLElement>(
+      'a[href], button, input, [tabindex="0"]'
+    )).filter((element) => !element.hasAttribute('disabled'));
+    (focusable()[0] ?? root).focus();
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); close(); }
+      if (event.key === 'Tab') {
+        const items = focusable();
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (!first) { event.preventDefault(); root.focus(); return; }
+        if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [open, ref, close]);
+}
+
 function useCommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -78,8 +111,10 @@ function useCommandPalette() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        if (e.target instanceof Element && e.target.closest('#shell-navigation[role="dialog"]')) return;
         setOpen((o) => !o);
         setQuery('');
+        setActiveIdx(0);
       }
       if (e.key === 'Escape') setOpen(false);
     };
@@ -102,19 +137,22 @@ function useCommandPalette() {
 function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPalette> }) {
   const { open, setOpen, query, setQuery, activeIdx, setActiveIdx, results, run } = palette;
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 10);
-  }, [open]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), [setOpen]);
+  useModalFocus(open, dialogRef, close);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 pt-[12vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 px-3 pt-[12vh] backdrop-blur-sm"
       onClick={() => setOpen(false)}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="fp-enter w-full max-w-xl overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -122,13 +160,18 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
           <Search size={15} className="text-muted-foreground" />
           <input
             ref={inputRef}
+            role="combobox"
+            aria-label="Search commands"
+            aria-expanded="true"
+            aria-controls="command-results"
+            aria-activedescendant={results[activeIdx] ? `command-${activeIdx}` : undefined}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setActiveIdx(0);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, results.length - 1)); }
+              if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.max(0, Math.min(i + 1, results.length - 1))); }
               if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(0, i - 1)); }
               if (e.key === 'Enter' && results[activeIdx]) run(results[activeIdx].href);
             }}
@@ -137,9 +180,9 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
           />
           <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">ESC</kbd>
         </div>
-        <div className="max-h-[320px] overflow-y-auto p-1.5">
+        <div id="command-results" role="listbox" aria-label="Commands" className="max-h-[min(320px,60dvh)] overflow-y-auto p-1.5">
           {results.length === 0 && (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">No matches</p>
+            <p role="status" className="px-3 py-6 text-center text-xs text-muted-foreground">No matches</p>
           )}
           {results.map((r, i) => {
             const showGroup = i === 0 || results[i - 1].group !== r.group;
@@ -149,6 +192,10 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
                   <p className="label-xs px-3 pb-1 pt-2">{r.group}</p>
                 )}
                 <button
+                  id={`command-${i}`}
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  tabIndex={-1}
                   onMouseEnter={() => setActiveIdx(i)}
                   onClick={() => run(r.href)}
                   className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm ${
@@ -167,7 +214,7 @@ function CommandPalette({ palette }: { palette: ReturnType<typeof useCommandPale
   );
 }
 
-function Topbar({ collapsed, onOpenPalette }: { collapsed: boolean; onOpenPalette: () => void }) {
+function Topbar({ collapsed, onOpenPalette, onOpenMenu, menuOpen }: { collapsed: boolean; onOpenPalette: () => void; onOpenMenu: () => void; menuOpen: boolean }) {
   const pathname = usePathname();
 
   const title = useMemo(() => {
@@ -182,18 +229,21 @@ function Topbar({ collapsed, onOpenPalette }: { collapsed: boolean; onOpenPalett
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-border bg-background/80 px-5 backdrop-blur-md"
+      className="sticky top-0 z-40 flex h-14 min-w-0 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-md md:gap-4 md:px-5"
     >
+        <button onClick={onOpenMenu} aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="shell-navigation" className="shrink-0 rounded-md p-2 hover:bg-accent md:hidden">
+          <Menu size={20} />
+        </button>
         <button
           onClick={onOpenPalette}
-          className="group flex h-9 min-w-[220px] items-center gap-2 rounded-md border border-border bg-card px-3 text-xs text-muted-foreground transition-colors hover:border-ring"
+          className="group flex h-9 min-w-0 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs text-muted-foreground transition-colors hover:border-ring md:min-w-[220px]"
         >
           <Search size={13} />
           <span className="flex-1 text-left">Jump to…</span>
           <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
         </button>
 
-        <h1 className={`text-sm font-semibold tracking-tight ${collapsed ? '' : 'hidden md:block'}`}>{title}</h1>
+        <h1 className={`min-w-0 truncate text-sm font-semibold tracking-tight ${collapsed ? '' : 'hidden md:block'}`}>{title}</h1>
 
         <div className="ml-auto flex items-center gap-4">
           <span className="hidden items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground sm:flex">
@@ -208,18 +258,41 @@ function Topbar({ collapsed, onOpenPalette }: { collapsed: boolean; onOpenPalett
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useModalFocus(menuOpen, drawerRef, closeMenu);
   const pathname = usePathname();
   const { user } = useUser();
   const palette = useCommandPalette();
 
+  useEffect(() => {
+    closeMenu();
+  }, [pathname, closeMenu]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)');
+    const resize = () => { if (media.matches) closeMenu(); };
+    media.addEventListener('change', resize);
+    return () => media.removeEventListener('change', resize);
+  }, [closeMenu]);
+
   return (
     <div className="flex h-screen overflow-hidden w-full">
+      {menuOpen && <div aria-hidden="true" className="fixed inset-0 z-50 bg-black/60 md:hidden" onClick={closeMenu} />}
       <aside
-        className={`flex h-full shrink-0 flex-col border-r border-border bg-card transition-all duration-200 ${
+        ref={drawerRef}
+        id="shell-navigation"
+        role={menuOpen ? 'dialog' : undefined}
+        aria-modal={menuOpen ? true : undefined}
+        aria-label="Navigation"
+        inert={palette.open}
+        className={`fp-sidebar ${menuOpen ? 'fp-sidebar-open' : ''} h-full shrink-0 flex-col border-r border-border bg-card transition-all duration-200 ${
           collapsed ? 'w-[64px]' : 'w-[228px]'
         }`}
       >
         <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
+          {menuOpen && <button aria-label="Close navigation" onClick={closeMenu} className="rounded p-1 hover:bg-accent md:hidden"><X size={20} /></button>}
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-[13px] font-bold text-white shadow-lg shadow-indigo-950/50">
             FP
           </div>
@@ -241,6 +314,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <a
                     key={item.href}
                     href={item.href}
+                    onClick={closeMenu}
+                    aria-current={active ? 'page' : undefined}
                     title={collapsed ? item.label : undefined}
                     className={`relative mb-0.5 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors ${
                       active
@@ -276,9 +351,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             )}
             {!collapsed && (
               <button
-                onClick={() => setCollapsed(true)}
+                onClick={() => { if (menuOpen) closeMenu(); else setCollapsed(true); }}
                 className="rounded p-1 text-muted-foreground hover:bg-accent"
-                aria-label="Collapse sidebar"
+                aria-label={menuOpen ? 'Close sidebar' : 'Collapse sidebar'}
               >
                 <ChevronLeft size={15} />
               </button>
@@ -296,8 +371,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar collapsed={collapsed} onOpenPalette={() => palette.setOpen(true)} />
+      <div inert={menuOpen || palette.open} className="flex min-w-0 flex-1 flex-col">
+        <Topbar collapsed={collapsed} menuOpen={menuOpen} onOpenMenu={() => { setCollapsed(false); setMenuOpen(true); }} onOpenPalette={() => palette.setOpen(true)} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
 
