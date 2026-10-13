@@ -8,6 +8,7 @@ import { PromotionAudit } from '@/models/PromotionAudit';
 import { OutboxEvent } from '@/models/OutboxEvent';
 import { OrderEvent } from '@/models/OrderEvent';
 import { assertOrderTransition, OrderTransitionError } from '@/lib/orders/lifecycle';
+import { businessDateTime } from '@/lib/orders/time';
 import { rateLimitAsync } from '@/lib/rate-limit';
 import { AuthorizationError, requirePermission, requireWorkspace } from '@/lib/auth';
 import { addWorkspaceScope } from '@/lib/authorization';
@@ -142,8 +143,7 @@ export async function POST(req: NextRequest) {
     const { orderValueMinor, priceSource, productsWithSnapshot } = await priceOrder(orgId, products);
     const tracking = createTrackingCredential();
     const orderedAtDate = date && time ? parseOrderDateToIST(date, time) : new Date();
-    const dateStr = orderedAtDate.toISOString().slice(0, 10);
-    const timeStr = orderedAtDate.toTimeString().slice(0, 5);
+    const { date: dateStr, time: timeStr } = businessDateTime(orderedAtDate);
 
     // Attempt transactional path
     let createdOrder: any = null;

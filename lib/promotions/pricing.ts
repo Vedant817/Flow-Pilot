@@ -1,5 +1,6 @@
 import { dbConnect } from '@/lib/mongodb';
 import { normalizeNameKey as nkey } from '@/lib/auth';
+import { parseBusinessDateTime } from '@/lib/orders/time';
 
 export interface PricedProduct {
   productId: string;
@@ -116,14 +117,5 @@ export function computeDiscount(
 }
 
 export function parseOrderDateToIST(dateStr: string, timeStr: string): Date {
-  try {
-    const d = dateStr?.trim() || new Date().toISOString().slice(0, 10);
-    const t = timeStr?.trim() || '00:00';
-    const iso = `${d}T${t}:00+05:30`;
-    const dt = new Date(iso);
-    if (isNaN(dt.getTime())) return new Date();
-    return dt;
-  } catch {
-    return new Date();
-  }
+  return parseBusinessDateTime(dateStr, timeStr);
 }

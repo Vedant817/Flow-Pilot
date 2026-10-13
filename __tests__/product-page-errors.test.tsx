@@ -99,3 +99,39 @@ test.each([undefined, 'https://example.test/api/'])('order status uses the confi
   expect(await screen.findByRole('alert')).toHaveTextContent('Failed to update order status');
   expect(statusSelect).toHaveValue('pending fulfillment');
 });
+
+test('cancellation requires an explicit reason and confirmation', async () => {
+  get.mockResolvedValue({ data: {
+    data: [{
+      _id: 'order12345678', status: 'pending fulfillment', products: [],
+      name: 'Test customer', email: 'test@example.test', date: '2026-01-01', time: '12:00',
+    }],
+    pagination: { total: 1, totalPages: 1 },
+  } });
+  put.mockResolvedValue({ data: { order: { status: 'canceled' } } });
+  render(<OrdersPage />);
+  const select = await screen.findByRole('combobox', { name: 'Status for order 12345678' });
+  fireEvent.change(select, { target: { value: 'canceled' } });
+  expect(put).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Cancellation reason'), { target: { value: 'Customer requested cancellation' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }));
+  await waitFor(() => expect(put).toHaveBeenCalledWith('/api/orders', {
+    orderId: 'order12345678', expectedStatus: 'pending fulfillment', status: 'canceled',
+    reason: 'Customer requested cancellation',
+  }));
+});
+
+test('fulfilled orders do not offer a status reversal', async () => {
+  get.mockResolvedValue({ data: {
+    data: [{
+      _id: 'order12345678', status: 'fulfilled', products: [],
+      name: 'Test customer', email: 'test@example.test', date: '2026-01-01', time: '12:00',
+    }],
+    pagination: { total: 1, totalPages: 1 },
+  } });
+  render(<OrdersPage />);
+  const select = await screen.findByRole('combobox', { name: 'Status for order 12345678' });
+  expect(select).toBeDisabled();
+  expect(select.querySelectorAll('option')).toHaveLength(1);
+});
