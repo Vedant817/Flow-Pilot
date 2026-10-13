@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useUser, UserButton } from '@clerk/nextjs';
+import { useUser, useOrganization, OrganizationSwitcher, UserButton } from '@clerk/nextjs';
 import {
   ShoppingBag, Package, BarChart2, Bot, MessageSquare, AlertTriangle,
-  TrendingUp, Skull, IndianRupee, Command as CommandIcon, Search,
+  TrendingUp, Skull, IndianRupee, Search,
   ChevronLeft, Zap, CircleDot, Network, Ticket, Menu, X, Rocket, Mail, Bell,
 } from 'lucide-react';
 
@@ -305,6 +305,7 @@ function Topbar({ collapsed, onOpenPalette, onOpenMenu, menuOpen }: { collapsed:
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const workspace = useOrganization();
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
@@ -442,7 +443,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div inert={menuOpen || palette.open} className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-white/[0.06] bg-[#17171C]">
         <Topbar collapsed={collapsed} menuOpen={menuOpen} onOpenMenu={() => { setCollapsed(false); setMenuOpen(true); }} onOpenPalette={() => palette.setOpen(true)} />
-        <main className="flex-1 overflow-y-auto px-4 pb-6 pt-4 sm:px-6">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 pb-6 pt-4 sm:px-6">
+          <div className="mb-4 max-w-full rounded-lg border border-border bg-card p-3">
+            <p className="mb-1 text-xs text-muted-foreground">Active workspace</p>
+            <OrganizationSwitcher hidePersonal afterSelectOrganizationUrl="/orders" afterCreateOrganizationUrl="/orders" />
+          </div>
+          {!workspace.isLoaded ? <p role="status">Loading workspace…</p>
+            : workspace.organization ? children
+              : <section className="rounded-lg border border-border bg-card p-5">
+                  <h2 className="font-semibold">Choose or create a workspace</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">Select a workspace above to open the console. Personal accounts do not share a default tenant.</p>
+                </section>}
+        </main>
       </div>
       <CommandPalette palette={palette} />
     </div>

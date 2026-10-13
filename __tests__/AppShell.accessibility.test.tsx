@@ -3,20 +3,32 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import AppShell from '@/components/AppShell';
 
 const mockPush = jest.fn();
+let mockOrganization: { id: string } | null = { id: 'org_a' };
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
   usePathname: () => '/orders',
 }));
 jest.mock('@clerk/nextjs', () => ({
   useUser: () => ({ user: null }),
+  useOrganization: () => ({ isLoaded: true, organization: mockOrganization }),
+  OrganizationSwitcher: () => <button>Workspace picker</button>,
   UserButton: () => <button>Account</button>,
 }));
 
 beforeEach(() => {
+  mockOrganization = { id: 'org_a' };
   mockPush.mockClear();
   window.matchMedia = jest.fn().mockReturnValue({
     matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn(),
   });
+});
+
+test('users without an active organization get a workspace choice instead of business data', () => {
+  mockOrganization = null;
+  render(<AppShell><p>Private order data</p></AppShell>);
+  expect(screen.getByText('Choose or create a workspace')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Workspace picker' })).toBeInTheDocument();
+  expect(screen.queryByText('Private order data')).not.toBeInTheDocument();
 });
 
 test('navigation contains keyboard focus, closes with Escape and restores its opener', () => {

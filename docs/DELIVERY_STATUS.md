@@ -28,6 +28,8 @@ Implemented:
 - Administrator-only Google OAuth with expiring browser/user/workspace-bound,
   single-use state and workspace-bound encrypted refresh credentials; watch and
   ingestion use the configured workspace's credential.
+- Explicit Clerk workspace selection/creation and a console onboarding gate;
+  an unassigned personal session is not presented as a valid shared workspace.
 
 Still required:
 
@@ -118,7 +120,7 @@ working test Clerk organizations/users. Never claim browser/live-service checks
 when only source review or mocks were used. Four pre-existing skipped test
 placeholders are not acceptance evidence.
 
-Latest local gate: 36 suites, 212 tests passing; the real ONNX classifier passes
+Latest local gate: 36 suites, 213 tests passing; the real ONNX classifier passes
 8/8 smoke cases. TypeScript, production build and
 `git diff --check` passing. The build used a synthetic publishable Clerk key,
 not live service credentials.
@@ -142,7 +144,13 @@ Subsequent Google and inventory slices received read-only QA in the existing
 shared checkout (no new branches/worktrees). The primary local checkout was
 fast-forwarded to the reconciled main; its untracked documents were preserved.
 
-Current real-service blocker: no MongoDB/Clerk/Google credentials are configured.
+The primary checkout's private `.env` contains a remote/unclassified MongoDB URI,
+Clerk test credentials and Google credentials; these are absent from the agent's
+process environment. Values were not printed. Required `GMAIL_ORG_ID`,
+`DEFAULT_ORG_ID` and `INTEGRATION_ENCRYPTION_KEY` are not configured. No write tests
+have been run against that remote database.
+
 Docker's client is installed, but the Docker Desktop Linux engine is unavailable
-(the named pipe does not exist). No disposable replica-set rollback/concurrency
-or authenticated browser certification is claimed.
+(the named pipe does not exist). A disposable local replica set is needed for
+rollback/concurrency validation without touching the existing remote dataset.
+No authenticated browser or live Google certification is claimed.
