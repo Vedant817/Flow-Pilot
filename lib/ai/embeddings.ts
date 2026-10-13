@@ -30,7 +30,12 @@ const cache: EmbedderCache =
 
 async function getEmbedder() {
   if (!cache.promise) {
-    cache.promise = pipeline('feature-extraction', MODEL_ID, { dtype: 'q8' }) as unknown as Promise<Embedder>;
+    cache.promise = (pipeline('feature-extraction', MODEL_ID, { dtype: 'q8' }) as unknown as Promise<Embedder>)
+      .catch((error: unknown) => {
+        // A failed initialization must not poison the process-wide cache.
+        cache.promise = null;
+        throw error;
+      });
   }
   return cache.promise;
 }

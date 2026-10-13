@@ -33,34 +33,30 @@ export function detectAnomalies(dailyUnits: number[], dates: string[]): AnomalyR
     return { series: [], anomalies: [], lambda: LAMBDA, kSigma: K_SIGMA, baselineMean: 0 };
   }
 
-  // Phase 1: warm-up window establishes baseline μ/σ from first half.
-  const warmup = Math.max(7, Math.floor(n / 2));
-  let ewma = dailyUnits.slice(0, warmup).reduce((a, b) => a + b, 0) / warmup;
-  const baselineMean = ewma;
-
-  const ewmaValues: number[] = [];
-  for (let i = 0; i < n; i++) {
-    ewma = LAMBDA * dailyUnits[i] + (1 - LAMBDA) * ewma;
-    ewmaValues.push(ewma);
-  }
-
-  const meanEwma = ewmaValues.reduce((a, b) => a + b, 0) / n;
-  const variance =
-    ewmaValues.reduce((acc, v) => acc + (v - meanEwma) ** 2, 0) / Math.max(1, n - 1);
-  const sigma = Math.sqrt(variance) || Math.sqrt(baselineMean) || 1;
-
-  const series: AnomalyPoint[] = dates.map((date, i) => {
-    const z = sigma > 0 ? (ewmaValues[i] - meanEwma) / sigma : 0;
-    const breached = Math.abs(z) > K_SIGMA;
-    return {
-      date,
-      units: dailyUnits[i],
-      ewma: round2(ewmaValues[i]),
-      upperLimit: round2(meanEwma + K_SIGMA * sigma),
-      lowerLimit: round2(Math.max(0, meanEwma - K_SIGMA * sigma)),
+  // Welford statistics of prior EWMA values only. The first observation seeds
+  // the chart; seven prior observations are required before emitting alerts.
+  let ewma = dailyUnits[0];
+  let meanEwma = 0;
+  let m2 = 0;
+  const series: AnomalyPoint[] = dailyUnits.map((units, i) => {
+    const center = i === 0 ? 0 : meanEwma;
+    const sigma = Math.sqrt(m2 / Math.max(1, i - 1)) || Math.sqrt(Math.max(0, center)) || 1;
+    if (i > 0) ewma = LAMBDA * units + (1 - LAMBDA) * ewma;
+    const z = i === 0 ? 0 : (ewma - center) / sigma;
+    const breached = i >= 7 && Math.abs(z) > K_SIGMA;
+    const point: AnomalyPoint = {
+      date: dates[i],
+      units,
+      ewma: round2(ewma),
+      upperLimit: round2(center + K_SIGMA * sigma),
+      lowerLimit: round2(Math.max(0, center - K_SIGMA * sigma)),
       zScore: round2(z),
       direction: breached ? (z > 0 ? 'spike' : 'drop') : null,
     };
+    const delta = ewma - meanEwma;
+    meanEwma += delta / (i + 1);
+    m2 += delta * (ewma - meanEwma);
+    return point;
   });
 
   return {
@@ -68,7 +64,7 @@ export function detectAnomalies(dailyUnits: number[], dates: string[]): AnomalyR
     anomalies: series.filter((p) => p.direction !== null),
     lambda: LAMBDA,
     kSigma: K_SIGMA,
-    baselineMean: round2(baselineMean),
+    baselineMean: round2(meanEwma),
   };
 }
 

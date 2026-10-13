@@ -29,7 +29,13 @@ async function getLLM() {
     cache.promise = Promise.all([
       AutoTokenizer.from_pretrained(MODEL_ID) as unknown as Promise<TokenizerLike>,
       AutoModelForCausalLM.from_pretrained(MODEL_ID, { dtype: 'q4' }),
-    ]).then(([tokenizer, model]) => ({ tokenizer, model }));
+    ])
+      .then(([tokenizer, model]) => ({ tokenizer, model }))
+      .catch((error: unknown) => {
+        // Keep concurrent callers on one attempt, but allow the next call to retry.
+        cache.promise = null;
+        throw error;
+      });
   }
   return cache.promise;
 }
