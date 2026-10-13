@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Flow Pilot Enterprise Design Tokens ───────────────────────────────
+   Dark operations-console aesthetic. shadcn variable names preserved so
+   every existing ui/ component inherits the theme automatically. */
+@layer base {
+  :root {
+    --background: 222 47% 5%;
+    --foreground: 213 31% 91%;
+    --card: 222 44% 7%;
+    --card-foreground: 213 31% 91%;
+    --popover: 224 44% 8%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 5%;
+    --secondary: 218 34% 12%;
+    --secondary-foreground: 210 28% 82%;
+    --muted: 219 33% 11%;
+    --muted-foreground: 216 15% 58%;
+    --accent: 220 36% 14%;
+    --accent-foreground: 210 30% 90%;
+    --destructive: 350 84% 56%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 219 30% 14%;
+    --input: 219 30% 16%;
+    --ring: 217 91% 60%;
+    --chart-1: 199 89% 48%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 262 83% 65%;
+    --chart-4: 38 92% 55%;
+    --chart-5: 350 84% 60%;
+    --radius: 0.5rem;
+
+    --success: 160 74% 42%;
+    --warning: 38 92% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "tnum";
+  }
+}
+
+@layer utilities {
+  .panel {
+    @apply rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))];
+  }
+  .kpi-value {
+    @apply text-2xl font-semibold tracking-tight tabular-nums;
+  }
+  .label-xs {
+    @apply text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground;
+  }
+}
+
+/* Dense scrollbars tuned for ops consoles */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(219 25% 20%);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(219 25% 28%);
+}
+::selection {
+  background: hsl(217 91% 60% / 0.35);
+}
+
+@keyframes fp-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.fp-live-dot {
+  animation: fp-pulse-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes fp-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fp-enter {
+  animation: fp-fade-up 0.18s ease-out both;
+}
+
+@keyframes fp-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.fp-caret::after {
+  content: "▍";
+  animation: fp-caret 0.9s steps(1) infinite;
+  color: hsl(217 91% 60%);
+}
+
+/* The legacy order cards retain their information-dense structure while
+   inheriting the enterprise dark surface until they move to shared tokens. */
+.enterprise-orders [class*="bg-white"] {
+  background-color: hsl(var(--card)) !important;
+}
+.enterprise-orders [class*="bg-slate-50"] {
+  background-color: hsl(var(--secondary)) !important;
+}
+.enterprise-orders [class*="text-slate-900"],
+.enterprise-orders [class*="text-slate-800"],
+.enterprise-orders [class*="text-slate-700"] {
+  color: hsl(var(--foreground)) !important;
+}
+.enterprise-orders [class*="text-slate-600"],
+.enterprise-orders [class*="text-slate-500"],
+.enterprise-orders [class*="text-slate-400"] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.enterprise-orders [class*="border-slate"] {
+  border-color: hsl(var(--border)) !important;
+}

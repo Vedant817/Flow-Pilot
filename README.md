@@ -1,61 +1,196 @@
-# 🚀 Flow Pilot  
+# Flow Pilot
 
-## 📌 Overview  
-The **Flow Pilot** provides a centralized dashboard for managing orders, inventory, analytics, errors, feedback, and chatbot interactions. It streamlines order tracking, inventory management, analytics monitoring, error logging, and customer interactions through a user-friendly interface.  
+Flow Pilot is a distribution management and sales-intelligence console for order operations, inventory planning, customer risk, and grounded operational analysis. It is designed around bounded queries and materialized read models rather than browser-side CRUD over entire collections.
 
-## 🔥 Features  
-- **Order Management**: Track, search, and manage orders efficiently.  
-- **Inventory Control**: Monitor stock levels, predict demand, and adjust prices dynamically.  
-- **Analytics Dashboard**: Gain insights into sales, customer trends, and product performance.  
-- **Error Logs**: Identify and troubleshoot system and customer-related errors.  
-- **Feedback Monitoring**: Analyze customer sentiments for service improvements.  
-- **AI-Powered Chatbot**: Retrieve order, inventory, and analytics data via a chatbot interface.  
+## Product Advantages
 
-## 📂 Dashboard Sections  
+- **Operations Copilot without paid inference APIs:** SmolLM2-360M-Instruct and MiniLM run locally through ONNX and Transformers.js inside the Vercel Node runtime.
+- **Tool-grounded RAG:** semantic routing chooses deterministic MongoDB tools before generation. The model writes an answer over verified facts instead of inventing calculations.
+- **Hybrid retrieval:** MongoDB Atlas Vector Search is preferred; bounded lexical plus cosine retrieval remains available for local MongoDB.
+- **Incremental analytics:** a `daily_sales_rollup` read model reduces forecasting and trend reads from `O(raw orders)` to `O(days × active SKUs)`.
+- **Sales intelligence:** Holt-Winters demand forecasting, EWMA anomaly detection, RFM account segmentation, ABC/XYZ concepts, EOQ, reorder-point and deadstock analysis.
+- **Enterprise operations UI:** grouped navigation, dense order workflows, command palette, source-cited copilot, and a consistent dark operations-console theme.
 
-### 📦 Orders Tab  
-- **Order Tracking & Management**: View order details, statuses (Fulfilled, Pending, Canceled).  
-- **Search & Filtering**: Search by Order ID or Customer Name.  
-- **Order Status Monitoring**: Update order statuses as needed.  
-- **Pagination Support**: Navigate through large datasets with ease.  
+## Architecture
 
-### 📊 Inventory Tab  
-- **Product Details**: Track inventory with key attributes (Product ID, Name, Price, Quantity, Supplier, etc.).  
-- **Stock Management**: View total products, low-stock alerts, and inventory value.  
-- **Forecasting & Dynamic Pricing**: Predict demand and adjust prices accordingly.  
-- **DeadStock Analysis**: Identify slow-moving or obsolete products.  
+```text
+Gmail / Web / Operator
+          │
+          ▼
+   Next.js Route Handlers ─── Clerk authentication + rate limits
+          │
+          ├── Transaction path ── MongoDB orders / inventory / feedback
+          │                              │
+          │                              ├── query-pattern indexes
+          │                              └── incremental sales rollup
+          │
+          ├── Intelligence path ── Rollups ── Forecast / EWMA / RFM
+          │
+          └── Copilot path
+                semantic intent router (MiniLM)
+                         │
+                  deterministic tools
+                         │
+            Atlas Vector Search + lexical fallback
+                         │
+              SmolLM2 q4 grounded generation
+                         │
+                   cited SSE response
+```
 
-### 📈 Analytics Tab  
-- **Customer Insights**: Analyze order trends, top spenders, and frequent buyers.  
-- **Product Performance**: View best/worst selling products and revenue trends.  
-- **Feedback Sentiment Analysis**: Monitor customer satisfaction via pie charts.  
+### Scale Decisions
 
-### 💬 Feedback Tab  
-- **Review Categorization**: Automatically classify reviews as Positive, Neutral, or Negative.  
-- **Search & Filter Reviews**: Search by email, content, or sentiment.  
-- **Customer Sentiment Trends**: Track changes in customer satisfaction.  
+| Concern | Implementation |
+|---|---|
+| Million-order feeds | Index-backed server pagination; max 100 rows/request |
+| Analytics fan-out | Materialized daily product rollups and bounded aggregation pipelines |
+| Forecasting | Reads dense rollup series, never raw order documents |
+| Semantic search | Persisted 384-dimensional memory collection with Atlas vector index |
+| AI reliability | Typed tools compute facts; the small model only composes the response |
+| Cold starts | Global model/embedding singleton and `/tmp` Hugging Face weight cache |
+| Abuse protection | Clerk proxy protection plus token buckets on generation and writes |
+| Maintenance | Idempotent, secret-protected rollup and knowledge backfill |
 
-### ⚠️ Errors Tab  
-- **System & Customer Errors**: Categorize errors based on source and severity.  
-- **Search & Filter**: Find specific errors for debugging.  
-- **Error Log Analysis**: Track timestamps, severity levels (Critical, Medium, Low).  
+MongoDB remains the operational source of truth because orders are document-shaped and transactional access dominates. The analytical read model avoids introducing ClickHouse operational overhead at the current scale. A future CDC sink can mirror the same rollup events into ClickHouse without changing route contracts.
 
-### 🤖 Chatbot Tab  
-- **AI-Powered Assistance**: Retrieve order, inventory, and analytics information.  
-- **Instant Responses & Voice Input**: Query data using text or voice commands.  
-- **Chat History & Clear Chat**: Maintain recent interactions for reference.  
- 
-## 🛠️ Installation  
+## Local Models
 
-Follow these steps to set up and run the **Flow Pilot** locally:  
+Default models:
 
-### 1️⃣ Clone the Repository  
+- Generator: `HuggingFaceTB/SmolLM2-360M-Instruct` (`q4`)
+- Embeddings/router: `Xenova/all-MiniLM-L6-v2` (`q8`, 384 dimensions)
+
+No Gemini, OpenAI, or hosted LLM inference API is used. Model weights are downloaded from Hugging Face and inference executes in-process through `onnxruntime-node`.
+
+Override models with:
+
+```env
+AI_GEN_MODEL=HuggingFaceTB/SmolLM2-360M-Instruct
+AI_GEN_MAX_TOKENS=320
+AI_EMBED_MODEL=Xenova/all-MiniLM-L6-v2
+```
+
+## Setup
+
 ```bash
 git clone https://github.com/Vedant817/Flow-Pilot.git
-cd flow-pilot
-```
-### 2️⃣  Start the Application 
-```bash
+cd Flow-Pilot
 npm install --force
+```
+
+Create `.env.local`:
+
+```env
+MONGO_URI=mongodb+srv://...
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+CLERK_SECRET_KEY=...
+DEFAULT_ORG_ID=org_...
+ADMIN_SECRET=replace-with-a-long-random-value
+
+# Optional Gmail ingestion
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=...
+GOOGLE_REFRESH_TOKEN=...
+GOOGLE_TOPIC_NAME=projects/your-project/topics/gmail-notifications
+GMAIL_ORG_ID=org_...
+
+# Authenticate Pub/Sub pushes with either a shared secret...
+GMAIL_WEBHOOK_SECRET=replace-with-a-long-random-value
+
+# ...or Google Pub/Sub OIDC (preferred for Google-hosted pushes)
+GOOGLE_PUBSUB_AUDIENCE=https://your-app.example.com/api/webhook/gmail
+GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL=pubsub-push@your-project.iam.gserviceaccount.com
+```
+
+Start the application:
+
+```bash
 npm run dev
 ```
+
+### Existing data migration
+
+Workspace-scoped releases require every tenant record to have an `orgId`.
+Preview the migration first; no data is changed without `--apply`:
+
+```bash
+npm run data:migrate-workspace
+npm run data:migrate-workspace -- --apply
+```
+
+For an older single-tenant deployment whose records use `orgId: "default"`,
+explicitly name that source:
+
+```bash
+npm run data:migrate-workspace -- --from=default
+npm run data:migrate-workspace -- --from=default --apply
+```
+
+Both forms migrate into `DEFAULT_ORG_ID`; use `--to=org_...` to override it.
+
+## Public Demo Warehouse
+
+Flow Pilot can load the official UCI Online Retail dataset into an isolated
+public-demo workspace:
+
+- 541,909 real wholesale transaction lines
+- 25,901 invoices/cancellation invoices
+- 4,381 customer/dealer accounts
+- 4,070 products
+- CC BY 4.0, DOI `10.24432/C5BW33`
+
+The importer downloads the official archive, streams the XLSX, persists raw
+lineage facts, and materializes dealer, product, daily-sales, return, credit,
+territory, and service-level views. It does not write into tenant order or
+inventory collections.
+
+```bash
+npm run data:import:uci -- --reset
+```
+
+On npm versions that consume unknown flags, call the runner directly:
+
+```bash
+npx tsx scripts/import-uci-retail.ts --reset
+```
+
+For interrupted large imports, source-line writes can resume while all
+materialized views are rebuilt from the complete workbook:
+
+```bash
+npx tsx scripts/import-uci-retail.ts --resume-lines=390000
+```
+
+Rebuild only the dealer/product/daily materialized views from the cached
+workbook without rewriting raw source facts:
+
+```bash
+npx tsx scripts/import-uci-retail.ts --views-only
+```
+
+Open `/network` for dealer health, territory performance, credit exposure,
+returns, product velocity, and exception queues. Original source fields are
+kept distinct from deterministic demo enrichments such as credit and service
+levels. See `docs/DMS_IMPLEMENTATION_PLAN.md` for the complete provider roadmap.
+
+After connecting a database, build rollups and seed the DMS knowledge corpus:
+
+```bash
+curl -X POST http://localhost:3000/api/admin/backfill \
+  -H "x-admin-secret: $ADMIN_SECRET"
+```
+
+For MongoDB Atlas, allow the app to create the `vec_idx` Vector Search index or create an equivalent 384-dimension cosine index on `semantic_memory.embedding`. Local MongoDB automatically uses the bounded fallback retriever.
+
+## Verification
+
+```bash
+npx tsc --noEmit
+npm test
+npm run build
+```
+
+## Vercel Notes
+
+`next.config.ts` externalizes Transformers.js and ONNX native packages so Vercel bundles the correct Linux runtime rather than parsing every platform binary. The copilot route allows a 60-second execution window and streams tokens immediately after retrieval. Provision sufficient function memory for the quantized 360M model; choose a smaller SmolLM2 checkpoint through `AI_GEN_MODEL` if the selected Vercel plan has tighter memory limits.

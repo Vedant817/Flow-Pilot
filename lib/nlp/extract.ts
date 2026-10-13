@@ -1,0 +1,119 @@
+export interface ProductDetail {
+  name: string;
+  quantity: number;
+}
+
+export interface OrderDetails {
+  name: string;
+  phone: string;
+  products: ProductDetail[];
+  date: string;
+  time: string;
+}
+
+export interface FeedbackDetails {
+  review: string;
+  type: 'good' | 'bad' | 'neutral';
+}
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+function normalizeDate(raw: string | undefined): string {
+  if (!raw) return new Date().toISOString().slice(0, 10);
+
+  const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const dmy = raw.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (dmy) {
+    const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+    return `${year}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  }
+
+  const dMon = raw.match(/(\d{1,2})\s*([a-zA-Z]{3,9})/);
+  if (dMon) {
+    const m = MONTHS.indexOf(dMon[2].slice(0, 3).toLowerCase());
+    if (m >= 0) {
+      const year = new Date().getFullYear();
+      return `${year}-${String(m + 1).padStart(2, '0')}-${dMon[1].padStart(2, '0')}`;
+    }
+  }
+
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Rule-based structured extraction from order emails.
+ * Deterministic and auditable — replaces hosted-LLM JSON extraction,
+ * eliminating hallucinated quantities/dates on the write path.
+ */
+export function extractOrderDetails(emailBody: string): OrderDetails | null {
+  const body = emailBody.replace(/\r/g, '');
+
+  const phoneMatch =
+    body.match(/(?:phone|mobile|contact)[ \t]*(?:number)?[ \t]*[:\-]?[ \t]*(\+?\d[\d \t-]{8,13}\d)/i) ??
+    body.match(/\b([6-9]\d{9})\b/);
+  const phone = phoneMatch ? phoneMatch[1].replace(/[\s-]/g, '') : '';
+
+  const nameMatch = body.match(/(?:name|customer|attn|attention)[ \t]*[:\-][ \t]*([A-Z][\w.]+(?:[ \t]+[A-Z][\w.]+){0,3})/i);
+  const name = nameMatch ? nameMatch[1].trim() : '';
+
+  const dateRaw =
+    body.match(/(?:date|delivery|deliver by|required by)\s*(?:on|by|:|-)?\s*((?:\d{4}-\d{2}-\d{2})|(?:\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})|(?:\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*))/i)?.[1];
+  const date = normalizeDate(dateRaw);
+
+  const timeMatch = body.match(/\b(\d{1,2}[:.]\d{2})\s*(am|pm|AM|PM)?\b/);
+  let time = '12:00';
+  if (timeMatch) {
+    const [, hhmm, meridiem] = timeMatch;
+    const [hRaw, mm] = hhmm.split(/[.:]/).map(Number);
+    let h = hRaw;
+    if (meridiem?.toLowerCase() === 'pm' && h < 12) h += 12;
+    if (meridiem?.toLowerCase() === 'am' && h === 12) h = 0;
+    time = `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  }
+
+  const products: ProductDetail[] = [];
+  const lineParsers: Array<{ pattern: RegExp; nameGroup: number; quantityGroup: number }> = [
+    { pattern: /^\s*[•*\-]?\s*(.+?)\s+[-–x×:]\s*(?:qty|quantity)?\s*[:=]?\s*(\d{1,5})\s*$/gim, nameGroup: 1, quantityGroup: 2 },
+    { pattern: /^\s*[•*\-]?\s*(\d{1,5})\s*(?:x|pcs|units?|nos\.?)?\s+([A-Za-z][\w \t&.'()-]{2,60})\s*$/gim, nameGroup: 2, quantityGroup: 1 },
+    { pattern: /^\s*[•*\-]?\s*([\w \t&.'()-]{3,60}?)\s*[:\-]\s*(?:qty|quantity)\s*[:\-]?\s*(\d{1,5})\s*$/gim, nameGroup: 1, quantityGroup: 2 },
+  ];
+
+  for (const parser of lineParsers) {
+    for (const m of body.matchAll(parser.pattern)) {
+      const namePart = (m[parser.nameGroup] || '').trim();
+      const qty = parseInt(m[parser.quantityGroup], 10);
+      const quantity = Number.isFinite(qty) ? qty : NaN;
+      if (!namePart || !Number.isFinite(quantity) || quantity <= 0) continue;
+      if (/^(total|subtotal|amount|price|gst|tax)/i.test(namePart)) continue;
+      if (products.some((p) => p.name.toLowerCase() === namePart.toLowerCase())) continue;
+      products.push({ name: namePart.slice(0, 80), quantity });
+    }
+    if (products.length > 0) break;
+  }
+
+  if (!products.length) return null;
+
+  return { name, phone, products, date, time };
+}
+
+const POSITIVE = ['great', 'excellent', 'good', 'love', 'perfect', 'fast', 'reliable', 'happy', 'satisfied', 'recommend', 'smooth', 'best', 'awesome', 'thank'];
+const NEGATIVE = ['bad', 'terrible', 'worst', 'late', 'delay', 'damaged', 'broken', 'poor', 'disappointed', 'complaint', 'refund', 'return', 'issue', 'problem', 'never', 'worst', 'unacceptable'];
+
+export function extractFeedbackDetails(emailBody: string): FeedbackDetails | null {
+  const text = emailBody
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1500);
+  if (text.length < 8) return null;
+
+  const lower = ` ${text.toLowerCase()} `;
+  let score = 0;
+  for (const w of POSITIVE) if (lower.includes(` ${w}`)) score++;
+  for (const w of NEGATIVE) if (lower.includes(` ${w}`)) score--;
+
+  const type: 'good' | 'bad' | 'neutral' = score >= 1 ? 'good' : score <= -1 ? 'bad' : 'neutral';
+  return { review: text, type };
+}
