@@ -432,8 +432,6 @@ export async function POST(req: NextRequest) {
         result = await doCreate(session!);
       });
       createdOrder = result;
-    } catch (txnErr: any) {
-      throw txnErr;
     } finally {
       if (session) await session.endSession().catch(() => {});
     }
@@ -469,8 +467,11 @@ export async function POST(req: NextRequest) {
       );
     }
     console.error('Error creating order:', error);
-    const status = error?.status || 500;
-    return NextResponse.json({ error: error?.message || 'Failed to create order' }, { status });
+    const status = error instanceof SyntaxError ? 400 : error?.status || 500;
+    const publicMessage = status >= 400 && status < 500
+      ? error instanceof SyntaxError ? 'Invalid JSON payload' : error.message
+      : 'Failed to create order';
+    return NextResponse.json({ error: publicMessage }, { status });
   }
 }
 

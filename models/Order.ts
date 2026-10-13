@@ -44,7 +44,7 @@ export interface IOrder extends Document {
 const ProductSchema = new Schema<Product>({
     productId: { type: String },
     name: { type: String, required: true },
-    quantity: { type: Number, required: true },
+    quantity: { type: Number, required: true, min: 1, max: 100_000, validate: Number.isSafeInteger },
     unitPrice: { type: Number, min: 0 },
     unitPriceMinor: { type: Number, min: 0 },
     lineValueMinor: { type: Number, min: 0 },
@@ -59,7 +59,7 @@ const OrderSchema = new Schema<IOrder>({
     orgId: { type: String, required: true, index: true },
     date: { type: String, required: true },
     time: { type: String, required: true },
-    orderedAt: { type: Date, sparse: true } as any,
+    orderedAt: { type: Date },
     products: { type: [ProductSchema], required: true },
     status: { type: String, required: true },
     orderLink: { type: String, default: '' },
@@ -77,20 +77,18 @@ const OrderSchema = new Schema<IOrder>({
         benefitType: { type: String },
         discountMinor: { type: Number, min: 0 },
     },
-    idempotencyKey: { type: String, sparse: true } as any,
+    idempotencyKey: { type: String },
     requestHash: { type: String, select: false },
-    trackingTokenHash: { type: String, sparse: true, select: false } as any,
+    trackingTokenHash: { type: String, select: false },
 }, {
     collection: 'orders',
     timestamps: false,
 });
 
-(OrderSchema as any).pre('validate', function (this: any, next: any) {
-    const doc = this as IOrder;
-    if (doc.email && !doc.emailNormalized) {
-        doc.emailNormalized = doc.email.toLowerCase().trim();
+OrderSchema.pre('validate', function () {
+    if (this.email && !this.emailNormalized) {
+        this.emailNormalized = this.email.toLowerCase().trim();
     }
-    next();
 });
 
 export const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);

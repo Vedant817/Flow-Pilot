@@ -101,10 +101,21 @@ describe('transactional order command', () => {
   });
 
   it('never retries failed writes outside the transaction', async () => {
-    create.mockRejectedValue(new Error('database write failed'));
-    expect((await POST(request())).status).toBe(500);
+    create.mockRejectedValue(new Error('database write failed: private internal detail'));
+    const response = await POST(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Failed to create order' });
     expect(create).toHaveBeenCalledTimes(1);
     expect(session.endSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects malformed JSON without echoing payload details', async () => {
+    const malformed = request();
+    malformed.json = async () => { throw new SyntaxError('private payload fragment'); };
+    const response = await POST(malformed);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid JSON payload' });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('fails closed on a legacy key in the duplicate-key race too', async () => {
